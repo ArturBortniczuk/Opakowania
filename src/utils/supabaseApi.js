@@ -1,49 +1,96 @@
 // Plik: src/utils/supabaseApi.js
-// Opis: Wersja API wykorzystująca Supabase Edge Functions do autentykacji.
+// Opis: Finalna wersja API z poprawioną logiką pobierania danych użytkownika,
+// dostosowana do nowej architektury bazy danych.
 
 import { supabase, supabaseHelpers } from '../lib/supabase';
 
 export const authAPI = {
   /**
    * Sprawdza, czy użytkownik (klient lub admin) istnieje i czy ma ustawione hasło.
-   * Ta funkcja pozostaje po stronie klienta, aby kierować przepływem logowania.
+   * Ta funkcja została poprawiona, aby poprawnie pobierać dane dla klientów i adminów.
    */
   async checkUserStatus(nip, loginMode) {
-    const table = loginMode === 'admin' ? 'admin_users' : 'users';
-    
-    const { data, error } = await supabase
-      .from(table)
-      .select('password_hash, name, nip, role, email, id, username, permissions')
-      .eq('nip', nip)
-      .maybeSingle();
+    if (loginMode === 'admin') {
+      // Zapytanie dla administratora (pozostaje bez zmian)
+      const { data, error } = await supabase
+        .from('admin_users')
+        .select('password_hash, name, nip, role, email, id, username, permissions')
+        .eq('nip', nip)
+        .maybeSingle();
 
-    if (error) {
-      console.error('Check user error:', error);
-      throw new Error('Błąd podczas sprawdzania użytkownika.');
+      if (error) {
+        console.error('Admin check user error:', error);
+        throw new Error('Błąd podczas sprawdzania administratora.');
+      }
+
+      if (!data) {
+        return { exists: false, hasPassword: false, userData: null };
+      }
+
+      return {
+        exists: true,
+        hasPassword: !!data.password_hash,
+        userData: data,
+      };
+    } else {
+      // POPRAWIONE ZAPYTANIE DLA KLIENTA
+      // Pobieramy dane z tabeli 'users' i łączymy je z danymi z tabeli 'companies'
+      const { data, error } = await supabase
+        .from('users')
+        .select(`
+          id,
+          nip,
+          password_hash,
+          is_first_login,
+          companies (
+            name,
+            email
+          )
+        `)
+        .eq('nip', nip)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Client check user error:', error);
+        throw new Error('Błąd podczas sprawdzania użytkownika.');
+      }
+
+      if (!data || !data.companies) {
+        // Jeśli nie ma użytkownika lub powiązanej firmy
+        return { exists: false, hasPassword: false, userData: null };
+      }
+
+      // Składamy kompletny obiekt użytkownika z danych z obu tabel
+      const userData = {
+        id: data.id,
+        nip: data.nip,
+        password_hash: data.password_hash,
+        is_first_login: data.is_first_login,
+        name: data.companies.name, // Nazwa z tabeli companies
+        email: data.companies.email, // Email z tabeli companies
+        role: 'client', // Rola na sztywno dla klienta
+        username: data.nip, // Nazwa użytkownika to NIP
+        permissions: [], // Klienci nie mają specjalnych uprawnień
+        companyName: data.companies.name,
+      };
+
+      return {
+        exists: true,
+        hasPassword: !!userData.password_hash,
+        userData: userData,
+      };
     }
-
-    if (!data) {
-      return { exists: false, hasPassword: false, userData: null };
-    }
-
-    return {
-      exists: true,
-      hasPassword: !!data.password_hash,
-      userData: data,
-    };
   },
 
   /**
    * Loguje użytkownika, wywołując bezpieczną funkcję Supabase Edge 'sign-in'.
    */
   async signIn(nip, password, userData, loginMode) {
-    // Wywołanie funkcji serwerowej zamiast logiki po stronie klienta
     const { data, error } = await supabase.functions.invoke('sign-in', {
       body: { nip, password, userData, loginMode },
     });
 
     if (error) {
-      // Przechwytywanie błędów zwróconych przez funkcję Edge
       const errorMessage = error.context?.error_message || error.message;
       throw new Error(errorMessage || 'Wystąpił nieznany błąd logowania.');
     }
@@ -52,7 +99,6 @@ export const authAPI = {
       throw new Error(data.error);
     }
 
-    // Zwracamy dane użytkownika, aby zachować spójność z resztą aplikacji
     const user = data.user;
     return {
       user: {
@@ -76,7 +122,6 @@ export const authAPI = {
       throw new Error('Hasło musi mieć co najmniej 6 znaków.');
     }
 
-    // Wywołanie funkcji serwerowej zamiast hashowania hasła na frontendzie
     const { data, error } = await supabase.functions.invoke('set-password', {
       body: { nip, password, loginMode },
     });
@@ -90,7 +135,6 @@ export const authAPI = {
       throw new Error(data.error);
     }
     
-    // Po pomyślnym ustawieniu hasła, zwracamy dane użytkownika, co loguje go do systemu.
     const updatedUser = data.user;
     return {
       user: {
@@ -107,7 +151,7 @@ export const authAPI = {
   },
 };
 
-// Pozostałe funkcje API (drumsAPI, companiesAPI, etc.) pozostają bez zmian.
+// Reszta pliku pozostaje bez zmian
 export const drumsAPI = {
   async getDrums(nip = null) {
     try {
