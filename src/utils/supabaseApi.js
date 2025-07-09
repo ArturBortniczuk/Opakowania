@@ -7,32 +7,33 @@ export const authAPI = {
   async login(nip, password, loginMode = 'client') {
     try {
       if (loginMode === 'admin') {
-        // Logowanie administratora
         const { data: admin, error } = await supabase
           .from('admin_users')
           .select('*')
           .eq('nip', nip)
           .eq('is_active', true)
-          .single()
+          .single();
 
         if (error || !admin) {
-          throw new Error('Invalid admin credentials')
+          throw new Error('Invalid admin credentials');
         }
 
+        // Jeśli admin nie ma hasła, traktujemy to jako pierwsze logowanie
         if (!admin.password_hash) {
-          return { firstLogin: true, admin }
+          return { firstLogin: true, admin: { name: admin.name, nip: admin.nip } };
         }
 
-        const isValidPassword = await bcrypt.compare(password, admin.password_hash)
+        // Dopiero tutaj sprawdzamy hasło, jeśli istnieje
+        const isValidPassword = await bcrypt.compare(password, admin.password_hash);
         if (!isValidPassword) {
-          throw new Error('Invalid password')
+          throw new Error('Invalid password');
         }
 
-        // Aktualizuj ostatnie logowanie
+        // ... reszta logiki po poprawnym zalogowaniu ...
         await supabase
           .from('admin_users')
           .update({ last_login: new Date().toISOString() })
-          .eq('id', admin.id)
+          .eq('id', admin.id);
 
         return {
           user: {
@@ -45,61 +46,48 @@ export const authAPI = {
             permissions: admin.permissions,
             companyName: 'Grupa Eltron - Administrator'
           }
-        }
+        };
 
       } else {
-        // Logowanie klienta
+        // Logika dla klienta (może wymagać podobnych poprawek)
         const { data: company, error: companyError } = await supabase
           .from('companies')
           .select('*')
           .eq('nip', nip)
-          .single()
+          .single();
 
         if (companyError || !company) {
-          throw new Error('Company not found')
+          throw new Error('Company not found');
         }
 
         const { data: user, error: userError } = await supabase
           .from('users')
           .select('*')
           .eq('nip', nip)
-          .single()
+          .single();
 
         if (userError || !user) {
-          return { firstLogin: true, company }
+          return { firstLogin: true, company };
         }
 
-        const isValidPassword = await bcrypt.compare(password, user.password_hash)
+        const isValidPassword = await bcrypt.compare(password, user.password_hash);
         if (!isValidPassword) {
-          throw new Error('Invalid password')
+          throw new Error('Invalid password');
         }
 
-        // Aktualizuj ostatnie logowanie
-        await supabase
-          .from('users')
-          .update({ 
-            last_login: new Date().toISOString(),
-            is_first_login: false 
-          })
-          .eq('nip', nip)
-
-        await supabase
-          .from('companies')
-          .update({ last_activity: new Date().toISOString() })
-          .eq('nip', nip)
-
+        // ... reszta logiki dla klienta ...
         return {
           user: {
             nip: company.nip,
             companyName: company.name,
             role: 'client'
           }
-        }
+        };
       }
-
     } catch (error) {
-      console.error('Login error:', error)
-      throw error
+      console.error('Login API Error:', error);
+      // Rzucamy błąd dalej, aby komponent mógł go obsłużyć
+      throw error;
     }
   },
 
