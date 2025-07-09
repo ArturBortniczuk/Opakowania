@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1e40af" />
+    <meta name="description" content="System Zarządzania Bębnami dla Grupy Eltron" />
+    <meta name="keywords" content="bębny, logistyka, zarządzanie, Eltron, system" />
+    <meta name="author" content="Grupa Eltron" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://eltron-drums.vercel.app/" />
+    <meta property="og:title" content="Grupa Eltron - System Zarządzania Bębnami" />
+    <meta property="og:description" content="Nowoczesny system do zarządzania bębnami i zgłaszania zwrotów" />
+    <meta property="og:image" content="%PUBLIC_URL%/og-image.png" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://eltron-drums.vercel.app/" />
+    <meta property="twitter:title" content="Grupa Eltron - System Zarządzania Bębnami" />
+    <meta property="twitter:description" content="Nowoczesny system do zarządzania bębnami i zgłaszania zwrotów" />
+    <meta property="twitter:image" content="%PUBLIC_URL%/og-image.png" />
+
+    <!-- Preconnect dla lepszej wydajności -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/apple-touch-icon.png" />
+    
+    <!-- Manifest -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    
+    <!-- Preload krytycznych zasobów -->
+    <link rel="preload" href="/static/css/main.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+    
+    <title>Grupa Eltron - System Zarządzania Bębnami</title>
+    
+    <!-- Inline critical CSS dla lepszego LCP -->
+    <style>
+      /* Critical CSS - podstawowe style dla szybszego ładowania */
+      body {
+        margin: 0;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+          'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0f9ff 100%);
+        min-height: 100vh;
+      }
+      
+      #root {
+        min-height: 100vh;
+      }
+      
+      /* Loading spinner */
+      .loading-spinner {
+        display: inline-block;
+        width: 40px;
+        height: 40px;
+        border: 3px solid #f3f4f6;
+        border-radius: 50%;
+        border-top-color: #3b82f6;
+        animation: spin 1s ease-in-out infinite;
+      }
+      
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      
+      /* Loading screen */
+      .initial-loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0f9ff 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+      
+      .eltron-logo {
+        width: 80px;
+        height: 80px;
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+        box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+        animation: pulse 2s infinite;
+      }
+      
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.8; }
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>
+      <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+        <h1>JavaScript jest wymagany</h1>
+        <p>Aby korzystać z systemu zarządzania bębnami Grupy Eltron, musisz włączyć JavaScript w swojej przeglądarce.</p>
+        <p>Skontaktuj się z działem IT, jeśli potrzebujesz pomocy.</p>
+      </div>
+    </noscript>
+    
+    <!-- Loading screen pokazywany przed załadowaniem React -->
+    <div id="initial-loading" class="initial-loading">
+      <div class="eltron-logo">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V7C21 5.89543 20.1046 5 19 5H5C3.89543 5 3 5.89543 3 7Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M8 11H16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M8 15H12" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="loading-spinner"></div>
+      <p style="margin-top: 20px; color: #6b7280; font-size: 14px;">Ładowanie systemu...</p>
+    </div>
+    
+    <div id="root"></div>
+    
+    <!-- Script do ukrycia loading screen po załadowaniu React -->
+    <script>
+      // Ukryj loading screen gdy React się załaduje
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          const loadingElement = document.getElementById('initial-loading');
+          if (loadingElement) {
+            loadingElement.style.opacity = '0';
+            loadingElement.style.transition = 'opacity 0.5s ease-out';
+            setTimeout(function() {
+              loadingElement.remove();
+            }, 500);
+          }
+        }, 1000); // Minimum 1 sekunda wyświetlania
+      });
+      
+      // Service Worker registration dla PWA
+      if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js')
+            .then(function(registration) {
+              console.log('SW registered: ', registration);
+            })
+            .catch(function(registrationError) {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+      
+      // Performance monitoring
+      window.addEventListener('load', function() {
+        // Wyślij metryki wydajności (opcjonalne)
+        if (typeof gtag !== 'undefined') {
+          gtag('event', 'timing_complete', {
+            'name': 'load',
+            'value': Math.round(performance.now())
+          });
+        }
+      });
+    </script>
+  </body>
+</html>
