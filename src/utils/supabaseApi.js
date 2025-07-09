@@ -11,10 +11,10 @@ export const authAPI = {
    */
   async checkUserStatus(nip, loginMode) {
     if (loginMode === 'admin') {
-      // Zapytanie dla administratora (pozostaje bez zmian)
+      // POPRAWIONE ZAPYTANIE DLA ADMINISTRATORA - usunięto pole 'permissions'
       const { data, error } = await supabase
         .from('admin_users')
-        .select('password_hash, name, nip, role, email, id, username, permissions')
+        .select('password_hash, name, nip, role, email, id, username') // Usunięto 'permissions'
         .eq('nip', nip)
         .maybeSingle();
 
@@ -30,11 +30,10 @@ export const authAPI = {
       return {
         exists: true,
         hasPassword: !!data.password_hash,
-        userData: data,
+        userData: { ...data, permissions: [] }, // Dodajemy pustą tablicę permissions dla spójności
       };
     } else {
-      // POPRAWIONE ZAPYTANIE DLA KLIENTA
-      // Pobieramy dane z tabeli 'users' i łączymy je z danymi z tabeli 'companies'
+      // Zapytanie dla klienta
       const { data, error } = await supabase
         .from('users')
         .select(`
@@ -56,7 +55,6 @@ export const authAPI = {
       }
 
       if (!data || !data.companies) {
-        // Jeśli nie ma użytkownika lub powiązanej firmy
         return { exists: false, hasPassword: false, userData: null };
       }
 
@@ -66,10 +64,10 @@ export const authAPI = {
         nip: data.nip,
         password_hash: data.password_hash,
         is_first_login: data.is_first_login,
-        name: data.companies.name, // Nazwa z tabeli companies
-        email: data.companies.email, // Email z tabeli companies
-        role: 'client', // Rola na sztywno dla klienta
-        username: data.nip, // Nazwa użytkownika to NIP
+        name: data.companies.name,
+        email: data.companies.email,
+        role: 'client',
+        username: data.nip,
         permissions: [], // Klienci nie mają specjalnych uprawnień
         companyName: data.companies.name,
       };
@@ -108,7 +106,7 @@ export const authAPI = {
         name: user.name,
         email: user.email,
         role: user.role || 'client',
-        permissions: user.permissions,
+        permissions: user.permissions || [], // Zapewnienie, że permissions zawsze jest tablicą
         companyName: loginMode === 'client' ? user.name : 'Grupa Eltron - Administrator',
       },
     };
@@ -144,7 +142,7 @@ export const authAPI = {
         name: updatedUser.name,
         email: updatedUser.email,
         role: updatedUser.role || 'client',
-        permissions: updatedUser.permissions,
+        permissions: updatedUser.permissions || [], // Zapewnienie, że permissions zawsze jest tablicą
         companyName: loginMode === 'client' ? updatedUser.name : 'Grupa Eltron - Administrator',
       },
     };
@@ -159,7 +157,7 @@ export const drumsAPI = {
         .from('drums')
         .select(`
           *,
-          companies!inner (
+          companies (
             name,
             email,
             phone,
@@ -189,7 +187,7 @@ export const drumsAPI = {
           CECHA: drum.cecha,
           DATA_ZWROTU_DO_DOSTAWCY: drum.data_zwrotu_do_dostawcy,
           KON_DOSTAWCA: drum.kon_dostawca,
-          PELNA_NAZWA_KONTRAHENTA: drum.companies.name,
+          PELNA_NAZWA_KONTRAHENTA: drum.companies?.name || 'Brak danych firmy',
           NIP: drum.nip,
           TYP_DOK: drum.typ_dok,
           NR_DOKUMENTUPZ: drum.nr_dokumentupz,
@@ -197,10 +195,10 @@ export const drumsAPI = {
           KONTRAHENT: drum.kontrahent,
           STATUS: drum.status,
           DATA_WYDANIA: drum.data_wydania,
-          company: drum.companies.name,
-          companyPhone: drum.companies.phone,
-          companyEmail: drum.companies.email,
-          companyAddress: drum.companies.address,
+          company: drum.companies?.name || 'Brak danych firmy',
+          companyPhone: drum.companies?.phone,
+          companyEmail: drum.companies?.email,
+          companyAddress: drum.companies?.address,
           returnPeriodDays,
           ...status
         }
@@ -255,7 +253,7 @@ export const returnsAPI = {
         .from('return_requests')
         .select(`
           *,
-          companies!inner (
+          companies (
             name
           )
         `)
@@ -283,7 +281,7 @@ export const returnPeriodsAPI = {
         .from('custom_return_periods')
         .select(`
           *,
-          companies!inner (
+          companies (
             name,
             email,
             phone
