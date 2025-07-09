@@ -1,16 +1,17 @@
 // supabase/functions/set-password/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import bcrypt from 'https://deno.land/x/bcrypt@v0.4.0/mod.ts';
+// POPRAWIONY IMPORT: Zamiast 'import bcrypt from ...' używamy 'import * as bcrypt from ...'
+import * as bcrypt from 'https://deno.land/x/bcrypt@v0.4.0/mod.ts';
 
-// Nagłówki CORS, które pozwalają na zapytania z dowolnej domeny.
+// Pełne, jawne nagłówki CORS
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 serve(async (req) => {
-  // Obsługa zapytania preflight (OPTIONS) wysyłanego przez przeglądarkę
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
