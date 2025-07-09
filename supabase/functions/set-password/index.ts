@@ -3,18 +3,29 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import bcrypt from 'https://deno.land/x/bcrypt@v0.4.0/mod.ts';
 
-serve(async (req) => {
-  const { nip, password, loginMode } = await req.json();
-  const table = loginMode === 'admin' ? 'admin_users' : 'users';
+// Nagłówki CORS, które pozwalają na zapytania z dowolnej domeny.
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
-  if (!password || password.length < 6) {
-    return new Response(JSON.stringify({ error: 'Hasło musi mieć co najmniej 6 znaków.' }), {
-      headers: { 'Content-Type': 'application/json' },
-      status: 400,
-    });
+serve(async (req) => {
+  // Obsługa zapytania preflight (OPTIONS) wysyłanego przez przeglądarkę
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
+    const { nip, password, loginMode } = await req.json();
+    const table = loginMode === 'admin' ? 'admin_users' : 'users';
+
+    if (!password || password.length < 6) {
+      return new Response(JSON.stringify({ error: 'Hasło musi mieć co najmniej 6 znaków.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -39,11 +50,12 @@ serve(async (req) => {
     if (error) throw error;
 
     return new Response(JSON.stringify({ user: updatedUser }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
     });
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });
   }
