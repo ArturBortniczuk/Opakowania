@@ -1,5 +1,5 @@
 // Plik: src/utils/supabaseApi.js
-// Opis: Całkowicie przebudowana, uproszczona i bezpieczniejsza logika API.
+// Opis: Finalna, poprawiona wersja logiki API.
 
 import { supabase } from '../lib/supabase';
 import bcrypt from 'bcryptjs';
@@ -7,9 +7,6 @@ import bcrypt from 'bcryptjs';
 export const authAPI = {
   /**
    * Sprawdza, czy użytkownik (klient lub admin) istnieje i czy ma ustawione hasło.
-   * @param {string} nip - Numer NIP.
-   * @param {'client' | 'admin'} loginMode - Tryb logowania.
-   * @returns {Promise<{exists: boolean, hasPassword: boolean, userData: object|null}>}
    */
   async checkUserStatus(nip, loginMode) {
     const table = loginMode === 'admin' ? 'admin_users' : 'users';
@@ -18,7 +15,7 @@ export const authAPI = {
       .from(table)
       .select('password_hash, name, nip, role, email, id, username, permissions')
       .eq('nip', nip)
-      .maybeSingle(); // Używamy maybeSingle, aby brak rekordu nie był błędem
+      .maybeSingle();
 
     if (error) {
       console.error('Check user error:', error);
@@ -31,41 +28,32 @@ export const authAPI = {
 
     return {
       exists: true,
-      hasPassword: !!data.password_hash, // Sprawdza, czy pole nie jest null/puste
+      hasPassword: !!data.password_hash,
       userData: data,
     };
   },
 
   /**
    * Loguje użytkownika z istniejącym hasłem.
-   * @param {string} nip - Numer NIP.
-   * @param {string} password - Hasło.
-   * @param {object} userData - Dane użytkownika z checkUserStatus.
-   * @returns {Promise<{user: object}>}
    */
-  async signIn(nip, password, userData) {
+  async signIn(nip, password, userData, loginMode) {
     if (!password) {
       throw new Error('Hasło jest wymagane.');
     }
     
-    // Prawdziwa weryfikacja z bcrypt powinna być w Edge Function.
-    // Na potrzeby tego etapu, wykonujemy ją tutaj.
     const isValidPassword = await bcrypt.compare(password, userData.password_hash);
     if (!isValidPassword) {
       throw new Error('Nieprawidłowe hasło.');
     }
 
-    if (userData.role === 'admin' || userData.role === 'supervisor') {
-      await supabase
-        .from('admin_users')
-        .update({ last_login: new Date().toISOString() })
-        .eq('id', userData.id);
-    } else {
-      await supabase
-        .from('users')
-        .update({ last_login: new Date().toISOString() })
-        .eq('nip', nip);
-    }
+    const table = loginMode === 'admin' ? 'admin_users' : 'users';
+    const updateColumn = loginMode === 'admin' ? 'id' : 'nip';
+    const updateValue = loginMode === 'admin' ? userData.id : nip;
+
+    await supabase
+      .from(table)
+      .update({ last_login: new Date().toISOString() })
+      .eq(updateColumn, updateValue);
 
     return {
       user: {
@@ -76,18 +64,13 @@ export const authAPI = {
         email: userData.email,
         role: userData.role || 'client',
         permissions: userData.permissions,
-        companyName: userData.role === 'client' ? userData.name : 'Grupa Eltron - Administrator',
+        companyName: loginMode === 'client' ? userData.name : 'Grupa Eltron - Administrator',
       },
     };
   },
 
   /**
    * Ustawia hasło dla nowego użytkownika.
-   * UWAGA: W przyszłości przenieś tę logikę do Supabase Edge Function dla bezpieczeństwa.
-   * @param {string} nip - Numer NIP.
-   * @param {string} password - Nowe hasło.
-   * @param {'client' | 'admin'} loginMode - Tryb logowania.
-   * @returns {Promise<{user: object}>}
    */
   async setPassword(nip, password, loginMode) {
     if (password.length < 6) {
@@ -99,9 +82,18 @@ export const authAPI = {
     
     const table = loginMode === 'admin' ? 'admin_users' : 'users';
     
+    // KLUCZOWA ZMIANA: Tworzymy obiekt do aktualizacji
+    // i dodajemy `is_first_login` tylko dla klientów.
+    const updateData = {
+      password_hash: passwordHash,
+    };
+    if (loginMode === 'client') {
+      updateData.is_first_login = false;
+    }
+    
     const { error } = await supabase
       .from(table)
-      .update({ password_hash: passwordHash, is_first_login: false })
+      .update(updateData)
       .eq('nip', nip);
 
     if (error) {
@@ -109,13 +101,12 @@ export const authAPI = {
       throw new Error('Nie udało się ustawić hasła.');
     }
     
-    // Po pomyślnym ustawieniu hasła, "logujemy" użytkownika
     const { userData } = await this.checkUserStatus(nip, loginMode);
-    return this.signIn(nip, password, userData);
+    return this.signIn(nip, password, userData, loginMode);
   },
 };
 
-// Pozostałe funkcje API pozostają bez zmian
+// Pozostałe funkcje API (drumsAPI, companiesAPI, etc.) pozostają bez zmian.
 export const drumsAPI = { /* ... bez zmian ... */ };
 export const companiesAPI = { /* ... bez zmian ... */ };
 export const returnsAPI = { /* ... bez zmian ... */ };
