@@ -40,8 +40,14 @@ export const authAPI = {
     if (!password) {
       throw new Error('Hasło jest wymagane.');
     }
+
+    // KLUCZOWA ZMIANA: Upewniamy się, że zawsze używamy poprawnego hasha.
+    const hashToCompare = userData.password_hash;
+    if (!hashToCompare) {
+        throw new Error('Brak hasha do porównania. Błąd wewnętrzny.');
+    }
     
-    const isValidPassword = await bcrypt.compare(password, userData.password_hash);
+    const isValidPassword = await bcrypt.compare(password, hashToCompare);
     if (!isValidPassword) {
       throw new Error('Nieprawidłowe hasło.');
     }
@@ -82,8 +88,6 @@ export const authAPI = {
     
     const table = loginMode === 'admin' ? 'admin_users' : 'users';
     
-    // KLUCZOWA ZMIANA: Tworzymy obiekt do aktualizacji
-    // i dodajemy `is_first_login` tylko dla klientów.
     const updateData = {
       password_hash: passwordHash,
     };
@@ -101,6 +105,7 @@ export const authAPI = {
       throw new Error('Nie udało się ustawić hasła.');
     }
     
+    // Po ustawieniu hasła, pobieramy świeże dane użytkownika, aby mieć pewność, że zawierają nowy hash.
     const { userData } = await this.checkUserStatus(nip, loginMode);
     return this.signIn(nip, password, userData, loginMode);
   },
