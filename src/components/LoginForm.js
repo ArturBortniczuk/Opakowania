@@ -1,8 +1,7 @@
-// src/components/LoginForm.js
+// src/components/LoginForm.js - Updated for Supabase
 import React, { useState } from 'react';
 import { Eye, EyeOff, Building2, Shield, CheckCircle, ArrowRight, UserCheck } from 'lucide-react';
-import { mockDrumsData } from '../data/mockData';
-import { mockAdmins } from '../data/additionalData';
+import { authAPI, handleAPIError } from '../utils/supabaseApi';
 
 const LoginForm = ({ onLogin }) => {
   const [nip, setNip] = useState('');
@@ -14,115 +13,69 @@ const LoginForm = ({ onLogin }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [loginMode, setLoginMode] = useState('client'); // 'client' or 'admin'
+  const [pendingLoginData, setPendingLoginData] = useState(null);
 
   const handleNipSubmit = async () => {
     setLoading(true);
     setError('');
     
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    if (loginMode === 'admin') {
-      // Admin login logic
-      const adminUser = mockAdmins.find(admin => admin.nip === nip);
-      if (!adminUser) {
-        setError('Nie znaleziono konta administratora dla podanego NIP');
-        setLoading(false);
-        return;
+    try {
+      // Sprawdź czy to pierwsze logowanie
+      const result = await authAPI.login(nip, '', loginMode);
+      
+      if (result.firstLogin) {
+        setIsFirstLogin(true);
+        setPendingLoginData(result);
+      } else {
+        setError('Konto już ma ustawione hasło. Wpisz hasło aby się zalogować.');
       }
       
-      const savedPassword = localStorage.getItem(`admin_password_${nip}`);
-      if (!savedPassword) {
-        setIsFirstLogin(true);
+    } catch (error) {
+      if (error.message === 'Invalid admin credentials' || error.message === 'Company not found') {
+        setError(`Nie znaleziono konta ${loginMode === 'admin' ? 'administratora' : 'klienta'} dla podanego NIP`);
       } else {
-        setIsFirstLogin(false);
+        setError(handleAPIError(error));
       }
-    } else {
-      // Client login logic
-      if (nip.length !== 10) {
-        setError('NIP musi mieć 10 cyfr');
-        setLoading(false);
-        return;
-      }
-
-      const userData = mockDrumsData.find(item => item.NIP === nip);
-      if (!userData) {
-        setError('Nie znaleziono konta dla podanego NIP');
-        setLoading(false);
-        return;
-      }
-
-      const savedPassword = localStorage.getItem(`password_${nip}`);
-      if (!savedPassword) {
-        setIsFirstLogin(true);
-      } else {
-        setIsFirstLogin(false);
-      }
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
   const handlePasswordSubmit = async () => {
     setLoading(true);
     setError('');
 
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      let result;
 
-    if (isFirstLogin) {
-      if (newPassword !== confirmPassword) {
-        setError('Hasła nie są identyczne');
-        setLoading(false);
-        return;
+      if (isFirstLogin) {
+        // Pierwsze logowanie - ustaw hasło
+        if (newPassword !== confirmPassword) {
+          setError('Hasła nie są identyczne');
+          setLoading(false);
+          return;
+        }
+        if (newPassword.length < 6) {
+          setError('Hasło musi mieć minimum 6 znaków');
+          setLoading(false);
+          return;
+        }
+        
+        result = await authAPI.register(nip, newPassword, confirmPassword, loginMode);
+      } else {
+        // Logowanie z istniejącym hasłem
+        result = await authAPI.login(nip, password, loginMode);
       }
-      if (newPassword.length < 6) {
-        setError('Hasło musi mieć minimum 6 znaków');
-        setLoading(false);
-        return;
+
+      if (result.user) {
+        onLogin(result.user);
       }
       
-      // Zapisz nowe hasło
-      const passwordKey = loginMode === 'admin' ? `admin_password_${nip}` : `password_${nip}`;
-      localStorage.setItem(passwordKey, newPassword);
-    } else {
-      // Sprawdź hasło
-      const passwordKey = loginMode === 'admin' ? `admin_password_${nip}` : `password_${nip}`;
-      const savedPassword = localStorage.getItem(passwordKey);
-      if (password !== savedPassword) {
-        setError('Nieprawidłowe hasło');
-        setLoading(false);
-        return;
-      }
+    } catch (error) {
+      setError(handleAPIError(error));
+    } finally {
+      setLoading(false);
     }
-
-    // Zaloguj użytkownika
-    let user;
-    
-    if (loginMode === 'admin') {
-      const adminData = mockAdmins.find(admin => admin.nip === nip);
-      user = {
-        id: adminData.id,
-        nip: nip,
-        username: adminData.username,
-        name: adminData.name,
-        email: adminData.email,
-        role: adminData.role,
-        permissions: adminData.permissions,
-        companyName: 'Grupa Eltron - Administrator'
-      };
-    } else {
-      const userData = mockDrumsData.find(item => item.NIP === nip);
-      user = {
-        nip: nip,
-        companyName: userData.PELNA_NAZWA_KONTRAHENTA,
-        role: 'client'
-      };
-    }
-    
-    localStorage.setItem('currentUser', JSON.stringify(user));
-    setLoading(false);
-    onLogin(user);
   };
 
   const resetForm = () => {
@@ -131,6 +84,7 @@ const LoginForm = ({ onLogin }) => {
     setNewPassword('');
     setConfirmPassword('');
     setIsFirstLogin(false);
+    setPendingLoginData(null);
     setError('');
     setLoading(false);
   };
@@ -151,7 +105,7 @@ const LoginForm = ({ onLogin }) => {
           </p>
           <div className="mt-4 flex items-center justify-center space-x-2 text-sm text-gray-500">
             <Shield className="h-4 w-4" />
-            <span>Bezpieczne logowanie</span>
+            <span>Bezpieczne logowanie z Supabase</span>
           </div>
         </div>
 
@@ -191,7 +145,7 @@ const LoginForm = ({ onLogin }) => {
 
         {/* Login Card */}
         <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-blue-100 p-8 space-y-6">
-          {!isFirstLogin && !localStorage.getItem(`${loginMode === 'admin' ? 'admin_' : ''}password_${nip}`) ? (
+          {!isFirstLogin && !pendingLoginData ? (
             // NIP Input Phase
             <div className="space-y-6">
               <div className="text-center">
@@ -241,13 +195,6 @@ const LoginForm = ({ onLogin }) => {
                   </div>
                 )}
 
-                {loginMode === 'client' && (
-                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <p className="text-xs text-blue-700 mb-1">💡 Przykładowe NIP-y klientów:</p>
-                    <p className="text-xs text-blue-600"><strong>1234567890</strong>, <strong>9876543210</strong>, <strong>5555666677</strong></p>
-                  </div>
-                )}
-
                 {error && (
                   <div className="p-3 rounded-lg bg-red-50 border border-red-200 animate-shake">
                     <p className="text-sm text-red-600 flex items-center">
@@ -289,6 +236,11 @@ const LoginForm = ({ onLogin }) => {
                     <p className="text-sm text-gray-600">
                       Ustaw bezpieczne hasło dla swojego konta
                     </p>
+                    {pendingLoginData?.company && (
+                      <p className="text-sm text-blue-600 mt-2 font-medium">
+                        {pendingLoginData.company.name}
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div>
@@ -414,6 +366,7 @@ const LoginForm = ({ onLogin }) => {
         {/* Footer */}
         <div className="text-center text-sm text-gray-500">
           <p>© 2025 Grupa Eltron. Wszystkie prawa zastrzeżone.</p>
+          <p className="text-xs mt-1">Powered by Supabase</p>
         </div>
       </div>
     </div>
