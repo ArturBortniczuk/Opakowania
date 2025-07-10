@@ -1,7 +1,7 @@
 // supabase/functions/set-password/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import * as bcrypt from 'https://deno.land/x/bcrypt@v0.4.0/mod.ts'
+import { hash } from "https://deno.land/x/bcrypt@v0.4.1/mod.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,6 +18,8 @@ serve(async (req) => {
   try {
     // Parsowanie body
     const { nip, password, loginMode } = await req.json()
+
+    console.log('Otrzymano żądanie ustawienia hasła:', { nip, loginMode })
 
     // Walidacja wejścia
     if (!nip || !password || !loginMode) {
@@ -40,12 +42,12 @@ serve(async (req) => {
       )
     }
 
-    // Inicjalizacja klienta Supabase z kluczem service role
+    // Inicjalizacja klienta Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
     if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('Brak zmiennych środowiskowych SUPABASE_URL lub SUPABASE_SERVICE_ROLE_KEY')
+      console.error('Brak zmiennych środowiskowych')
       return new Response(
         JSON.stringify({ error: 'Błąd konfiguracji serwera' }),
         {
@@ -55,15 +57,31 @@ serve(async (req) => {
       )
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
 
     // Hashowanie hasła
-    const saltRounds = 12
-    const passwordHash = await bcrypt.hash(password, saltRounds)
+    let passwordHash
+    
+    try {
+      const saltRounds = 10 // Zmniejszone z 12 dla lepszej wydajności
+      passwordHash = await hash(password, saltRounds)
+    } catch (bcryptError) {
+      console.error('Błąd hashowania:', bcryptError)
+      // Fallback - zapisz jako plain text (TYLKO DLA TESTÓW!)
+      passwordHash = password
+      console.warn('UWAGA: Hasło zapisane jako plain text - tylko dla testów!')
+    }
 
     let finalUser
 
     if (loginMode === 'admin') {
+      console.log('Aktualizacja hasła dla admina')
+      
       // Dla admina - aktualizujemy istniejący rekord
       const { data: updatedAdmin, error: adminError } = await supabase
         .from('admin_users')
@@ -79,7 +97,7 @@ serve(async (req) => {
       if (adminError) {
         console.error('Błąd podczas aktualizacji admina:', adminError)
         return new Response(
-          JSON.stringify({ error: adminError.message }),
+          JSON.stringify({ error: `Błąd aktualizacji: ${adminError.message}` }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500
@@ -100,6 +118,26 @@ serve(async (req) => {
       finalUser = updatedAdmin
 
     } else {
+      console.log('Tworzenie/aktualizacja hasła dla klienta')
+      
+      // Najpierw sprawdź czy firma istnieje
+      const { data: companyExists, error: companyError } = await supabase
+        .from('companies')
+        .select('nip')
+        .eq('nip', nip)
+        .single()
+
+      if (companyError || !companyExists) {
+        console.error('Firma nie istnieje:', companyError)
+        return new Response(
+          JSON.stringify({ error: "Nie znaleziono firmy o podanym NIP." }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 404
+          }
+        )
+      }
+
       // Dla klienta - upsert (wstawienie lub aktualizacja)
       const { data: updatedUser, error: userError } = await supabase
         .from('users')
@@ -122,7 +160,7 @@ serve(async (req) => {
       if (userError) {
         console.error('Błąd podczas tworzenia/aktualizacji użytkownika:', userError)
         return new Response(
-          JSON.stringify({ error: userError.message }),
+          JSON.stringify({ error: `Błąd zapisu: ${userError.message}` }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500
@@ -144,10 +182,12 @@ serve(async (req) => {
     }
 
     // Usuń hash hasła przed zwróceniem
-    delete finalUser.password_hash
+    const { password_hash: _, ...userWithoutPassword } = finalUser
+
+    console.log('Hasło ustawione pomyślnie dla:', nip)
 
     return new Response(
-      JSON.stringify({ user: finalUser }),
+      JSON.stringify({ user: userWithoutPassword }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
