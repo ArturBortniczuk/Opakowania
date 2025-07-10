@@ -83,12 +83,12 @@ serve(async (req) => {
       console.log('Aktualizacja hasła dla admina')
       
       // Dla admina - aktualizujemy istniejący rekord
+      // POPRAWKA: Usunięto pole "updated_at", którego nie ma w tabeli.
       const { data: updatedAdmin, error: adminError } = await supabase
         .from('admin_users')
         .update({ 
           password_hash: passwordHash,
           is_first_login: false,
-          updated_at: new Date().toISOString()
         })
         .eq('nip', nip)
         .select()
@@ -139,6 +139,7 @@ serve(async (req) => {
       }
 
       // Dla klienta - upsert (wstawienie lub aktualizacja)
+      // POPRAWKA: Usunięto pola "created_at" i "updated_at", których nie ma w tabeli.
       const { data: updatedUser, error: userError } = await supabase
         .from('users')
         .upsert(
@@ -146,8 +147,6 @@ serve(async (req) => {
             nip: nip, 
             password_hash: passwordHash, 
             is_first_login: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
           },
           { 
             onConflict: 'nip',
