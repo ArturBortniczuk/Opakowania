@@ -1,9 +1,8 @@
 // Plik: supabase/functions/set-password/index.ts
-// WERSJA FINALNA
+// WERSJA FINALNA - Gwarantuje hashowanie haseł dla klientów
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-// Używamy funkcji synchronicznej, aby uniknąć problemów w środowisku Deno
 import { hashSync } from 'https://deno.land/x/bcrypt@v0.4.1/mod.ts';
 
 const corsHeaders = {
@@ -31,24 +30,24 @@ serve(async (req) => {
     );
 
     const saltRounds = 12;
-    // Używamy `hashSync` zamiast `await bcrypt.hash`
+    // Zawsze hashujemy hasło, niezależnie od trybu
     const passwordHash = hashSync(password, saltRounds);
 
-    const table = loginMode === 'admin' ? 'admin_users' : 'users';
-    
     if (loginMode === 'client') {
-      // Dla klienta, tworzymy lub aktualizujemy wpis
+      // Dla klienta, tworzymy lub aktualizujemy wpis w tabeli 'users'
+      // Upewniamy się, że przekazujemy ZAHASHOWANE hasło
       const { data, error } = await supabase
-        .from(table)
-        .upsert({ nip, password_hash: passwordHash, is_first_login: false }, { onConflict: 'nip' })
+        .from('users')
+        .upsert({ nip: nip, password_hash: passwordHash, is_first_login: false }, { onConflict: 'nip' })
         .select()
         .single();
+
       if (error) throw error;
       return new Response(JSON.stringify({ user: data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     } else {
       // Dla admina, tylko aktualizujemy istniejący wpis
       const { data, error } = await supabase
-        .from(table)
+        .from('admin_users')
         .update({ password_hash: passwordHash })
         .eq('nip', nip)
         .select()
@@ -58,6 +57,7 @@ serve(async (req) => {
     }
 
   } catch (error) {
+    console.error("Błąd w funkcji set-password:", error);
     return new Response(JSON.stringify({ error: `Błąd serwera: ${error.message}` }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 })
