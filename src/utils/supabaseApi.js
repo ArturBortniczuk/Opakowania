@@ -1,5 +1,10 @@
 // src/utils/supabaseApi.js
+<<<<<<< HEAD
 // Kompletny, poprawiony plik do komunikacji z Supabase
+=======
+// Finalna, kompletna i poprawiona wersja pliku do komunikacji z Supabase.
+// Ten plik zawiera całą logikę potrzebną do poprawnej autoryzacji oraz pozostałe moduły API.
+>>>>>>> f33492158f0d1ce573bec42858dcfd656d5e062f
 
 import { supabase, supabaseHelpers } from '../lib/supabase';
 
@@ -15,6 +20,7 @@ export const authAPI = {
    * @returns {Promise<{exists: boolean, hasPassword: boolean, userData: object | null}>}
    */
   async checkUserStatus(nip, loginMode) {
+<<<<<<< HEAD
     try {
       if (loginMode === 'admin') {
         // --- Logika dla Administratora ---
@@ -75,6 +81,63 @@ export const authAPI = {
     } catch (error) {
       console.error('Błąd w checkUserStatus:', error);
       throw error;
+=======
+    if (loginMode === 'admin') {
+      // --- Logika dla Administratora ---
+      const { data, error } = await supabase
+        .from('admin_users')
+        .select('name, password_hash')
+        .eq('nip', nip)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Błąd przy sprawdzaniu admina:', error);
+        throw new Error('Błąd serwera przy weryfikacji administratora.');
+      }
+
+      if (!data) {
+        return { exists: false, hasPassword: false, userData: null };
+      }
+
+      return { exists: true, hasPassword: !!data.password_hash, userData: data };
+
+    } else {
+      // --- Logika dla Klienta (POPRAWIONA) ---
+      // 1. Sprawdź, czy firma o danym NIP istnieje w tabeli 'companies'.
+      const { data: companyData, error: companyError } = await supabase
+        .from('companies')
+        .select('name, email')
+        .eq('nip', nip)
+        .maybeSingle();
+
+      if (companyError) {
+        console.error('Błąd przy sprawdzaniu firmy:', companyError);
+        throw new Error('Błąd serwera przy weryfikacji firmy.');
+      }
+
+      if (!companyData) {
+        // Jeśli nie ma firmy, to nie ma też konta klienta.
+        return { exists: false, hasPassword: false, userData: null };
+      }
+
+      // 2. Firma istnieje. Teraz sprawdzamy, czy ma już konto w tabeli 'users'.
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('password_hash')
+        .eq('nip', nip)
+        .maybeSingle();
+
+      if (userError) {
+        console.error('Błąd przy sprawdzaniu użytkownika klienta:', userError);
+        throw new Error('Błąd serwera przy weryfikacji użytkownika.');
+      }
+      
+      return {
+        exists: true,
+        hasPassword: !!(userData && userData.password_hash),
+        userData: companyData,
+      };
+>>>>>>> f33492158f0d1ce573bec42858dcfd656d5e062f
     }
   },
 
@@ -82,6 +145,7 @@ export const authAPI = {
    * Loguje użytkownika za pomocą funkcji serwerowej 'sign-in'.
    */
   async signIn(nip, password, loginMode) {
+<<<<<<< HEAD
     try {
       const { data, error } = await supabase.functions.invoke('sign-in', {
         body: { nip, password, loginMode },
@@ -134,6 +198,45 @@ export const authAPI = {
       console.error('Błąd w signIn:', error);
       throw error;
     }
+=======
+    const { data, error } = await supabase.functions.invoke('sign-in', {
+      body: { nip, password, loginMode },
+    });
+
+    if (error) {
+      const errorMessage = error.context?.data?.error || error.message || 'Wystąpił nieznany błąd logowania.';
+      throw new Error(errorMessage);
+    }
+    
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    const user = data.user;
+    
+    let companyName = 'Brak nazwy firmy';
+    if (loginMode === 'admin') {
+        companyName = 'Grupa Eltron - Administrator';
+    } else {
+        const { data: companyData } = await supabase.from('companies').select('name').eq('nip', nip).single();
+        if (companyData) {
+            companyName = companyData.name;
+        }
+    }
+
+    return {
+      user: {
+        id: user.id,
+        nip: user.nip,
+        username: user.username || user.nip,
+        name: user.name,
+        email: user.email,
+        role: user.role || 'client',
+        permissions: user.permissions || [],
+        companyName: companyName,
+      },
+    };
+>>>>>>> f33492158f0d1ce573bec42858dcfd656d5e062f
   },
 
   /**
@@ -145,6 +248,7 @@ export const authAPI = {
       throw new Error('Hasło musi mieć co najmniej 6 znaków.');
     }
 
+<<<<<<< HEAD
     try {
       const { data, error } = await supabase.functions.invoke('set-password', {
         body: { nip, password, loginMode },
@@ -169,12 +273,30 @@ export const authAPI = {
       console.error('Błąd w setPassword:', error);
       throw error;
     }
+=======
+    const { error } = await supabase.functions.invoke('set-password', {
+      body: { nip, password, loginMode },
+    });
+
+    if (error) {
+      const errorMessage = error.context?.data?.error || error.message || 'Nie udało się ustawić hasła.';
+      throw new Error(errorMessage);
+    }
+    
+    return this.signIn(nip, password, loginMode);
+>>>>>>> f33492158f0d1ce573bec42858dcfd656d5e062f
   },
 };
 
 // ==================================
+<<<<<<< HEAD
 //  API dla Bębnów
 // ==================================
+=======
+//  Pozostałe API (Nietknięte)
+// ==================================
+
+>>>>>>> f33492158f0d1ce573bec42858dcfd656d5e062f
 export const drumsAPI = {
   async getDrums(nip = null) {
     try {
@@ -255,12 +377,16 @@ export const companiesAPI = {
     try {
       const { data, error } = await supabase
         .from('companies')
+<<<<<<< HEAD
         .select(`
           *,
           custom_return_periods(return_period_days),
           drums(count),
           return_requests(count)
         `)
+=======
+        .select(`*, custom_return_periods(return_period_days), drums(count), return_requests(count)`)
+>>>>>>> f33492158f0d1ce573bec42858dcfd656d5e062f
         .order('name');
 
       if (error) throw error;
@@ -322,6 +448,7 @@ export const companiesAPI = {
 export const returnsAPI = {
   async getReturns(nip = null) {
     try {
+<<<<<<< HEAD
       let query = supabase
         .from('return_requests')
         .select(`*, companies(name)`);
@@ -333,6 +460,14 @@ export const returnsAPI = {
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
       
+=======
+      let query = supabase.from('return_requests').select(`*, companies(name)`);
+      if (nip) {
+        query = query.eq('user_nip', nip);
+      }
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (error) throw error;
+>>>>>>> f33492158f0d1ce573bec42858dcfd656d5e062f
       return data;
     } catch (error) {
       console.error('Returns API error:', error);
@@ -387,7 +522,10 @@ export const returnPeriodsAPI = {
         .from('custom_return_periods')
         .select(`*, companies(name, email, phone)`)
         .order('companies(name)');
+<<<<<<< HEAD
       
+=======
+>>>>>>> f33492158f0d1ce573bec42858dcfd656d5e062f
       if (error) throw error;
       return data;
     } catch (error) {
@@ -446,6 +584,7 @@ export const statsAPI = {
   async getDashboardStats(nip = null) {
     try {
       const now = new Date().toISOString();
+<<<<<<< HEAD
       const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       
       if (nip) {
@@ -519,11 +658,39 @@ export const statsAPI = {
           totalRequests: totalRequests || 0
         };
       }
+=======
+      if (nip) {
+        const [{ count: totalDrums }, { count: overdueDrums }, { count: dueSoonDrums }, { count: totalRequests }, { count: pendingRequests }] = await Promise.all([
+          supabase.from('drums').select('*', { count: 'exact', head: true }).eq('nip', nip),
+          supabase.from('drums').select('*', { count: 'exact', head: true }).eq('nip', nip).lt('data_zwrotu_do_dostawcy', now),
+          supabase.from('drums').select('*', { count: 'exact', head: true }).eq('nip', nip).gte('data_zwrotu_do_dostawcy', now).lte('data_zwrotu_do_dostawcy', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()),
+          supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('user_nip', nip),
+          supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('user_nip', nip).eq('status', 'Pending')
+        ]);
+        return { totalDrums: totalDrums || 0, activeDrums: (totalDrums || 0) - (overdueDrums || 0) - (dueSoonDrums || 0), pendingReturns: overdueDrums || 0, recentReturns: dueSoonDrums || 0, totalRequests: totalRequests || 0, pendingRequests: pendingRequests || 0 };
+      }
+      const [{ count: totalClients }, { count: totalDrums }, { count: overdueDrums }, { count: dueSoonDrums }, { count: totalRequests }, { count: pendingRequests }, { count: approvedRequests }, { count: completedRequests }] = await Promise.all([
+        supabase.from('companies').select('*', { count: 'exact', head: true }),
+        supabase.from('drums').select('*', { count: 'exact', head: true }),
+        supabase.from('drums').select('*', { count: 'exact', head: true }).lt('data_zwrotu_do_dostawcy', now),
+        supabase.from('drums').select('*', { count: 'exact', head: true }).gte('data_zwrotu_do_dostawcy', now).lte('data_zwrotu_do_dostawcy', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()),
+        supabase.from('return_requests').select('*', { count: 'exact', head: true }),
+        supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Pending'),
+        supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Approved'),
+        supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Completed')
+      ]);
+      return { totalClients: totalClients || 0, totalDrums: totalDrums || 0, activeDrums: (totalDrums || 0) - (overdueDrums || 0) - (dueSoonDrums || 0), pendingReturns: pendingRequests || 0, overdueReturns: overdueDrums || 0, activeRequests: (pendingRequests || 0) + (approvedRequests || 0), completedRequests: completedRequests || 0, totalRequests: totalRequests || 0 };
+>>>>>>> f33492158f0d1ce573bec42858dcfd656d5e062f
     } catch (error) {
       console.error('Stats API error:', error);
       throw error;
     }
+<<<<<<< HEAD
   },
+=======
+  }
+};
+>>>>>>> f33492158f0d1ce573bec42858dcfd656d5e062f
 
   async getAdminStats() {
     return this.getDashboardStats(null);
