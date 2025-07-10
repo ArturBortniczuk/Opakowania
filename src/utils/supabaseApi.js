@@ -1,6 +1,5 @@
 // src/utils/supabaseApi.js
 // Finalna, kompletna i poprawiona wersja pliku do komunikacji z Supabase.
-// Ten plik zawiera całą logikę potrzebną do poprawnej autoryzacji oraz pozostałe moduły API.
 
 import { supabase, supabaseHelpers } from '../lib/supabase';
 
@@ -50,7 +49,6 @@ export const authAPI = {
       }
 
       if (!companyData) {
-        // Jeśli nie ma firmy, to nie ma też konta klienta.
         return { exists: false, hasPassword: false, userData: null };
       }
 
@@ -95,7 +93,7 @@ export const authAPI = {
     
     let companyName = 'Brak nazwy firmy';
     if (loginMode === 'admin') {
-        companyName = 'Grupa Eltron - Administrator';
+        companyName = user.name || 'Administrator';
     } else {
         const { data: companyData } = await supabase.from('companies').select('name').eq('nip', nip).single();
         if (companyData) {
@@ -103,30 +101,30 @@ export const authAPI = {
         }
     }
 
-    return {
-      user: {
-        id: user.id,
-        nip: user.nip,
-        username: user.username || user.nip,
-        name: user.name,
-        email: user.email,
-        role: user.role || 'client',
-        permissions: user.permissions || [],
-        companyName: companyName,
-      },
+    const finalUser = {
+      id: user.id,
+      nip: user.nip,
+      username: user.username || user.nip,
+      name: user.name,
+      email: user.email,
+      role: user.role || loginMode,
+      permissions: user.permissions || [],
+      companyName: companyName,
     };
+    
+    localStorage.setItem('currentUser', JSON.stringify(finalUser));
+    return { user: finalUser };
   },
 
   /**
    * Ustawia hasło za pomocą funkcji serwerowej 'set-password'.
-   * Po udanym ustawieniu hasła, automatycznie loguje użytkownika.
    */
   async setPassword(nip, password, loginMode) {
     if (password.length < 6) {
       throw new Error('Hasło musi mieć co najmniej 6 znaków.');
     }
 
-    const { error } = await supabase.functions.invoke('set-password', {
+    const { data, error } = await supabase.functions.invoke('set-password', {
       body: { nip, password, loginMode },
     });
 
@@ -135,13 +133,15 @@ export const authAPI = {
       throw new Error(errorMessage);
     }
     
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
     return this.signIn(nip, password, loginMode);
   },
 };
 
-// ==================================
-//  Pozostałe API (Nietknięte)
-// ==================================
+// --- Reszta Twojego oryginalnego kodu ---
 
 export const drumsAPI = {
   async getDrums(nip = null) {

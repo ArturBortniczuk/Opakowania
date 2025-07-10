@@ -3,7 +3,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-// Używamy funkcji synchronicznej, aby uniknąć problemów w środowisku Deno
 import { compareSync } from 'https://deno.land/x/bcrypt@v0.4.1/mod.ts';
 
 const corsHeaders = {
@@ -30,7 +29,7 @@ serve(async (req) => {
     
     const { data: userData, error: userError } = await supabase
       .from(table)
-      .select('*') // Pobieramy wszystkie dane od razu
+      .select('*')
       .eq('nip', nip)
       .single();
 
@@ -42,14 +41,12 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Użytkownik nie ma ustawionego hasła.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Używamy `compareSync` zamiast `await bcrypt.compare`
     const isValidPassword = compareSync(password, userData.password_hash);
 
     if (!isValidPassword) {
       return new Response(JSON.stringify({ error: 'Nieprawidłowe hasło.' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Usuwamy hash hasła przed odesłaniem danych do klienta
     delete userData.password_hash;
     
     return new Response(JSON.stringify({ user: userData }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
