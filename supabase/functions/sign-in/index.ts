@@ -1,3 +1,4 @@
+// supabase/functions/sign-in/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import * as bcrypt from 'https://deno.land/x/bcrypt@v0.4.0/mod.ts';
@@ -10,11 +11,11 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { nip, password } = await req.json();
+    const { nip, password, loginMode } = await req.json();
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -22,64 +23,52 @@ serve(async (req) => {
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
-    let userRecord;
-    let table;
-    let selectQuery;
-
-    // Sprawdź najpierw, czy to logowanie administratora
-    const { data: adminData, error: adminError } = await supabase
-      .from('admin_users')
-      .select('*, password_hash')
+    const table = loginMode === 'admin' ? 'admin_users' : 'users';
+    
+    // Pobieramy dane użytkownika z odpowiedniej tabeli
+    const { data: userData, error: userError } = await supabase
+      .from(table)
+      .select('*, password_hash') // Pobieramy wszystkie kolumny + hash hasła
       .eq('nip', nip)
-      .single();
+      .single(); // .single() zwróci błąd jeśli nie znajdzie rekordu, co obsłużymy
 
-    if (adminError && adminError.code !== 'PGRST116') { // Ignoruj błąd "brak wiersza"
-      throw adminError;
-    }
-
-    if (adminData) {
-      userRecord = adminData;
-      table = 'admin_users';
-    } else {
-      // Jeśli nie admin, sprawdź jako klient
-      const { data: clientData, error: clientError } = await supabase
-        .from('users')
-        .select('*, password_hash')
-        .eq('nip', nip)
-        .single();
-      
-      if (clientError) throw clientError;
-      
-      userRecord = clientData;
-      table = 'users';
-    }
-
-    if (!userRecord || !userRecord.password_hash) {
-      return new Response(JSON.stringify({ error: 'Nieprawidłowy NIP lub hasło nie zostało ustawione.' }), { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 404 
+    if (userError || !userData) {
+      return new Response(JSON.stringify({ error: 'Nie znaleziono użytkownika o podanym NIP.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404
       });
     }
 
-    const isValidPassword = await bcrypt.compare(password, userRecord.password_hash);
+    if (!userData.password_hash) {
+      // Ten przypadek jest teraz obsługiwany w `checkUserStatus` w `supabaseApi.js`, ale zostawiamy zabezpieczenie
+      return new Response(JSON.stringify({ error: 'Użytkownik nie ma ustawionego hasła.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      });
+    }
+
+    const isValidPassword = await bcrypt.compare(password, userData.password_hash);
 
     if (!isValidPassword) {
-      return new Response(JSON.stringify({ error: 'Nieprawidłowe hasło.' }), { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401 
+      return new Response(JSON.stringify({ error: 'Nieprawidłowe hasło.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401
       });
     }
-    
-    // Usuń hash hasła przed wysłaniem danych użytkownika z powrotem do klienta
-    delete userRecord.password_hash;
 
-    return new Response(JSON.stringify({ user: userRecord }), {
+    // Usuwamy hash hasła przed odesłaniem danych do klienta - dla bezpieczeństwa
+    delete userData.password_hash;
+    
+    // Logowanie pomyślne
+    return new Response(JSON.stringify({ user: userData }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
+
   } catch (error) {
+    // Ogólny błąd serwera, jeśli coś innego pójdzie nie tak
     console.error('Błąd w funkcji sign-in:', error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: 'Wystąpił wewnętrzny błąd serwera.' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });
