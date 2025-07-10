@@ -1,4 +1,3 @@
-// supabase/functions/sign-in/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import * as bcrypt from 'https://deno.land/x/bcrypt@v0.4.0/mod.ts';
@@ -24,23 +23,21 @@ serve(async (req) => {
     );
 
     const table = loginMode === 'admin' ? 'admin_users' : 'users';
-    
-    // Pobieramy dane użytkownika z odpowiedniej tabeli
+
     const { data: userData, error: userError } = await supabase
       .from(table)
-      .select('*, password_hash') // Pobieramy wszystkie kolumny + hash hasła
+      .select('*, password_hash')
       .eq('nip', nip)
-      .single(); // .single() zwróci błąd jeśli nie znajdzie rekordu, co obsłużymy
+      .single();
 
     if (userError || !userData) {
-      return new Response(JSON.stringify({ error: 'Nie znaleziono użytkownika o podanym NIP.' }), {
+      return new Response(JSON.stringify({ error: `Nie znaleziono konta dla NIP: ${nip}` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 404
       });
     }
 
     if (!userData.password_hash) {
-      // Ten przypadek jest teraz obsługiwany w `checkUserStatus` w `supabaseApi.js`, ale zostawiamy zabezpieczenie
       return new Response(JSON.stringify({ error: 'Użytkownik nie ma ustawionego hasła.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400
@@ -56,19 +53,16 @@ serve(async (req) => {
       });
     }
 
-    // Usuwamy hash hasła przed odesłaniem danych do klienta - dla bezpieczeństwa
     delete userData.password_hash;
-    
-    // Logowanie pomyślne
+
     return new Response(JSON.stringify({ user: userData }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
 
   } catch (error) {
-    // Ogólny błąd serwera, jeśli coś innego pójdzie nie tak
     console.error('Błąd w funkcji sign-in:', error.message);
-    return new Response(JSON.stringify({ error: 'Wystąpił wewnętrzny błąd serwera.' }), {
+    return new Response(JSON.stringify({ error: 'Wystąpił wewnętrzny błąd serwera: ' + error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });

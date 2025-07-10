@@ -74,7 +74,7 @@ const LoginForm = ({ onLogin }) => {
         }
         result = await authAPI.setPassword(nip, password, loginMode);
       } else {
-        result = await authAPI.signIn(nip, password, pendingUserData);
+        result = await authAPI.signIn(nip, password, loginMode); // Usunięto 'pendingUserData'
       }
 
       if (result && result.user) {

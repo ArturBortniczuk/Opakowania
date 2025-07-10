@@ -83,31 +83,36 @@ export const authAPI = {
   /**
    * Loguje użytkownika, wywołując bezpieczną funkcję Supabase Edge 'sign-in'.
    */
-  async signIn(nip, password, userData, loginMode) {
+  async signIn(nip, password, loginMode) { // Usunęliśmy "userData"
     const { data, error } = await supabase.functions.invoke('sign-in', {
-      body: { nip, password, userData, loginMode },
+      body: { nip, password, loginMode }, // Przesyłamy tylko to, co potrzebne
     });
 
     if (error) {
       const errorMessage = error.context?.error_message || error.message;
       throw new Error(errorMessage || 'Wystąpił nieznany błąd logowania.');
     }
-    
+
     if (data.error) {
       throw new Error(data.error);
     }
 
     const user = data.user;
+
+    // Upewniamy się, że nazwa firmy jest poprawnie przypisana
+    const companyName = loginMode === 'admin' 
+      ? 'Grupa Eltron - Administrator' 
+      : user.name || 'Brak nazwy firmy';
+
     return {
       user: {
         id: user.id,
         nip: user.nip,
-        username: user.username,
+        username: user.username || user.nip,
         name: user.name,
         email: user.email,
         role: user.role || 'client',
-        permissions: user.permissions || [], // Zapewnienie, że permissions zawsze jest tablicą
-        companyName: loginMode === 'client' ? user.name : 'Grupa Eltron - Administrator',
+        companyName: companyName,
       },
     };
   },
