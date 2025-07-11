@@ -1,11 +1,8 @@
-// Plik: src/App.js
-// Opis: Dodano logikę do obsługi routingu dla ustawiania nowego hasła.
-
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import AdminNavbar from './components/AdminNavbar';
 import LoginForm from './components/LoginForm';
-import SetPassword from './components/SetPassword'; // NOWY IMPORT
+import SetPassword from './components/SetPassword';
 import Dashboard from './components/Dashboard';
 import DrumsList from './components/DrumsList';
 import ReturnForm from './components/ReturnForm';
@@ -20,7 +17,7 @@ import './App.css';
 const App = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [currentView, setCurrentView] = useState('login');
-  const [passwordResetToken, setPasswordResetToken] = useState(null); // NOWY STAN
+  const [passwordResetToken, setPasswordResetToken] = useState(null);
   const [selectedDrum, setSelectedDrum] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [navigationData, setNavigationData] = useState(null);
@@ -31,15 +28,23 @@ const App = () => {
     const token = urlParams.get('token');
 
     if (token) {
+      console.log("Znaleziono token w URL:", token);
       setPasswordResetToken(token);
       setCurrentView('set-password');
+      // Czyścimy URL, żeby token nie był widoczny po załadowaniu strony
+      window.history.replaceState({}, document.title, window.location.pathname);
     } else {
-      // Jeśli nie ma tokenu, sprawdź, czy użytkownik jest już zalogowany
+      // Jeśli nie ma tokenu, sprawdź, czy użytkownik jest już zalogowany w localStorage
       const savedUser = localStorage.getItem('currentUser');
       if (savedUser) {
-        const user = JSON.parse(savedUser);
-        setCurrentUser(user);
-        setCurrentView(user.role === 'admin' || user.role === 'supervisor' ? 'admin-dashboard' : 'dashboard');
+        try {
+          const user = JSON.parse(savedUser);
+          setCurrentUser(user);
+          setCurrentView(user.role === 'admin' || user.role === 'supervisor' ? 'admin-dashboard' : 'dashboard');
+        } catch (e) {
+          console.error("Błąd parsowania danych użytkownika z localStorage", e);
+          localStorage.removeItem('currentUser');
+        }
       }
     }
   }, []); // Ten efekt uruchamia się tylko raz, przy starcie aplikacji
@@ -48,17 +53,22 @@ const App = () => {
     setCurrentUser(user);
     const defaultView = user.role === 'admin' || user.role === 'supervisor' ? 'admin-dashboard' : 'dashboard';
     setCurrentView(defaultView);
-    // Wyczyść URL z tokenu po udanym logowaniu
-    window.history.replaceState({}, document.title, window.location.pathname);
+    setPasswordResetToken(null); // Wyczyść token po udanym logowaniu
   };
 
-  const logout = () => {
+  const handleLogout = () => {
     localStorage.removeItem('currentUser');
     setCurrentUser(null);
     setCurrentView('login');
     setSidebarOpen(false);
     setSelectedDrum(null);
     setNavigationData(null);
+  };
+  
+  const handleInvalidToken = () => {
+    alert("Link do ustawienia hasła jest nieprawidłowy lub wygasł. Przekierowuję do strony logowania.");
+    setCurrentView('login');
+    setPasswordResetToken(null);
   };
 
   const navigateTo = (view, data = null) => {
@@ -77,7 +87,7 @@ const App = () => {
       case 'login':
         return <LoginForm onLogin={handleLogin} onNavigate={navigateTo} />;
       case 'set-password':
-        return <SetPassword token={passwordResetToken} onPasswordSet={handleLogin} onInvalidToken={logout} />;
+        return <SetPassword token={passwordResetToken} onPasswordSet={handleLogin} onInvalidToken={handleInvalidToken} />;
       
       // Widoki klienta
       case 'dashboard':
@@ -111,14 +121,14 @@ const App = () => {
       {currentUser && (
         <>
           {isAdmin ? (
-            <AdminNavbar user={currentUser} currentView={currentView} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} onNavigate={navigateTo} onLogout={logout} />
+            <AdminNavbar user={currentUser} currentView={currentView} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} onNavigate={navigateTo} onLogout={handleLogout} />
           ) : (
-            <Navbar user={currentUser} currentView={currentView} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} onNavigate={navigateTo} onLogout={logout} />
+            <Navbar user={currentUser} currentView={currentView} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} onNavigate={navigateTo} onLogout={handleLogout} />
           )}
         </>
       )}
       
-      <div className={`transition-all duration-300 ${currentUser ? 'lg:ml-0' : ''}`}>
+      <div className={`transition-all duration-300 ${currentUser && !isAdmin ? 'lg:ml-80' : ''} ${currentUser && isAdmin ? 'lg:ml-80' : ''}`}>
         {renderContent()}
       </div>
     </div>
