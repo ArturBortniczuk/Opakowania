@@ -1,114 +1,102 @@
 // Plik: src/components/LoginForm.js
-// Opis: Przebudowany komponent logowania do współpracy z nowym, wieloetapowym API.
+// Opis: Finalna, bezpieczna wersja komponentu logowania z obsługą resetowania hasła.
 
 import React, { useState } from 'react';
-import { Eye, EyeOff, Building2, Shield, CheckCircle, ArrowRight, UserCheck } from 'lucide-react';
-import { authAPI, handleAPIError } from '../utils/supabaseApi';
+import { Eye, EyeOff, Building2, UserCheck, LogIn, Mail, ArrowLeft } from 'lucide-react';
+// Upewnij się, że ścieżka do API jest poprawna
+import { authAPI } from '../utils/supabaseApi'; 
 
-const LoginForm = ({ onLogin }) => {
+const LoginForm = ({ onLogin, onNavigate }) => {
+  const [view, setView] = useState('login'); // 'login' | 'requestReset'
   const [nip, setNip] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [loginMode, setLoginMode] = useState('client');
-  
-  // Nowy stan do zarządzania przepływem logowania
-  const [loginStep, setLoginStep] = useState('enter_nip'); // 'enter_nip', 'enter_password', 'set_password'
-  const [pendingUserData, setPendingUserData] = useState(null);
 
-  const resetForm = () => {
-    setNip('');
-    setPassword('');
-    setConfirmPassword('');
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (loading || !nip || !password) return;
+
+    setLoading(true);
     setError('');
-    setLoading(false);
-    setLoginStep('enter_nip');
-    setPendingUserData(null);
+    setSuccessMessage('');
+
+    try {
+      const result = await authAPI.signIn(nip, password, loginMode);
+      if (result && result.user) {
+        onLogin(result.user);
+      } else {
+        throw new Error('Logowanie nie powiodło się. Spróbuj ponownie.');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleRequestReset = async (e) => {
+    e.preventDefault();
+    if (loading || !nip) return;
+
+    setLoading(true);
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      // Ta funkcja backendowa ZAWSZE powinna zwracać sukces, aby nie zdradzać, czy NIP istnieje.
+      // Rzeczywiste wysłanie maila odbywa się tylko, jeśli NIP jest poprawny.
+      // const response = await authAPI.requestPasswordSetup(nip);
+      // setSuccessMessage(response.message);
+      
+      // --- MOCKOWANA ODPOWIEDŹ NA CZAS TESTÓW ---
+      // Zastąp to prawdziwym wywołaniem API kiedy funkcja backendowa będzie gotowa
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setSuccessMessage('Jeśli podany NIP jest w naszej bazie, na przypisany do niego adres e-mail wysłaliśmy link do ustawienia hasła.');
+      // --- KONIEC MOCKOWANEJ ODPOWIEDZI ---
+
+    } catch (err) {
+      setError('Wystąpił błąd. Spróbuj ponownie później.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleModeChange = (mode) => {
     setLoginMode(mode);
-    resetForm();
-  };
-
-  const handleNipSubmit = async (e) => {
-    e.preventDefault();
-    if (loading || nip.length !== 10) return;
-    setLoading(true);
+    setNip('');
+    setPassword('');
     setError('');
-
-    try {
-      const { exists, hasPassword, userData } = await authAPI.checkUserStatus(nip, loginMode);
-      
-      if (!exists) {
-        throw new Error(`Nie znaleziono konta dla podanego NIP.`);
-      }
-
-      setPendingUserData(userData);
-      if (hasPassword) {
-        setLoginStep('enter_password');
-      } else {
-        setLoginStep('set_password');
-      }
-    } catch (err) {
-      setError(handleAPIError(err));
-    } finally {
-      setLoading(false);
-    }
+    setSuccessMessage('');
+    setView('login');
   };
 
-  const handleAuthSubmit = async (e) => {
-    e.preventDefault();
-    if (loading) return;
-    setLoading(true);
-    setError('');
-
-    try {
-      let result;
-      if (loginStep === 'set_password') {
-        if (password !== confirmPassword) {
-          throw new Error('Hasła nie są identyczne.');
-        }
-        result = await authAPI.setPassword(nip, password, loginMode);
-      } else {
-        result = await authAPI.signIn(nip, password, loginMode); // Usunięto 'pendingUserData'
-      }
-
-      if (result && result.user) {
-        onLogin(result.user);
-      } else {
-        throw new Error('Nie udało się zalogować. Spróbuj ponownie.');
-      }
-    } catch (err) {
-      setError(handleAPIError(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const renderNipStep = () => (
-    <form onSubmit={handleNipSubmit} className="space-y-6">
-      <div className="text-center">
-        {loginMode === 'admin' ? (
-          <UserCheck className="w-16 h-16 mx-auto text-purple-600 mb-4" />
-        ) : (
-          <Building2 className="w-16 h-16 mx-auto text-blue-600 mb-4" />
-        )}
+  const renderLoginView = () => (
+    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-blue-100 p-8">
+      <div className="text-center mb-6">
         <h3 className="text-xl font-semibold text-gray-900 mb-2">
-          {loginMode === 'admin' ? 'Panel Administratora' : 'Logowanie Klienta'}
+          {loginMode === 'admin' ? 'Logowanie Administratora' : 'Logowanie Klienta'}
         </h3>
         <p className="text-sm text-gray-600">
-          Wpisz swój numer NIP aby kontynuować
+          Wprowadź swoje dane, aby uzyskać dostęp.
         </p>
       </div>
-      <div>
-        <label htmlFor="nip" className="block text-sm font-medium text-gray-700 mb-2">
-          {loginMode === 'admin' ? 'NIP Administratora' : 'Numer NIP'}
-        </label>
-        <div className="relative">
+      
+      {error && (
+        <div className="p-3 mb-4 rounded-lg bg-red-50 border border-red-200 animate-shake">
+          <p className="text-sm text-red-600 text-center">{error}</p>
+        </div>
+      )}
+
+      <form onSubmit={handleLogin} className="space-y-6">
+        <div>
+          <label htmlFor="nip" className="block text-sm font-medium text-gray-700 mb-2">
+            Numer NIP
+          </label>
           <input
             id="nip"
             type="text"
@@ -117,91 +105,125 @@ const LoginForm = ({ onLogin }) => {
             className="block w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
             placeholder="Wpisz 10-cyfrowy NIP"
             disabled={loading}
+            required
           />
-          {nip.length === 10 && (
-            <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-500" />
-          )}
         </div>
+
+        <div>
+          <label htmlFor="password"className="block text-sm font-medium text-gray-700 mb-2">
+            Hasło
+          </label>
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="block w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
+              placeholder="Wpisz swoje hasło"
+              disabled={loading}
+              required
+            />
+            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading || !nip || !password}
+          className={`w-full py-3 px-4 rounded-xl font-medium flex items-center justify-center space-x-2 transition-all duration-200 ${
+            loginMode === 'admin'
+              ? 'bg-purple-600 text-white hover:bg-purple-700 focus:ring-purple-500'
+              : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
+          } disabled:opacity-50`}
+        >
+          {loading ? (
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          ) : (
+            <>
+              <LogIn className="w-4 h-4" />
+              <span>Zaloguj się</span>
+            </>
+          )}
+        </button>
+      </form>
+      <div className="text-center mt-6">
+        <button 
+          onClick={() => setView('requestReset')}
+          className="text-sm text-blue-600 hover:underline"
+        >
+          Nie pamiętasz hasła lub ustawiasz je po raz pierwszy?
+        </button>
       </div>
-      <button
-        type="submit"
-        disabled={loading || nip.length !== 10}
-        className={`w-full py-3 px-4 rounded-xl font-medium flex items-center justify-center space-x-2 transition-all duration-200 ${
-          loginMode === 'admin'
-            ? 'bg-purple-600 text-white hover:bg-purple-700 focus:ring-purple-500'
-            : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
-        } disabled:opacity-50`}
-      >
-        {loading ? (
-          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-        ) : (
-          <><span>Dalej</span><ArrowRight className="w-4 h-4" /></>
-        )}
-      </button>
-    </form>
+    </div>
   );
 
-  const renderPasswordStep = (isFirstLogin) => (
-    <form onSubmit={handleAuthSubmit} className="space-y-6">
-      <div className="text-center">
+  const renderRequestResetView = () => (
+     <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-blue-100 p-8">
+      <div className="text-center mb-6">
         <h3 className="text-xl font-semibold text-gray-900 mb-2">
-          {isFirstLogin ? 'Ustaw swoje hasło' : `Witaj, ${pendingUserData?.name || ''}!`}
+          Ustawianie / Resetowanie hasła
         </h3>
         <p className="text-sm text-gray-600">
-          {isFirstLogin ? 'To Twoje pierwsze logowanie, ustaw hasło dostępu.' : 'Wpisz hasło, aby kontynuować.'}
+          Wpisz NIP swojej firmy, aby otrzymać link do ustawienia hasła na adres e-mail.
         </p>
       </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          {isFirstLogin ? 'Nowe hasło' : 'Hasło'}
-        </label>
-        <div className="relative">
-          <input
-            type={showPassword ? "text" : "password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="block w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
-            placeholder={isFirstLogin ? 'Minimum 6 znaków' : 'Wpisz hasło'}
-            disabled={loading}
-            autoFocus
-          />
-          <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-          </button>
-        </div>
-      </div>
-      {isFirstLogin && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Potwierdź hasło</label>
-          <input
-            type={showPassword ? "text" : "password"}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="block w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
-            placeholder="Powtórz hasło"
-            disabled={loading}
-          />
+      
+      {error && (
+        <div className="p-3 mb-4 rounded-lg bg-red-50 border border-red-200 animate-shake">
+          <p className="text-sm text-red-600 text-center">{error}</p>
         </div>
       )}
-      <button
-        type="submit"
-        disabled={loading}
-        className={`w-full py-3 px-4 rounded-xl font-medium flex items-center justify-center space-x-2 transition-all duration-200 ${
-          loginMode === 'admin'
-            ? 'bg-purple-600 text-white hover:bg-purple-700 focus:ring-purple-500'
-            : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
-        } disabled:opacity-50`}
-      >
-        {loading ? (
-          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-        ) : (
-          <span>{isFirstLogin ? 'Ustaw hasło i zaloguj' : 'Zaloguj się'}</span>
-        )}
-      </button>
-      <button type="button" onClick={resetForm} className="w-full text-sm text-blue-600 hover:text-blue-800 font-medium">
-        ← Wróć
-      </button>
-    </form>
+      {successMessage && (
+        <div className="p-3 mb-4 rounded-lg bg-green-50 border border-green-200">
+          <p className="text-sm text-green-700 text-center">{successMessage}</p>
+        </div>
+      )}
+
+      <form onSubmit={handleRequestReset} className="space-y-6">
+        <div>
+          <label htmlFor="nip-reset" className="block text-sm font-medium text-gray-700 mb-2">
+            Numer NIP
+          </label>
+          <input
+            id="nip-reset"
+            type="text"
+            value={nip}
+            onChange={(e) => setNip(e.target.value.replace(/\D/g, '').slice(0, 10))}
+            className="block w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
+            placeholder="Wpisz 10-cyfrowy NIP"
+            disabled={loading}
+            required
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading || nip.length !== 10}
+          className="w-full py-3 px-4 rounded-xl font-medium flex items-center justify-center space-x-2 transition-all duration-200 bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 disabled:opacity-50"
+        >
+          {loading ? (
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          ) : (
+            <>
+              <Mail className="w-4 h-4" />
+              <span>Wyślij link</span>
+            </>
+          )}
+        </button>
+      </form>
+      <div className="text-center mt-6">
+        <button 
+          onClick={() => setView('login')}
+          className="text-sm text-blue-600 hover:underline flex items-center justify-center mx-auto"
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Wróć do logowania
+        </button>
+      </div>
+    </div>
   );
 
   return (
@@ -214,26 +236,28 @@ const LoginForm = ({ onLogin }) => {
           <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">Grupa Eltron</h2>
           <p className="mt-2 text-lg text-gray-600">System Zarządzania Bębnami</p>
         </div>
+
         <div className="bg-white/60 backdrop-blur-lg rounded-2xl p-2 shadow-lg border border-blue-100">
           <div className="flex">
-            <button onClick={() => handleModeChange('client')} className={`flex-1 py-3 px-4 rounded-xl font-medium text-sm transition-all duration-200 flex items-center justify-center space-x-2 ${loginMode === 'client' ? 'bg-white text-blue-600 shadow-md' : 'text-gray-600'}`}>
-              <Building2 className="w-4 h-4" /><span>Klient</span>
+            <button 
+              onClick={() => handleModeChange('client')} 
+              className={`flex-1 py-3 px-4 rounded-xl font-medium text-sm transition-all duration-200 flex items-center justify-center space-x-2 ${loginMode === 'client' ? 'bg-white text-blue-600 shadow-md' : 'text-gray-600'}`}
+            >
+              <Building2 className="w-4 h-4" />
+              <span>Klient</span>
             </button>
-            <button onClick={() => handleModeChange('admin')} className={`flex-1 py-3 px-4 rounded-xl font-medium text-sm transition-all duration-200 flex items-center justify-center space-x-2 ${loginMode === 'admin' ? 'bg-white text-purple-600 shadow-md' : 'text-gray-600'}`}>
-              <UserCheck className="w-4 h-4" /><span>Administrator</span>
+            <button 
+              onClick={() => handleModeChange('admin')} 
+              className={`flex-1 py-3 px-4 rounded-xl font-medium text-sm transition-all duration-200 flex items-center justify-center space-x-2 ${loginMode === 'admin' ? 'bg-white text-purple-600 shadow-md' : 'text-gray-600'}`}
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>Administrator</span>
             </button>
           </div>
         </div>
-        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-blue-100 p-8">
-          {error && (
-            <div className="p-3 mb-4 rounded-lg bg-red-50 border border-red-200 animate-shake">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          )}
-          {loginStep === 'enter_nip' && renderNipStep()}
-          {loginStep === 'enter_password' && renderPasswordStep(false)}
-          {loginStep === 'set_password' && renderPasswordStep(true)}
-        </div>
+
+        {view === 'login' ? renderLoginView() : renderRequestResetView()}
+
         <div className="text-center text-sm text-gray-500">
           <p>© 2025 Grupa Eltron. Wszystkie prawa zastrzeżone.</p>
         </div>

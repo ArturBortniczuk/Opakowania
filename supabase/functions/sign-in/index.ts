@@ -1,6 +1,3 @@
-// Plik: supabase/functions/sign-in/index.ts
-// WERSJA FINALNA
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { compareSync } from 'https://deno.land/x/bcrypt@v0.4.1/mod.ts';
@@ -21,8 +18,7 @@ serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
     const table = loginMode === 'admin' ? 'admin_users' : 'users';
@@ -33,18 +29,17 @@ serve(async (req) => {
       .eq('nip', nip)
       .single();
 
-    if (userError || !userData) {
-      return new Response(JSON.stringify({ error: 'Nie znaleziono użytkownika o podanym NIP.' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+    const genericError = 'Nieprawidłowy NIP lub hasło.';
+    const genericErrorResponse = new Response(JSON.stringify({ error: genericError }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-    if (!userData.password_hash) {
-      return new Response(JSON.stringify({ error: 'Użytkownik nie ma ustawionego hasła.' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (userError || !userData || !userData.password_hash) {
+      return genericErrorResponse;
     }
 
     const isValidPassword = compareSync(password, userData.password_hash);
 
     if (!isValidPassword) {
-      return new Response(JSON.stringify({ error: 'Nieprawidłowe hasło.' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return genericErrorResponse;
     }
 
     delete userData.password_hash;
@@ -52,6 +47,6 @@ serve(async (req) => {
     return new Response(JSON.stringify({ user: userData }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: `Błąd serwera: ${error.message}` }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: `Błąd serwera: ${error.message}` }), { status: 500 });
   }
 })
