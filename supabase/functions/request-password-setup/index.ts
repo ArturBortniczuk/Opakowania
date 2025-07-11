@@ -18,7 +18,9 @@ serve(async (req) => {
       .eq('nip', nip)
       .maybeSingle();
 
-    if (!companyError && companyData && companyData.email && companyData.users.length === 0) {
+    // --- POPRAWIONY WARUNEK ---
+    // Sprawdzamy, czy `companyData.users` jest tablicą przed odczytaniem jej długości.
+    if (!companyError && companyData && companyData.email && Array.isArray(companyData.users) && companyData.users.length === 0) {
       const token = crypto.randomUUID();
       const tokenHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
       const hashString = Array.from(new Uint8Array(tokenHash)).map(b => b.toString(16).padStart(2, '0')).join('');
