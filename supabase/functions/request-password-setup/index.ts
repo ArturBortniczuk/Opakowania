@@ -1,6 +1,3 @@
-// Plik: supabase/functions/request-password-setup/index.ts
-// Wersja finalna z poprawnym adresem nadawcy
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
@@ -33,10 +30,7 @@ serve(async (req) => {
       const setupLink = `https://opakowania.vercel.app/set-password?token=${token}`; 
       
       await resend.emails.send({
-        // --- WAŻNA ZMIANA ---
-        // Użyj adresu z Twojej nowo zweryfikowanej domeny.
-        from: 'system@opakowania.grupaeltron.pl', 
-        // --------------------
+        from: 'opakowania@grupaeltron.pl', 
         to: companyData.email,
         subject: 'Grupa Eltron - Ustaw hasło do systemu zarządzania bębnami',
         html: `
