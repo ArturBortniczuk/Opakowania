@@ -1,6 +1,6 @@
 // Plik: src/utils/supabaseApi.js
-// Opis: Zaktualizowana i bezpieczna wersja pliku do komunikacji z Supabase.
-// Usunięto niebezpieczne funkcje i dodano obsługę nowego przepływu rejestracji/resetowania hasła.
+// Opis: Kompletna, bezpieczna wersja pliku do komunikacji z Supabase.
+// Zawiera nową logikę autoryzacji oraz wszystkie pozostałe funkcje API.
 
 import { supabase, supabaseHelpers } from '../lib/supabase';
 
@@ -22,7 +22,6 @@ export const authAPI = {
     });
 
     if (error) {
-      // Przechwytywanie błędu z funkcji Edge i rzucanie go dalej
       const errorMessage = error.context?.data?.error || error.message || 'Wystąpił nieznany błąd logowania.';
       throw new Error(errorMessage);
     }
@@ -31,7 +30,6 @@ export const authAPI = {
       throw new Error(data.error);
     }
 
-    // Po pomyślnym zalogowaniu, pobieramy dodatkowe dane, np. nazwę firmy
     const user = data.user;
     let companyName = 'Brak nazwy firmy';
     if (loginMode === 'admin') {
@@ -43,7 +41,6 @@ export const authAPI = {
         }
     }
 
-    // Tworzymy finalny obiekt użytkownika do przechowywania w stanie aplikacji
     const finalUser = {
       id: user.id,
       nip: user.nip,
@@ -51,7 +48,7 @@ export const authAPI = {
       name: user.name,
       email: user.email,
       role: user.role || loginMode,
-      is_first_login: user.is_first_login, // Ważne dla wymuszenia zmiany hasła
+      is_first_login: user.is_first_login,
       companyName: companyName,
     };
     
@@ -60,8 +57,7 @@ export const authAPI = {
   },
 
   /**
-   * (NOWA FUNKCJA) Inicjuje proces ustawiania/resetowania hasła.
-   * Wywołuje funkcję Edge, która wysyła e-mail z linkiem do klienta.
+   * Inicjuje proces ustawiania/resetowania hasła.
    * @param {string} nip - Numer NIP firmy.
    * @returns {Promise<{message: string}>} Potwierdzenie wysłania.
    */
@@ -79,8 +75,7 @@ export const authAPI = {
   },
 
   /**
-   * (NOWA FUNKCJA) Ustawia nowe hasło dla użytkownika przy użyciu jednorazowego tokenu.
-   * Wywoływana po kliknięciu linku z e-maila.
+   * Ustawia nowe hasło dla użytkownika przy użyciu jednorazowego tokenu.
    * @param {string} token - Jednorazowy token z adresu URL.
    * @param {string} password - Nowe hasło podane przez użytkownika.
    * @returns {Promise<{user: object}>} Obiekt z danymi zalogowanego użytkownika.
@@ -103,52 +98,160 @@ export const authAPI = {
       throw new Error(data.error);
     }
     
-    // Po pomyślnym ustawieniu hasła, od razu logujemy użytkownika
-    // Wykorzystujemy NIP zwrócony przez funkcję backendową
     return this.signIn(data.user.nip, password, 'client');
   },
 
-  /**
-   * Wylogowuje użytkownika, czyszcząc dane z localStorage.
-   */
   logout() {
     localStorage.removeItem('currentUser');
-    // Tutaj można dodać ewentualne wywołanie supabase.auth.signOut(), jeśli używasz wbudowanej autoryzacji
   }
 };
 
 
 // ==================================
-//  Pozostałe API (bez zmian)
+//  Pozostałe API
 // ==================================
 
 export const drumsAPI = {
-  // ... (twoje istniejące funkcje drumsAPI)
+  async getDrums(nip = null) {
+    try {
+      let query = supabase
+        .from('drums')
+        .select(`*, companies ( name, email, phone, address ), custom_return_periods ( return_period_days )`);
+
+      if (nip) {
+        query = query.eq('nip', nip);
+      }
+
+      const { data, error } = await query.order('kod_bebna');
+      if (error) throw error;
+
+      return data.map(drum => {
+        const returnPeriodDays = drum.custom_return_periods?.[0]?.return_period_days || 85;
+        const status = supabaseHelpers.getDrumStatus(drum.data_zwrotu_do_dostawcy);
+        
+        return {
+          ...drum,
+          KOD_BEBNA: drum.kod_bebna,
+          NAZWA: drum.nazwa,
+          CECHA: drum.cecha,
+          DATA_ZWROTU_DO_DOSTAWCY: drum.data_zwrotu_do_dostawcy,
+          KON_DOSTAWCA: drum.kon_dostawca,
+          PELNA_NAZWA_KONTRAHENTA: drum.companies?.name || 'Brak danych firmy',
+          NIP: drum.nip,
+          TYP_DOK: drum.typ_dok,
+          NR_DOKUMENTUPZ: drum.nr_dokumentupz,
+          'Data przyjęcia na stan': drum.data_przyjecia_na_stan,
+          KONTRAHENT: drum.kontrahent,
+          STATUS: drum.status,
+          DATA_WYDANIA: drum.data_wydania,
+          company: drum.companies?.name || 'Brak danych firmy',
+          companyPhone: drum.companies?.phone,
+          companyEmail: drum.companies?.email,
+          companyAddress: drum.companies?.address,
+          returnPeriodDays,
+          ...status
+        };
+      });
+    } catch (error) {
+      console.error('Drums API error:', error);
+      throw error;
+    }
+  },
 };
 
 export const companiesAPI = {
-  // ... (twoje istniejące funkcje companiesAPI)
+  async getCompanies() {
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select(`*, custom_return_periods(return_period_days), drums(count), return_requests(count)`)
+        .order('name');
+
+      if (error) throw error;
+
+      return data.map(company => ({
+        ...company,
+        drumsCount: company.drums?.[0]?.count || 0,
+        totalRequests: company.return_requests?.[0]?.count || 0,
+        returnPeriodDays: company.custom_return_periods?.[0]?.return_period_days || 85
+      }));
+    } catch (error) {
+      console.error('Companies API error:', error);
+      throw error;
+    }
+  },
 };
 
 export const returnsAPI = {
-  // ... (twoje istniejące funkcje returnsAPI)
+  async getReturns(nip = null) {
+    try {
+      let query = supabase.from('return_requests').select(`*, companies(name)`);
+      if (nip) {
+        query = query.eq('user_nip', nip);
+      }
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Returns API error:', error);
+      throw error;
+    }
+  },
 };
 
-// ... i tak dalej dla pozostałych sekcji API.
+export const returnPeriodsAPI = {
+  async getReturnPeriods() {
+    try {
+      const { data, error } = await supabase
+        .from('custom_return_periods')
+        .select(`*, companies(name, email, phone)`)
+        .order('companies(name)');
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Return periods API error:', error);
+      throw error;
+    }
+  },
+};
 
-/**
- * Ogólna funkcja do obsługi błędów z API.
- * @param {Error} error - Obiekt błędu.
- * @param {Function | null} setError - Opcjonalna funkcja do ustawiania stanu błędu w komponencie.
- * @returns {string} Komunikat błędu.
- */
+export const statsAPI = {
+  async getDashboardStats(nip = null) {
+    try {
+      const now = new Date().toISOString();
+      if (nip) {
+        const [{ count: totalDrums }, { count: overdueDrums }, { count: dueSoonDrums }, { count: totalRequests }, { count: pendingRequests }] = await Promise.all([
+          supabase.from('drums').select('*', { count: 'exact', head: true }).eq('nip', nip),
+          supabase.from('drums').select('*', { count: 'exact', head: true }).eq('nip', nip).lt('data_zwrotu_do_dostawcy', now),
+          supabase.from('drums').select('*', { count: 'exact', head: true }).eq('nip', nip).gte('data_zwrotu_do_dostawcy', now).lte('data_zwrotu_do_dostawcy', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()),
+          supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('user_nip', nip),
+          supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('user_nip', nip).eq('status', 'Pending')
+        ]);
+        return { totalDrums: totalDrums || 0, activeDrums: (totalDrums || 0) - (overdueDrums || 0) - (dueSoonDrums || 0), pendingReturns: overdueDrums || 0, recentReturns: dueSoonDrums || 0, totalRequests: totalRequests || 0, pendingRequests: pendingRequests || 0 };
+      }
+      const [{ count: totalClients }, { count: totalDrums }, { count: overdueDrums }, { count: dueSoonDrums }, { count: totalRequests }, { count: pendingRequests }, { count: approvedRequests }, { count: completedRequests }] = await Promise.all([
+        supabase.from('companies').select('*', { count: 'exact', head: true }),
+        supabase.from('drums').select('*', { count: 'exact', head: true }),
+        supabase.from('drums').select('*', { count: 'exact', head: true }).lt('data_zwrotu_do_dostawcy', now),
+        supabase.from('drums').select('*', { count: 'exact', head: true }).gte('data_zwrotu_do_dostawcy', now).lte('data_zwrotu_do_dostawcy', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()),
+        supabase.from('return_requests').select('*', { count: 'exact', head: true }),
+        supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Pending'),
+        supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Approved'),
+        supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Completed')
+      ]);
+      return { totalClients: totalClients || 0, totalDrums: totalDrums || 0, activeDrums: (totalDrums || 0) - (overdueDrums || 0) - (dueSoonDrums || 0), pendingReturns: pendingRequests || 0, overdueReturns: overdueDrums || 0, activeRequests: (pendingRequests || 0) + (approvedRequests || 0), completedRequests: completedRequests || 0, totalRequests: totalRequests || 0 };
+    } catch (error) {
+      console.error('Stats API error:', error);
+      throw error;
+    }
+  }
+};
+
 export const handleAPIError = (error, setError = null) => {
   console.error('Błąd API Supabase:', error);
   const errorMessage = error.message || 'Wystąpił nieznany błąd. Spróbuj ponownie.';
-  
   if (setError) {
     setError(errorMessage);
   }
-  
   return errorMessage;
 };
