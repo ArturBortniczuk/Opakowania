@@ -49,7 +49,8 @@ serve(async (req) => {
       const hashString = Array.from(new Uint8Array(tokenHash)).map(b => b.toString(16).padStart(2, '0')).join('');
       
       // Ustawienie daty wygaśnięcia tokenu na 15 minut od teraz
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      const expiresAt = new Date(Date.now() + (2.5 * 60 * 60 * 1000)).toISOString();
+
 
       console.log(`[request-password-setup] Próba zapisu tokena do bazy. Hash: ${hashString}`);
       
