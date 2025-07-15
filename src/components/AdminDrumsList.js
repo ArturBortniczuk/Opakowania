@@ -1,5 +1,6 @@
-// src/components/AdminDrumsList.js
-import React, { useState, useMemo } from 'react';
+// src/components/AdminDrumsList.js - Zaktualizowany o prawdziwe dane
+import React, { useState, useMemo, useEffect } from 'react';
+import { drumsAPI, companiesAPI } from '../utils/supabaseApi';
 import { 
   Package, 
   Search, 
@@ -17,8 +18,6 @@ import {
   Download,
   RefreshCw
 } from 'lucide-react';
-import { mockDrumsData, mockCompanies } from '../data/mockData';
-import { enrichDrumsWithCalculatedDates } from '../data/additionalData';
 
 const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -29,61 +28,39 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
   const [filterDateRange, setFilterDateRange] = useState('all');
   const [selectedDrum, setSelectedDrum] = useState(null);
   const [showDrumDetails, setShowDrumDetails] = useState(false);
+  const [drums, setDrums] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const enrichedDrums = useMemo(() => {
-    return mockDrumsData.map(drum => {
-      const company = mockCompanies.find(c => c.nip === drum.NIP);
-      const now = new Date();
-      const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
+  // Pobierz bębny i firmy
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
       
-      // Poprawka: używamy DATA_WYDANIA zamiast Data przyjęcia na stan
-      const issueDate = drum.DATA_WYDANIA && drum.DATA_WYDANIA !== ' ' 
-        ? new Date(drum.DATA_WYDANIA) 
-        : new Date(drum['Data przyjęcia na stan']);
-      
-      const daysDiff = Math.ceil((returnDate - now) / (1000 * 60 * 60 * 24));
-      
-      let status = 'active';
-      let statusColor = 'text-green-600';
-      let statusBg = 'bg-green-100';
-      let statusBorder = 'border-green-200';
-      let statusText = 'Aktywny';
-      
-      if (daysDiff < 0) {
-        status = 'overdue';
-        statusColor = 'text-red-600';
-        statusBg = 'bg-red-100';
-        statusBorder = 'border-red-200';
-        statusText = `Przeterminowany`;
-        // Dodatkowe info w osobnej linii dla długich tekstów
-      } else if (daysDiff <= 7) {
-        status = 'due-soon';
-        statusColor = 'text-yellow-600';
-        statusBg = 'bg-yellow-100';
-        statusBorder = 'border-yellow-200';
-        statusText = `Za ${daysDiff} dni`;
+      try {
+        const [drumsData, companiesData] = await Promise.all([
+          drumsAPI.getDrums(),
+          companiesAPI.getCompanies()
+        ]);
+        
+        setDrums(drumsData);
+        setCompanies(companiesData);
+        
+      } catch (err) {
+        console.error('Błąd podczas pobierania danych:', err);
+        setError('Nie udało się pobrać danych. Spróbuj ponownie.');
+      } finally {
+        setLoading(false);
       }
-      
-      return {
-        ...drum,
-        company: company?.name || 'Nieznana firma',
-        companyPhone: company?.phone || '',
-        companyEmail: company?.email || '',
-        companyAddress: company?.address || '',
-        status,
-        statusColor,
-        statusBg,
-        statusBorder,
-        statusText,
-        daysDiff,
-        daysInPossession: Math.ceil((now - issueDate) / (1000 * 60 * 60 * 24)),
-        overdueDays: daysDiff < 0 ? Math.abs(daysDiff) : 0
-      };
-    });
+    };
+
+    fetchData();
   }, []);
 
   const filteredAndSortedDrums = useMemo(() => {
-    let filtered = enrichedDrums.filter(drum => {
+    let filtered = drums.filter(drum => {
       const matchesSearch = drum.KOD_BEBNA.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            drum.NAZWA.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            drum.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -121,7 +98,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
       let aValue = a[sortBy];
       let bValue = b[sortBy];
       
-      if (sortBy === 'DATA_ZWROTU_DO_DOSTAWCY' || sortBy === 'Data przyjęcia na stan') {
+      if (sortBy === 'DATA_ZWROTU_DO_DOSTAWCY' || sortBy === 'DATA_WYDANIA') {
         aValue = new Date(aValue);
         bValue = new Date(bValue);
       } else if (sortBy === 'daysDiff' || sortBy === 'daysInPossession') {
@@ -133,7 +110,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
       if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [enrichedDrums, searchTerm, sortBy, sortOrder, filterStatus, filterClient, filterDateRange]);
+  }, [drums, searchTerm, sortBy, sortOrder, filterStatus, filterClient, filterDateRange]);
 
   const handleSort = (field) => {
     if (sortBy === field) {
@@ -149,11 +126,32 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     setShowDrumDetails(true);
   };
 
+  const handleRefresh = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const [drumsData, companiesData] = await Promise.all([
+        drumsAPI.getDrums(),
+        companiesAPI.getCompanies()
+      ]);
+      
+      setDrums(drumsData);
+      setCompanies(companiesData);
+      
+    } catch (err) {
+      console.error('Błąd podczas odświeżania:', err);
+      setError('Nie udało się odświeżyć danych.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getStatistics = () => {
-    const total = enrichedDrums.length;
-    const overdue = enrichedDrums.filter(d => d.status === 'overdue').length;
-    const dueSoon = enrichedDrums.filter(d => d.status === 'due-soon').length;
-    const active = enrichedDrums.filter(d => d.status === 'active').length;
+    const total = filteredAndSortedDrums.length;
+    const overdue = filteredAndSortedDrums.filter(d => d.status === 'overdue').length;
+    const dueSoon = filteredAndSortedDrums.filter(d => d.status === 'due-soon').length;
+    const active = filteredAndSortedDrums.filter(d => d.status === 'active').length;
     
     return { total, overdue, dueSoon, active };
   };
@@ -162,7 +160,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
 
   const DrumCard = ({ drum, index }) => (
     <div 
-      className={`bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] h-full flex flex-col ${drum.statusBorder}`}
+      className={`bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] h-full flex flex-col ${drum.borderColor}`}
       style={{ animationDelay: `${index * 50}ms` }}
     >
       <div className="flex items-start justify-between mb-4">
@@ -214,9 +212,9 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-500">Data wydania:</span>
           <span className="font-medium text-gray-900">
-            {drum.DATA_WYDANIA && drum.DATA_WYDANIA !== ' ' 
+            {drum.DATA_WYDANIA 
               ? new Date(drum.DATA_WYDANIA).toLocaleDateString('pl-PL')
-              : new Date(drum['Data przyjęcia na stan']).toLocaleDateString('pl-PL')
+              : 'Brak daty'
             }
           </span>
         </div>
@@ -225,7 +223,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
           <span className="text-gray-500">Termin zwrotu:</span>
           <div className="flex items-center space-x-2">
             <Calendar className="w-4 h-4 text-gray-400" />
-            <span className={`font-medium ${drum.statusColor}`}>
+            <span className={`font-medium ${drum.color}`}>
               {new Date(drum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL')}
             </span>
           </div>
@@ -313,12 +311,12 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Status</label>
-                    <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded ${selectedDrum.statusBg} ${selectedDrum.statusBorder} border`}>
-                      {selectedDrum.status === 'overdue' && <AlertCircle className={`w-4 h-4 ${selectedDrum.statusColor}`} />}
-                      {selectedDrum.status === 'due-soon' && <Clock className={`w-4 h-4 ${selectedDrum.statusColor}`} />}
-                      {selectedDrum.status === 'active' && <CheckCircle className={`w-4 h-4 ${selectedDrum.statusColor}`} />}
-                      <span className={`text-sm font-medium ${selectedDrum.statusColor}`}>
-                        {selectedDrum.statusText}
+                    <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded ${selectedDrum.bgColor} ${selectedDrum.borderColor} border`}>
+                      {selectedDrum.status === 'overdue' && <AlertCircle className={`w-4 h-4 ${selectedDrum.color}`} />}
+                      {selectedDrum.status === 'due-soon' && <Clock className={`w-4 h-4 ${selectedDrum.color}`} />}
+                      {selectedDrum.status === 'active' && <CheckCircle className={`w-4 h-4 ${selectedDrum.color}`} />}
+                      <span className={`text-sm font-medium ${selectedDrum.color}`}>
+                        {selectedDrum.text}
                         {selectedDrum.status === 'overdue' && ` (${selectedDrum.overdueDays} dni)`}
                       </span>
                     </div>
@@ -381,15 +379,15 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Data wydania</span>
                   <span className="font-medium">
-                    {selectedDrum.DATA_WYDANIA && selectedDrum.DATA_WYDANIA !== ' ' 
+                    {selectedDrum.DATA_WYDANIA 
                       ? new Date(selectedDrum.DATA_WYDANIA).toLocaleDateString('pl-PL')
-                      : new Date(selectedDrum['Data przyjęcia na stan']).toLocaleDateString('pl-PL')
+                      : 'Brak daty'
                     }
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Termin zwrotu do dostawcy</span>
-                  <span className={`font-medium ${selectedDrum.statusColor}`}>
+                  <span className={`font-medium ${selectedDrum.color}`}>
                     {new Date(selectedDrum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL')}
                   </span>
                 </div>
@@ -438,6 +436,37 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="text-red-600 mb-4">{error}</div>
+            <button 
+              onClick={handleRefresh}
+              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2 mx-auto"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Spróbuj ponownie</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -461,7 +490,10 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 <Download className="w-4 h-4" />
                 <span>Export</span>
               </button>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2">
+              <button 
+                onClick={handleRefresh}
+                className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2"
+              >
                 <RefreshCw className="w-4 h-4" />
                 <span>Odśwież</span>
               </button>
@@ -502,7 +534,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
               >
                 <option value="">Wszyscy klienci</option>
-                {mockCompanies.map(company => (
+                {companies.map(company => (
                   <option key={company.nip} value={company.nip}>{company.name}</option>
                 ))}
               </select>
