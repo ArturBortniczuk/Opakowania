@@ -1,4 +1,4 @@
-// src/components/Dashboard.js
+// src/components/Dashboard.js - Zaktualizowany o prawdziwe dane
 import React, { useState, useEffect } from 'react';
 import { 
   Package, 
@@ -12,8 +12,8 @@ import {
   BarChart3,
   Activity
 } from 'lucide-react';
-import { mockDrumsData } from '../data/mockData';
-import { enrichDrumsWithCalculatedDates } from '../data/additionalData';
+import { drumsAPI, statsAPI } from '../utils/supabaseApi';
+
 const Dashboard = ({ user, onNavigate }) => {
   const [stats, setStats] = useState({
     totalDrums: 0,
@@ -22,58 +22,91 @@ const Dashboard = ({ user, onNavigate }) => {
     recentReturns: 0
   });
   const [recentActivity, setRecentActivity] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Oblicz statystyki dla użytkownika
-    const userDrums = mockDrumsData.filter(drum => drum.NIP === user.nip);
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    
-    const pendingReturns = userDrums.filter(drum => {
-      const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
-      return returnDate <= now;
-    }).length;
-
-    const recentReturns = userDrums.filter(drum => {
-      const acceptDate = new Date(drum['Data przyjęcia na stan']);
-      return acceptDate >= thirtyDaysAgo;
-    }).length;
-
-    setStats({
-      totalDrums: userDrums.length,
-      activeDrums: userDrums.filter(drum => drum.STATUS === 'Aktywny').length,
-      pendingReturns,
-      recentReturns
-    });
-
-    // Mockowa aktywność
-    setRecentActivity([
-      {
-        id: 1,
-        type: 'accepted',
-        message: 'Przyjęto nowy bęben BEB001',
-        time: '2 godziny temu',
-        icon: CheckCircle,
-        color: 'text-green-600'
-      },
-      {
-        id: 2,
-        type: 'pending',
-        message: 'Zbliża się termin zwrotu BEB002',
-        time: '1 dzień temu',
-        icon: Clock,
-        color: 'text-yellow-600'
-      },
-      {
-        id: 3,
-        type: 'alert',
-        message: 'Przekroczono termin zwrotu BEB003',
-        time: '3 dni temu',
-        icon: AlertCircle,
-        color: 'text-red-600'
+    const fetchDashboardData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Pobierz statystyki dla konkretnego klienta
+        const dashboardStats = await statsAPI.getDashboardStats(user.nip);
+        setStats(dashboardStats);
+        
+        // Pobierz ostatnie bębny dla aktywności
+        const userDrums = await drumsAPI.getDrums(user.nip);
+        generateRecentActivity(userDrums);
+        
+      } catch (err) {
+        console.error('Błąd podczas pobierania danych dashboardu:', err);
+        setError('Nie udało się pobrać danych. Spróbuj ponownie.');
+      } finally {
+        setLoading(false);
       }
-    ]);
-  }, [user.nip]);
+    };
+
+    if (user?.nip) {
+      fetchDashboardData();
+    }
+  }, [user?.nip]);
+
+  const generateRecentActivity = (drums) => {
+    const now = new Date();
+    const activities = [];
+    
+    // Przygotuj aktywność na podstawie rzeczywistych danych
+    drums.forEach((drum, index) => {
+      if (index < 3) { // Pokaż tylko pierwsze 3 dla przykładu
+        const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
+        const daysDiff = Math.ceil((returnDate - now) / (1000 * 60 * 60 * 24));
+        
+        if (daysDiff < 0) {
+          activities.push({
+            id: `overdue-${drum.KOD_BEBNA}`,
+            type: 'overdue',
+            message: `Przekroczono termin zwrotu ${drum.KOD_BEBNA}`,
+            time: `${Math.abs(daysDiff)} dni temu`,
+            icon: AlertCircle,
+            color: 'text-red-600'
+          });
+        } else if (daysDiff <= 7) {
+          activities.push({
+            id: `due-soon-${drum.KOD_BEBNA}`,
+            type: 'due-soon',
+            message: `Zbliża się termin zwrotu ${drum.KOD_BEBNA}`,
+            time: `za ${daysDiff} dni`,
+            icon: Clock,
+            color: 'text-yellow-600'
+          });
+        } else {
+          activities.push({
+            id: `active-${drum.KOD_BEBNA}`,
+            type: 'active',
+            message: `Bęben ${drum.KOD_BEBNA} aktywny`,
+            time: 'dziś',
+            icon: CheckCircle,
+            color: 'text-green-600'
+          });
+        }
+      }
+    });
+    
+    // Jeśli brak danych, dodaj przykładową aktywność
+    if (activities.length === 0) {
+      activities.push({
+        id: 'welcome',
+        type: 'info',
+        message: 'Witaj w systemie zarządzania bębnami',
+        time: 'teraz',
+        icon: Activity,
+        color: 'text-blue-600'
+      });
+    }
+    
+    setRecentActivity(activities);
+  };
 
   const StatCard = ({ icon: Icon, title, value, subtitle, color, trend, onClick }) => (
     <div 
@@ -155,6 +188,36 @@ const Dashboard = ({ user, onNavigate }) => {
       </div>
     );
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="text-red-600 mb-4">{error}</div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200"
+            >
+              Odśwież stronę
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
@@ -273,8 +336,11 @@ const Dashboard = ({ user, onNavigate }) => {
                 ))}
               </div>
               
-              <button className="w-full mt-4 py-2 px-4 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200 border border-blue-200 rounded-lg hover:bg-blue-50">
-                Zobacz wszystkie aktywności
+              <button 
+                onClick={() => onNavigate('drums')}
+                className="w-full mt-4 py-2 px-4 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200 border border-blue-200 rounded-lg hover:bg-blue-50"
+              >
+                Zobacz wszystkie bębny
               </button>
             </div>
           </div>
