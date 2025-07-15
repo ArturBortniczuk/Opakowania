@@ -116,7 +116,7 @@ export const drumsAPI = {
       if (error) throw error;
 
       return data.map(drum => {
-        const returnPeriodDays = drum.custom_return_periods?.return_period_days || 85;
+        const returnPeriodDays = drum.companies?.custom_return_periods?.[0]?.return_period_days || 85;
         const status = supabaseHelpers.getDrumStatus(drum.data_zwrotu_do_dostawcy);
         
         // Oblicz dni w posiadaniu
