@@ -144,7 +144,6 @@ const App = () => {
         </>
       )}
       
-      {/* ZMIANA: Dodano pt-16 i poprawiono logikę marginesu */}
       <main className={`transition-all duration-300 pt-16 ${currentUser ? (isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-80') : ''}`}>
         {renderContent()}
       </main>
