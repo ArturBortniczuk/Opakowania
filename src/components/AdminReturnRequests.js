@@ -1,5 +1,6 @@
-// src/components/AdminReturnRequests.js
-import React, { useState, useMemo } from 'react';
+// src/components/AdminReturnRequests.js - Zaktualizowany o rzeczywiste dane
+import React, { useState, useMemo, useEffect } from 'react';
+import { returnsAPI, companiesAPI } from '../utils/supabaseApi';
 import { 
   Truck, 
   Search, 
@@ -18,9 +19,9 @@ import {
   ArrowUpDown,
   MoreVertical,
   Edit,
-  Download
+  Download,
+  RefreshCw
 } from 'lucide-react';
-import { mockReturnRequests } from '../data/additionalData';
 
 const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -30,9 +31,39 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
   const [filterPriority, setFilterPriority] = useState('all');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showRequestDetails, setShowRequestDetails] = useState(false);
+  const [requests, setRequests] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Pobierz zgłoszenia zwrotów i firmy
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const [requestsData, companiesData] = await Promise.all([
+          returnsAPI.getReturns(),
+          companiesAPI.getCompanies()
+        ]);
+        
+        setRequests(requestsData);
+        setCompanies(companiesData);
+        
+      } catch (err) {
+        console.error('Błąd podczas pobierania danych:', err);
+        setError('Nie udało się pobrać danych. Spróbuj ponownie.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const enrichedRequests = useMemo(() => {
-    return mockReturnRequests.map(request => {
+    return requests.map(request => {
       const now = new Date();
       const collectionDate = new Date(request.collection_date);
       const createdDate = new Date(request.created_at);
@@ -52,10 +83,10 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
         daysUntilCollection,
         daysOld,
         urgencyLevel,
-        drumsCount: request.selected_drums.length
+        drumsCount: Array.isArray(request.selected_drums) ? request.selected_drums.length : 0
       };
     });
-  }, []);
+  }, [requests]);
 
   const filteredAndSortedRequests = useMemo(() => {
     let filtered = enrichedRequests.filter(request => {
@@ -63,7 +94,8 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                            request.user_nip.includes(searchTerm) ||
                            request.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            request.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           request.selected_drums.some(drum => drum.toLowerCase().includes(searchTerm.toLowerCase()));
+                           (Array.isArray(request.selected_drums) && 
+                            request.selected_drums.some(drum => drum.toLowerCase().includes(searchTerm.toLowerCase())));
       
       if (!matchesSearch) return false;
       
@@ -105,10 +137,41 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
     setShowRequestDetails(true);
   };
 
-  const handleStatusChange = (requestId, newStatus) => {
-    // W rzeczywistej aplikacji tutaj byłby call do API
-    console.log(`Zmienianie statusu zgłoszenia ${requestId} na ${newStatus}`);
-    alert(`Status zgłoszenia #${requestId} został zmieniony na: ${newStatus}`);
+  const handleStatusChange = async (requestId, newStatus) => {
+    try {
+      await returnsAPI.updateReturnStatus(requestId, newStatus);
+      
+      // Zaktualizuj lokalny stan
+      setRequests(prev => prev.map(req => 
+        req.id === requestId ? { ...req, status: newStatus, updated_at: new Date().toISOString() } : req
+      ));
+      
+      alert(`✅ Status zgłoszenia #${requestId} został zmieniony na: ${newStatus}`);
+    } catch (error) {
+      console.error('Błąd podczas zmiany statusu:', error);
+      alert('❌ Wystąpił błąd podczas zmiany statusu. Spróbuj ponownie.');
+    }
+  };
+
+  const handleRefresh = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const [requestsData, companiesData] = await Promise.all([
+        returnsAPI.getReturns(),
+        companiesAPI.getCompanies()
+      ]);
+      
+      setRequests(requestsData);
+      setCompanies(companiesData);
+      
+    } catch (err) {
+      console.error('Błąd podczas odświeżania:', err);
+      setError('Nie udało się odświeżyć danych.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -250,7 +313,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
       <div className="space-y-2">
         <div className="text-xs text-gray-500 mb-2">Wybrane bębny:</div>
         <div className="flex flex-wrap gap-1">
-          {request.selected_drums.map((drum, idx) => (
+          {Array.isArray(request.selected_drums) && request.selected_drums.map((drum, idx) => (
             <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
               {drum}
             </span>
@@ -408,7 +471,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Wybrane bębny ({selectedRequest.drumsCount} szt.)</h3>
               <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                {selectedRequest.selected_drums.map((drum, idx) => (
+                {Array.isArray(selectedRequest.selected_drums) && selectedRequest.selected_drums.map((drum, idx) => (
                   <span key={idx} className="px-3 py-2 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium text-center">
                     {drum}
                   </span>
@@ -482,6 +545,37 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="text-red-600 mb-4">{error}</div>
+            <button 
+              onClick={handleRefresh}
+              className="px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors duration-200 flex items-center space-x-2 mx-auto"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Spróbuj ponownie</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -504,6 +598,13 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
               <button className="px-4 py-2 bg-white border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors duration-200 flex items-center space-x-2">
                 <Download className="w-4 h-4" />
                 <span>Export</span>
+              </button>
+              <button 
+                onClick={handleRefresh}
+                className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors duration-200 flex items-center space-x-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Odśwież</span>
               </button>
             </div>
           </div>
