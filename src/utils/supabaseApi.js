@@ -89,7 +89,7 @@ export const authAPI = {
 //  API do Bębnów (rzeczywiste dane) - POPRAWIONA WERSJA
 // ==================================
 export const drumsAPI = {
-async getDrums(nip = null) {
+  async getDrums(nip = null) {
     try {
       let query = supabase
         .from('drums')
@@ -99,10 +99,7 @@ async getDrums(nip = null) {
             name,
             email,
             phone,
-            address,
-            custom_return_periods (
-              return_period_days
-            )
+            address
           )
         `);
 
@@ -115,24 +112,18 @@ async getDrums(nip = null) {
       if (error) throw error;
 
       return data.map(drum => {
-        const returnPeriodDays = drum.companies?.custom_return_periods?.[0]?.return_period_days || 85;
         const status = supabaseHelpers.getDrumStatus(drum.data_zwrotu_do_dostawcy);
-        
-        const issueDate = drum.data_wydania ? new Date(drum.data_wydania) : new Date(drum.data_przyjecia_na_stan);
-        const now = new Date();
-        const daysInPossession = issueDate ? Math.ceil((now - issueDate) / (1000 * 60 * 60 * 24)) : 0;
-        
-        const returnDate = new Date(drum.data_zwrotu_do_dostawcy);
-        const overdueDays = status.status === 'overdue' ? Math.ceil((now - returnDate) / (1000 * 60 * 60 * 24)) : 0;
         
         return {
           ...drum,
+          // Poprawne mapowanie i ujednolicenie danych
           KOD_BEBNA: drum.kod_bebna,
           NAZWA: drum.nazwa,
           CECHA: drum.cecha,
           DATA_ZWROTU_DO_DOSTAWCY: drum.data_zwrotu_do_dostawcy,
           KON_DOSTAWCA: drum.kon_dostawca,
-          PELNA_NAZWA_KONTRAHENTA: drum.companies?.name || drum.pelna_nazwa_kontrahenta || 'Brak danych firmy',
+          // Ujednolicone pole z nazwą firmy
+          PELNA_NAZWA_KONTRAHENTA: drum.companies?.name || drum.pelna_nazwa_kontrahenta,
           NIP: drum.nip,
           TYP_DOK: drum.typ_dok,
           NR_DOKUMENTUPZ: drum.nr_dokumentupz,
@@ -140,13 +131,12 @@ async getDrums(nip = null) {
           KONTRAHENT: drum.kontrahent,
           STATUS: drum.status,
           DATA_WYDANIA: drum.data_wydania,
-          company: drum.companies?.name || drum.pelna_nazwa_kontrahenta || 'Brak danych firmy',
+          
+          // Dodatkowe pola dla komponentów
+          company: drum.companies?.name || drum.pelna_nazwa_kontrahenta,
           companyPhone: drum.companies?.phone,
           companyEmail: drum.companies?.email,
           companyAddress: drum.companies?.address,
-          returnPeriodDays,
-          daysInPossession,
-          overdueDays,
           ...status
         };
       });
