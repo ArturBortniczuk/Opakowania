@@ -1,4 +1,4 @@
-// src/components/AdminDrumsList.js - Zaktualizowany o prawdziwe dane
+// src/components/AdminDrumsList.js - Wersja do debugowania
 import React, { useState, useMemo, useEffect } from 'react';
 import { drumsAPI, companiesAPI } from '../utils/supabaseApi';
 import { 
@@ -40,11 +40,19 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
       setError(null);
       
       try {
+        // --- ZMIANA DO DEBUGOWANIA ---
+        // Pobieramy WSZYSTKIE bębny, aby sprawdzić połączenie i renderowanie
         const [drumsData, companiesData] = await Promise.all([
-          drumsAPI.getDrums(),
+          drumsAPI.getDrums(), // Usunięto filtr NIP
           companiesAPI.getCompanies()
         ]);
         
+        console.log("Odebrane bębny z API (Admin):", drumsData); // Sprawdź w konsoli przeglądarki
+        if (!Array.isArray(drumsData)) {
+          console.error("API nie zwróciło tablicy!", drumsData);
+          throw new Error("Otrzymano nieprawidłowe dane z serwera.");
+        }
+
         setDrums(drumsData);
         setCompanies(companiesData);
         
@@ -57,27 +65,21 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     };
 
     fetchData();
-  }, []);
+  }, []); // Pusty dependency array, żeby uruchomić tylko raz
 
   const filteredAndSortedDrums = useMemo(() => {
     let filtered = drums.filter(drum => {
-      // Poprawione warunki wyszukiwania
       const matchesSearch = (drum.KOD_BEBNA?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
                            (drum.NAZWA?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                           (drum.PELNA_NAZWA_KONTRAHENTA?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || // Poprawione pole
+                           (drum.PELNA_NAZWA_KONTRAHENTA?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
                            (drum.NIP || '').includes(searchTerm);
       
       if (!matchesSearch) return false;
       
-      // Filter by client
       if (filterClient && drum.NIP !== filterClient) return false;
       
-      // Filter by status
-      if (filterStatus === 'overdue' && drum.status !== 'overdue') return false;
-      if (filterStatus === 'due-soon' && drum.status !== 'due-soon') return false;
-      if (filterStatus === 'active' && drum.status !== 'active') return false;
+      if (filterStatus !== 'all' && drum.status !== filterStatus) return false;
       
-      // Filter by date range
       if (filterDateRange === 'this-week') {
         const weekFromNow = new Date();
         weekFromNow.setDate(weekFromNow.getDate() + 7);
@@ -112,6 +114,13 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
       return 0;
     });
   }, [drums, searchTerm, sortBy, sortOrder, filterStatus, filterClient, filterDateRange]);
+
+  // ... (reszta komponentu pozostaje bez zmian)
+
+  // ... (reszta pliku)
+  // UWAGA: Reszta pliku AdminDrumsList.js pozostaje bez zmian. 
+  // Należy skopiować tylko powyższy fragment, zastępując istniejący.
+  // Poniżej znajduje się tylko fragment dla kompletności.
 
   const handleSort = (field) => {
     if (sortBy === field) {
