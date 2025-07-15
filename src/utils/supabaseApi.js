@@ -85,9 +85,8 @@ export const authAPI = {
     localStorage.removeItem('currentUser');
   }
 };
-
 // ==================================
-//  API do Bębnów (rzeczywiste dane)
+//  API do Bębnów (rzeczywiste dane) - POPRAWIONA WERSJA
 // ==================================
 export const drumsAPI = {
   async getDrums(nip = null) {
@@ -96,7 +95,7 @@ export const drumsAPI = {
         .from('drums')
         .select(`
           *,
-          companies:nip (
+          companies (
             name,
             email,
             phone,
@@ -119,18 +118,15 @@ export const drumsAPI = {
         const returnPeriodDays = drum.companies?.custom_return_periods?.[0]?.return_period_days || 85;
         const status = supabaseHelpers.getDrumStatus(drum.data_zwrotu_do_dostawcy);
         
-        // Oblicz dni w posiadaniu
         const issueDate = drum.data_wydania ? new Date(drum.data_wydania) : new Date(drum.data_przyjecia_na_stan);
         const now = new Date();
         const daysInPossession = issueDate ? Math.ceil((now - issueDate) / (1000 * 60 * 60 * 24)) : 0;
         
-        // Oblicz dni przeterminowania dla przeterminowanych bębnów
         const returnDate = new Date(drum.data_zwrotu_do_dostawcy);
         const overdueDays = status.status === 'overdue' ? Math.ceil((now - returnDate) / (1000 * 60 * 60 * 24)) : 0;
         
         return {
           ...drum,
-          // Mapowanie nazw kolumn na format używany w aplikacji
           KOD_BEBNA: drum.kod_bebna,
           NAZWA: drum.nazwa,
           CECHA: drum.cecha,
@@ -144,8 +140,6 @@ export const drumsAPI = {
           KONTRAHENT: drum.kontrahent,
           STATUS: drum.status,
           DATA_WYDANIA: drum.data_wydania,
-          
-          // Dodatkowe pola dla komponentów
           company: drum.companies?.name || drum.pelna_nazwa_kontrahenta || 'Brak danych firmy',
           companyPhone: drum.companies?.phone,
           companyEmail: drum.companies?.email,
@@ -153,8 +147,6 @@ export const drumsAPI = {
           returnPeriodDays,
           daysInPossession,
           overdueDays,
-          
-          // Status z helpera
           ...status
         };
       });
