@@ -1,5 +1,5 @@
-// src/components/ReturnForm.js
-import React, { useState } from 'react';
+// src/components/ReturnForm.js - Zaktualizowany o rzeczywiste dane z Supabase
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   MapPin, 
@@ -14,8 +14,8 @@ import {
   Package,
   User
 } from 'lucide-react';
-import { mockDrumsData } from '../data/mockData';
-import { calculateReturnDate, getReturnPeriodForClient } from '../data/additionalData';
+import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
+
 const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -33,8 +33,27 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
     confirmEmpty: false
   });
   const [loading, setLoading] = useState(false);
+  const [userDrums, setUserDrums] = useState([]);
+  const [drumsLoading, setDrumsLoading] = useState(true);
 
-  const userDrums = mockDrumsData.filter(drum => drum.NIP === user.nip);
+  // Pobierz bębny użytkownika
+  useEffect(() => {
+    const fetchUserDrums = async () => {
+      setDrumsLoading(true);
+      try {
+        const drums = await drumsAPI.getDrums(user.nip);
+        setUserDrums(drums);
+      } catch (err) {
+        console.error('Błąd podczas pobierania bębnów:', err);
+      } finally {
+        setDrumsLoading(false);
+      }
+    };
+
+    if (user?.nip) {
+      fetchUserDrums();
+    }
+  }, [user?.nip]);
 
   const steps = [
     { id: 1, title: 'Dane podstawowe', icon: Building2 },
@@ -75,10 +94,32 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
     if (!validateStep(5)) return;
     
     setLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setLoading(false);
-    onSubmit();
+    try {
+      // Przygotuj dane do wysłania
+      const returnData = {
+        user_nip: user.nip,
+        company_name: formData.companyName,
+        collection_date: formData.collectionDate,
+        street: formData.street,
+        postal_code: formData.postalCode,
+        city: formData.city,
+        email: formData.email,
+        loading_hours: formData.loadingHours,
+        available_equipment: formData.availableEquipment,
+        notes: formData.notes,
+        selected_drums: formData.selectedDrums
+      };
+
+      // Wyślij zgłoszenie
+      await returnsAPI.createReturn(returnData);
+      
+      setLoading(false);
+      onSubmit();
+    } catch (err) {
+      console.error('Błąd podczas wysyłania zgłoszenia:', err);
+      setLoading(false);
+      alert('Wystąpił błąd podczas wysyłania zgłoszenia. Spróbuj ponownie.');
+    }
   };
 
   const handleDrumToggle = (drumCode) => {
@@ -321,35 +362,41 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-              {userDrums.map((drum, index) => (
-                <div
-                  key={index}
-                  className={`border-2 rounded-xl p-4 transition-all duration-200 cursor-pointer ${
-                    formData.selectedDrums.includes(drum.KOD_BEBNA)
-                      ? 'border-blue-600 bg-blue-50'
-                      : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
-                  }`}
-                  onClick={() => handleDrumToggle(drum.KOD_BEBNA)}
-                >
-                  <div className="flex items-start space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={formData.selectedDrums.includes(drum.KOD_BEBNA)}
-                      onChange={() => handleDrumToggle(drum.KOD_BEBNA)}
-                      className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">{drum.KOD_BEBNA}</h3>
-                      <p className="text-sm text-gray-600">{drum.NAZWA}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Termin zwrotu: {new Date(drum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL')}
-                      </p>
+            {drumsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                {userDrums.map((drum, index) => (
+                  <div
+                    key={index}
+                    className={`border-2 rounded-xl p-4 transition-all duration-200 cursor-pointer ${
+                      formData.selectedDrums.includes(drum.KOD_BEBNA)
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                    }`}
+                    onClick={() => handleDrumToggle(drum.KOD_BEBNA)}
+                  >
+                    <div className="flex items-start space-x-3">
+                      <input
+                        type="checkbox"
+                        checked={formData.selectedDrums.includes(drum.KOD_BEBNA)}
+                        onChange={() => handleDrumToggle(drum.KOD_BEBNA)}
+                        className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900">{drum.KOD_BEBNA}</h3>
+                        <p className="text-sm text-gray-600">{drum.NAZWA}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Termin zwrotu: {new Date(drum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL')}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         );
 
