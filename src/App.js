@@ -20,10 +20,11 @@ const App = () => {
   const [passwordResetToken, setPasswordResetToken] = useState(null);
   const [selectedDrum, setSelectedDrum] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // NOWY STAN: Dodajemy stan do kontrolowania zwinięcia paska bocznego
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [navigationData, setNavigationData] = useState(null);
 
   useEffect(() => {
-    // Sprawdź, czy w URL jest token do resetowania hasła
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
 
@@ -31,10 +32,8 @@ const App = () => {
       console.log("Znaleziono token w URL:", token);
       setPasswordResetToken(token);
       setCurrentView('set-password');
-      // Czyścimy URL, żeby token nie był widoczny po załadowaniu strony
       window.history.replaceState({}, document.title, window.location.pathname);
     } else {
-      // Jeśli nie ma tokenu, sprawdź, czy użytkownik jest już zalogowany w localStorage
       const savedUser = localStorage.getItem('currentUser');
       if (savedUser) {
         try {
@@ -47,13 +46,13 @@ const App = () => {
         }
       }
     }
-  }, []); // Ten efekt uruchamia się tylko raz, przy starcie aplikacji
+  }, []);
 
   const handleLogin = (user) => {
     setCurrentUser(user);
     const defaultView = user.role === 'admin' || user.role === 'supervisor' ? 'admin-dashboard' : 'dashboard';
     setCurrentView(defaultView);
-    setPasswordResetToken(null); // Wyczyść token po udanym logowaniu
+    setPasswordResetToken(null);
   };
 
   const handleLogout = () => {
@@ -121,16 +120,35 @@ const App = () => {
       {currentUser && (
         <>
           {isAdmin ? (
-            <AdminNavbar user={currentUser} currentView={currentView} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} onNavigate={navigateTo} onLogout={handleLogout} />
+            <AdminNavbar 
+              user={currentUser} 
+              currentView={currentView} 
+              sidebarOpen={sidebarOpen} 
+              setSidebarOpen={setSidebarOpen} 
+              isCollapsed={isSidebarCollapsed}
+              setIsCollapsed={setIsSidebarCollapsed}
+              onNavigate={navigateTo} 
+              onLogout={handleLogout} 
+            />
           ) : (
-            <Navbar user={currentUser} currentView={currentView} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} onNavigate={navigateTo} onLogout={handleLogout} />
+            <Navbar 
+              user={currentUser} 
+              currentView={currentView} 
+              sidebarOpen={sidebarOpen} 
+              setSidebarOpen={setSidebarOpen} 
+              isCollapsed={isSidebarCollapsed}
+              setIsCollapsed={setIsSidebarCollapsed}
+              onNavigate={navigateTo} 
+              onLogout={handleLogout} 
+            />
           )}
         </>
       )}
       
-      <div className={`transition-all duration-300 ${currentUser && !isAdmin ? 'lg:ml-80' : ''} ${currentUser && isAdmin ? 'lg:ml-80' : ''}`}>
+      {/* ZMIANA: Dynamiczny margines w zależności od stanu paska bocznego */}
+      <main className={`transition-all duration-300 ${currentUser ? (isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-80') : ''}`}>
         {renderContent()}
-      </div>
+      </main>
     </div>
   );
 };
