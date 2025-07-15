@@ -1,7 +1,6 @@
-// src/components/AdminClientsList.js
-import React, { useState, useMemo } from 'react';
-import { mockDrumsData } from '../data/mockData';
-import { mockCompanies, mockReturnRequests } from '../data/additionalData';
+// src/components/AdminClientsList.js - Zaktualizowany o prawdziwe dane
+import React, { useState, useMemo, useEffect } from 'react';
+import { companiesAPI, drumsAPI, returnsAPI } from '../utils/supabaseApi';
 import { 
   Users, 
   Search, 
@@ -19,8 +18,10 @@ import {
   ArrowUpDown,
   MoreVertical,
   Edit,
-  Trash2
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
+
 const AdminClientsList = ({ onNavigate }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name');
@@ -28,42 +29,72 @@ const AdminClientsList = ({ onNavigate }) => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedClient, setSelectedClient] = useState(null);
   const [showClientDetails, setShowClientDetails] = useState(false);
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const enrichedClients = useMemo(() => {
-    return mockCompanies.map(client => {
-      const clientDrums = mockDrumsData.filter(drum => drum.NIP === client.nip);
-      const clientRequests = mockReturnRequests.filter(req => req.user_nip === client.nip);
+  // Pobierz klientów z danymi
+  useEffect(() => {
+    const fetchClientsData = async () => {
+      setLoading(true);
+      setError(null);
       
-      const now = new Date();
-      const overdueDrums = clientDrums.filter(drum => {
-        const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
-        return returnDate < now;
-      });
-      
-      const pendingRequests = clientRequests.filter(req => req.status === 'Pending');
-      
-      return {
-        ...client,
-        drums: clientDrums,
-        overdueDrums: overdueDrums.length,
-        pendingRequests: pendingRequests.length,
-        totalRequests: clientRequests.length,
-        riskLevel: overdueDrums.length > 0 ? 'high' : 
-                  pendingRequests.length > 0 ? 'medium' : 'low'
-      };
-    });
+      try {
+        const [companiesData, allDrums, allReturns] = await Promise.all([
+          companiesAPI.getCompanies(),
+          drumsAPI.getDrums(),
+          returnsAPI.getReturns()
+        ]);
+        
+        // Wzbogać dane klientów o statystyki
+        const enrichedClients = companiesData.map(company => {
+          const clientDrums = allDrums.filter(drum => drum.NIP === company.nip);
+          const clientReturns = allReturns.filter(ret => ret.user_nip === company.nip);
+          
+          const now = new Date();
+          const overdueDrums = clientDrums.filter(drum => {
+            const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
+            return returnDate < now;
+          });
+          
+          const pendingRequests = clientReturns.filter(req => req.status === 'Pending');
+          
+          return {
+            ...company,
+            drums: clientDrums,
+            drumsCount: clientDrums.length,
+            overdueDrums: overdueDrums.length,
+            pendingRequests: pendingRequests.length,
+            totalRequests: clientReturns.length,
+            riskLevel: overdueDrums.length > 0 ? 'high' : 
+                      pendingRequests.length > 0 ? 'medium' : 'low',
+            lastActivity: company.created_at || new Date().toISOString().split('T')[0]
+          };
+        });
+        
+        setClients(enrichedClients);
+        
+      } catch (err) {
+        console.error('Błąd podczas pobierania danych klientów:', err);
+        setError('Nie udało się pobrać listy klientów. Spróbuj ponownie.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClientsData();
   }, []);
 
   const filteredAndSortedClients = useMemo(() => {
-    let filtered = enrichedClients.filter(client => {
+    let filtered = clients.filter(client => {
       const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            client.nip.includes(searchTerm) ||
-                           client.email.toLowerCase().includes(searchTerm.toLowerCase());
+                           (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase()));
       
       if (filterStatus === 'all') return matchesSearch;
       if (filterStatus === 'high-risk' && client.riskLevel === 'high') return matchesSearch;
       if (filterStatus === 'pending' && client.pendingRequests > 0) return matchesSearch;
-      if (filterStatus === 'active' && client.status === 'Aktywny') return matchesSearch;
+      if (filterStatus === 'active' && client.drumsCount > 0) return matchesSearch;
       
       return false;
     });
@@ -81,7 +112,7 @@ const AdminClientsList = ({ onNavigate }) => {
       if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [enrichedClients, searchTerm, sortBy, sortOrder, filterStatus]);
+  }, [clients, searchTerm, sortBy, sortOrder, filterStatus]);
 
   const handleSort = (field) => {
     if (sortBy === field) {
@@ -95,6 +126,52 @@ const AdminClientsList = ({ onNavigate }) => {
   const handleViewClient = (client) => {
     setSelectedClient(client);
     setShowClientDetails(true);
+  };
+
+  const handleRefresh = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const [companiesData, allDrums, allReturns] = await Promise.all([
+        companiesAPI.getCompanies(),
+        drumsAPI.getDrums(),
+        returnsAPI.getReturns()
+      ]);
+      
+      const enrichedClients = companiesData.map(company => {
+        const clientDrums = allDrums.filter(drum => drum.NIP === company.nip);
+        const clientReturns = allReturns.filter(ret => ret.user_nip === company.nip);
+        
+        const now = new Date();
+        const overdueDrums = clientDrums.filter(drum => {
+          const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
+          return returnDate < now;
+        });
+        
+        const pendingRequests = clientReturns.filter(req => req.status === 'Pending');
+        
+        return {
+          ...company,
+          drums: clientDrums,
+          drumsCount: clientDrums.length,
+          overdueDrums: overdueDrums.length,
+          pendingRequests: pendingRequests.length,
+          totalRequests: clientReturns.length,
+          riskLevel: overdueDrums.length > 0 ? 'high' : 
+                    pendingRequests.length > 0 ? 'medium' : 'low',
+          lastActivity: company.created_at || new Date().toISOString().split('T')[0]
+        };
+      });
+      
+      setClients(enrichedClients);
+      
+    } catch (err) {
+      console.error('Błąd podczas odświeżania:', err);
+      setError('Nie udało się odświeżyć danych.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getRiskBadge = (riskLevel) => {
@@ -111,6 +188,17 @@ const AdminClientsList = ({ onNavigate }) => {
       </span>
     );
   };
+
+  const getStatistics = () => {
+    const total = clients.length;
+    const highRisk = clients.filter(c => c.riskLevel === 'high').length;
+    const withPending = clients.filter(c => c.pendingRequests > 0).length;
+    const lowRisk = clients.filter(c => c.riskLevel === 'low').length;
+    
+    return { total, highRisk, withPending, lowRisk };
+  };
+
+  const stats = getStatistics();
 
   const ClientCard = ({ client, index }) => (
     <div 
@@ -161,21 +249,27 @@ const AdminClientsList = ({ onNavigate }) => {
       </div>
 
       <div className="space-y-2 mb-4 text-sm">
-        <div className="flex items-center space-x-2 text-gray-600">
-          <Mail className="w-4 h-4" />
-          <span>{client.email}</span>
-        </div>
-        <div className="flex items-center space-x-2 text-gray-600">
-          <Phone className="w-4 h-4" />
-          <span>{client.phone}</span>
-        </div>
-        <div className="flex items-center space-x-2 text-gray-600">
-          <MapPin className="w-4 h-4" />
-          <span className="truncate">{client.address}</span>
-        </div>
+        {client.email && (
+          <div className="flex items-center space-x-2 text-gray-600">
+            <Mail className="w-4 h-4" />
+            <span>{client.email}</span>
+          </div>
+        )}
+        {client.phone && (
+          <div className="flex items-center space-x-2 text-gray-600">
+            <Phone className="w-4 h-4" />
+            <span>{client.phone}</span>
+          </div>
+        )}
+        {client.address && (
+          <div className="flex items-center space-x-2 text-gray-600">
+            <MapPin className="w-4 h-4" />
+            <span className="truncate">{client.address}</span>
+          </div>
+        )}
         <div className="flex items-center space-x-2 text-gray-600">
           <Calendar className="w-4 h-4" />
-          <span>Ostatnia aktywność: {client.lastActivity}</span>
+          <span>Ostatnia aktywność: {new Date(client.lastActivity).toLocaleDateString('pl-PL')}</span>
         </div>
       </div>
 
@@ -232,15 +326,15 @@ const AdminClientsList = ({ onNavigate }) => {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Email</label>
-                    <p className="text-gray-900">{selectedClient.email}</p>
+                    <p className="text-gray-900">{selectedClient.email || 'Brak danych'}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Telefon</label>
-                    <p className="text-gray-900">{selectedClient.phone}</p>
+                    <p className="text-gray-900">{selectedClient.phone || 'Brak danych'}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Adres</label>
-                    <p className="text-gray-900">{selectedClient.address}</p>
+                    <p className="text-gray-900">{selectedClient.address || 'Brak danych'}</p>
                   </div>
                 </div>
               </div>
@@ -265,12 +359,8 @@ const AdminClientsList = ({ onNavigate }) => {
                     <span className="font-medium">{selectedClient.totalRequests}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Status</span>
-                    <span className="font-medium text-green-600">{selectedClient.status}</span>
-                  </div>
-                  <div className="flex justify-between">
                     <span className="text-gray-600">Ostatnia aktywność</span>
-                    <span className="font-medium">{selectedClient.lastActivity}</span>
+                    <span className="font-medium">{new Date(selectedClient.lastActivity).toLocaleDateString('pl-PL')}</span>
                   </div>
                 </div>
               </div>
@@ -302,21 +392,62 @@ const AdminClientsList = ({ onNavigate }) => {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="text-red-600 mb-4">{error}</div>
+            <button 
+              onClick={handleRefresh}
+              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2 mx-auto"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Spróbuj ponownie</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center space-x-4 mb-6">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
-              <Users className="w-6 h-6 text-white" />
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
+                <Users className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                  Zarządzanie klientami
+                </h1>
+                <p className="text-gray-600">Przeglądaj i zarządzaj wszystkimi klientami w systemie</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-                Zarządzanie klientami
-              </h1>
-              <p className="text-gray-600">Przeglądaj i zarządzaj wszystkimi klientami w systemie</p>
-            </div>
+            
+            <button
+              onClick={handleRefresh}
+              className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Odśwież</span>
+            </button>
           </div>
 
           {/* Filters and Search */}
@@ -381,25 +512,19 @@ const AdminClientsList = ({ onNavigate }) => {
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-blue-100 text-center">
-              <div className="text-2xl font-bold text-blue-600">{enrichedClients.length}</div>
+              <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
               <div className="text-sm text-gray-600">Wszyscy klienci</div>
             </div>
             <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-green-100 text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {enrichedClients.filter(c => c.riskLevel === 'low').length}
-              </div>
+              <div className="text-2xl font-bold text-green-600">{stats.lowRisk}</div>
               <div className="text-sm text-gray-600">Niskie ryzyko</div>
             </div>
             <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-yellow-100 text-center">
-              <div className="text-2xl font-bold text-yellow-600">
-                {enrichedClients.filter(c => c.pendingRequests > 0).length}
-              </div>
+              <div className="text-2xl font-bold text-yellow-600">{stats.withPending}</div>
               <div className="text-sm text-gray-600">Z oczekującymi</div>
             </div>
             <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-red-100 text-center">
-              <div className="text-2xl font-bold text-red-600">
-                {enrichedClients.filter(c => c.riskLevel === 'high').length}
-              </div>
+              <div className="text-2xl font-bold text-red-600">{stats.highRisk}</div>
               <div className="text-sm text-gray-600">Wysokie ryzyko</div>
             </div>
           </div>
