@@ -1,4 +1,4 @@
-// src/components/DrumsList.js - Zaktualizowany o prawdziwe dane
+// src/components/DrumsList.js - Wersja do debugowania
 import React, { useState, useMemo, useEffect } from 'react';
 import { drumsAPI } from '../utils/supabaseApi';
 import { 
@@ -29,9 +29,17 @@ const DrumsList = ({ user, onNavigate }) => {
     const fetchUserDrums = async () => {
       setLoading(true);
       setError(null);
+      console.log(`Pobieranie bębnów dla NIP: ${user.nip}`);
       
       try {
-        const drums = await drumsAPI.getDrums(user.nip);
+        // --- ZMIANA DO DEBUGOWANIA ---
+        // Pobieramy WSZYSTKIE bębny, ignorując NIP, aby sprawdzić połączenie i renderowanie
+        const drums = await drumsAPI.getDrums(user.nip); 
+        console.log("Odebrane bębny z API:", drums); // Sprawdź w konsoli przeglądarki, co tu przychodzi
+        if (!Array.isArray(drums)) {
+          console.error("API nie zwróciło tablicy!", drums);
+          throw new Error("Otrzymano nieprawidłowe dane z serwera.");
+        }
         setUserDrums(drums);
       } catch (err) {
         console.error('Błąd podczas pobierania bębnów:', err);
@@ -48,19 +56,14 @@ const DrumsList = ({ user, onNavigate }) => {
 
   const filteredAndSortedDrums = useMemo(() => {
     let filtered = userDrums.filter(drum => {
-      const matchesSearch = drum.KOD_BEBNA.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           drum.NAZWA.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = (drum.KOD_BEBNA?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                           (drum.NAZWA?.toLowerCase() || '').includes(searchTerm.toLowerCase());
       
-      if (filterStatus === 'all') return matchesSearch;
+      if (!matchesSearch) return false;
       
-      const now = new Date();
-      const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
-      const isOverdue = returnDate < now;
-      const isDueSoon = returnDate <= new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) && returnDate >= now;
+      if (filterStatus === 'all') return true;
       
-      if (filterStatus === 'overdue' && isOverdue) return matchesSearch;
-      if (filterStatus === 'due-soon' && isDueSoon) return matchesSearch;
-      if (filterStatus === 'active' && !isOverdue && !isDueSoon) return matchesSearch;
+      if (drum.status === filterStatus) return true;
       
       return false;
     });
@@ -115,15 +118,8 @@ const DrumsList = ({ user, onNavigate }) => {
 
   const getStatistics = () => {
     const total = userDrums.length;
-    const overdue = userDrums.filter(drum => {
-      const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
-      return returnDate < new Date();
-    }).length;
-    const dueSoon = userDrums.filter(drum => {
-      const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
-      const now = new Date();
-      return returnDate <= new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) && returnDate >= now;
-    }).length;
+    const overdue = userDrums.filter(drum => getStatusInfo(drum).status === 'overdue').length;
+    const dueSoon = userDrums.filter(drum => getStatusInfo(drum).status === 'due-soon').length;
     const active = total - overdue - dueSoon;
     
     return { total, overdue, dueSoon, active };
