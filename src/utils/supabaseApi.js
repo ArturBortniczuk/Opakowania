@@ -89,7 +89,7 @@ export const authAPI = {
 //  API do Bębnów (rzeczywiste dane) - POPRAWIONA WERSJA
 // ==================================
 export const drumsAPI = {
-  async getDrums(nip = null) {
+async getDrums(nip = null) {
     try {
       let query = supabase
         .from('drums')
