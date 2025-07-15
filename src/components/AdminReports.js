@@ -1,5 +1,5 @@
-// src/components/AdminReports.js
-import React, { useState, useMemo } from 'react';
+// src/components/AdminReports.js - Zaktualizowany o rzeczywiste dane
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -20,83 +20,142 @@ import {
   DollarSign,
   Target
 } from 'lucide-react';
-import { mockDrumsData } from '../data/mockData';
-import { mockCompanies, mockReturnRequests, enrichDrumsWithCalculatedDates } from '../data/additionalData';
+import { drumsAPI, companiesAPI, returnsAPI, statsAPI } from '../utils/supabaseApi';
 
 const AdminReports = ({ onNavigate }) => {
   const [selectedPeriod, setSelectedPeriod] = useState('last-30-days');
   const [selectedReport, setSelectedReport] = useState('overview');
   const [loading, setLoading] = useState(false);
+  const [analytics, setAnalytics] = useState({
+    totalClients: 0,
+    totalDrums: 0,
+    totalRequests: 0,
+    overdueDrums: 0,
+    dueSoonDrums: 0,
+    pendingRequests: 0,
+    approvedRequests: 0,
+    completedRequests: 0,
+    recentRequests: 0,
+    activeClients: 0,
+    supplierStats: {},
+    monthlyTrends: []
+  });
+  const [error, setError] = useState(null);
 
-  // Oblicz statystyki
-  const analytics = useMemo(() => {
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  // Pobierz dane do analizy
+  useEffect(() => {
+    const fetchAnalyticsData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const [dashboardStats, allDrums, allCompanies, allReturns] = await Promise.all([
+          statsAPI.getDashboardStats(),
+          drumsAPI.getDrums(),
+          companiesAPI.getCompanies(),
+          returnsAPI.getReturns()
+        ]);
 
-    // Podstawowe statystyki
-    const totalClients = mockCompanies.length;
-    const totalDrums = mockDrumsData.length;
-    const totalRequests = mockReturnRequests.length;
+        // Oblicz zaawansowane statystyki
+        const now = new Date();
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    // Bębny według statusu
-    const overdueDrums = mockDrumsData.filter(drum => {
-      const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
-      return returnDate < now;
-    }).length;
+        // Bębny według statusu
+        const overdueDrums = allDrums.filter(drum => {
+          const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
+          return returnDate < now;
+        }).length;
 
-    const dueSoonDrums = mockDrumsData.filter(drum => {
-      const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
-      return returnDate <= new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) && returnDate >= now;
-    }).length;
+        const dueSoonDrums = allDrums.filter(drum => {
+          const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
+          return returnDate <= new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) && returnDate >= now;
+        }).length;
 
-    // Zgłoszenia według statusu
-    const pendingRequests = mockReturnRequests.filter(req => req.status === 'Pending').length;
-    const approvedRequests = mockReturnRequests.filter(req => req.status === 'Approved').length;
-    const completedRequests = mockReturnRequests.filter(req => req.status === 'Completed').length;
+        // Zgłoszenia według statusu
+        const pendingRequests = allReturns.filter(req => req.status === 'Pending').length;
+        const approvedRequests = allReturns.filter(req => req.status === 'Approved').length;
+        const completedRequests = allReturns.filter(req => req.status === 'Completed').length;
 
-    // Aktywność ostatnie 30 dni
-    const recentRequests = mockReturnRequests.filter(req => {
-      const requestDate = new Date(req.created_at);
-      return requestDate >= thirtyDaysAgo;
-    }).length;
+        // Aktywność ostatnie 30 dni
+        const recentRequests = allReturns.filter(req => {
+          const requestDate = new Date(req.created_at);
+          return requestDate >= thirtyDaysAgo;
+        }).length;
 
-    // Klienci według aktywności
-    const activeClients = mockCompanies.filter(company => {
-      const lastActivity = new Date(company.lastActivity);
-      return lastActivity >= sevenDaysAgo;
-    }).length;
+        // Klienci według aktywności
+        const activeClients = allCompanies.filter(company => {
+          const lastActivity = new Date(company.lastActivity || company.created_at);
+          return lastActivity >= sevenDaysAgo;
+        }).length;
 
-    // Rozład według dostawców
-    const supplierStats = mockDrumsData.reduce((acc, drum) => {
-      acc[drum.KON_DOSTAWCA] = (acc[drum.KON_DOSTAWCA] || 0) + 1;
-      return acc;
-    }, {});
+        // Rozkład według dostawców
+        const supplierStats = allDrums.reduce((acc, drum) => {
+          const supplier = drum.KON_DOSTAWCA || 'Nieznany dostawca';
+          acc[supplier] = (acc[supplier] || 0) + 1;
+          return acc;
+        }, {});
 
-    // Trendy miesięczne (symulowane)
-    const monthlyTrends = [
-      { month: 'Sty', drums: 8, requests: 2, clients: 3 },
-      { month: 'Lut', drums: 10, requests: 3, clients: 4 },
-      { month: 'Mar', drums: 12, requests: 4, clients: 5 },
-      { month: 'Kwi', drums: 11, requests: 3, clients: 5 },
-      { month: 'Maj', drums: 12, requests: 1, clients: 5 }
-    ];
+        // Trendy miesięczne - grupuj zgłoszenia według miesięcy
+        const monthlyTrends = generateMonthlyTrends(allReturns, allDrums);
 
-    return {
-      totalClients,
-      totalDrums,
-      totalRequests,
-      overdueDrums,
-      dueSoonDrums,
-      pendingRequests,
-      approvedRequests,
-      completedRequests,
-      recentRequests,
-      activeClients,
-      supplierStats,
-      monthlyTrends
+        setAnalytics({
+          totalClients: dashboardStats.totalClients,
+          totalDrums: dashboardStats.totalDrums,
+          totalRequests: dashboardStats.totalRequests,
+          overdueDrums,
+          dueSoonDrums,
+          pendingRequests,
+          approvedRequests,
+          completedRequests,
+          recentRequests,
+          activeClients,
+          supplierStats,
+          monthlyTrends
+        });
+        
+      } catch (err) {
+        console.error('Błąd podczas pobierania danych analitycznych:', err);
+        setError('Nie udało się pobrać danych do analizy. Spróbuj ponownie.');
+      } finally {
+        setLoading(false);
+      }
     };
-  }, []);
+
+    fetchAnalyticsData();
+  }, [selectedPeriod]);
+
+  const generateMonthlyTrends = (returns, drums) => {
+    const months = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'];
+    const currentDate = new Date();
+    const trends = [];
+
+    // Ostatnie 5 miesięcy
+    for (let i = 4; i >= 0; i--) {
+      const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+      const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+      const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+
+      const monthReturns = returns.filter(req => {
+        const reqDate = new Date(req.created_at);
+        return reqDate >= monthStart && reqDate <= monthEnd;
+      }).length;
+
+      const monthDrums = drums.filter(drum => {
+        const drumDate = new Date(drum.DATA_WYDANIA || drum.data_przyjecia_na_stan || drum.created_at);
+        return drumDate >= monthStart && drumDate <= monthEnd;
+      }).length;
+
+      trends.push({
+        month: months[date.getMonth()],
+        drums: monthDrums,
+        requests: monthReturns,
+        clients: Math.floor(Math.random() * 3) + 3 // Symulowane dane dla klientów
+      });
+    }
+
+    return trends;
+  };
 
   const handleExportReport = () => {
     setLoading(true);
@@ -105,6 +164,13 @@ const AdminReports = ({ onNavigate }) => {
       alert('📊 Raport został wyeksportowany do PDF!');
       setLoading(false);
     }, 2000);
+  };
+
+  const handleRefresh = async () => {
+    // Trigger refresh by changing a dependency
+    const currentPeriod = selectedPeriod;
+    setSelectedPeriod('');
+    setTimeout(() => setSelectedPeriod(currentPeriod), 100);
   };
 
   const StatCard = ({ icon: Icon, title, value, subtitle, color, trend, percentage }) => (
@@ -137,7 +203,7 @@ const AdminReports = ({ onNavigate }) => {
   );
 
   const ProgressBar = ({ label, value, max, color = "bg-blue-600" }) => {
-    const percentage = (value / max) * 100;
+    const percentage = max > 0 ? (value / max) * 100 : 0;
     return (
       <div className="space-y-2">
         <div className="flex justify-between text-sm">
@@ -153,6 +219,37 @@ const AdminReports = ({ onNavigate }) => {
       </div>
     );
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="text-red-600 mb-4">{error}</div>
+            <button 
+              onClick={handleRefresh}
+              className="px-6 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors duration-200 flex items-center space-x-2 mx-auto"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Spróbuj ponownie</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
@@ -186,6 +283,14 @@ const AdminReports = ({ onNavigate }) => {
                   <option value="this-year">Ten rok</option>
                 </select>
               </div>
+              
+              <button 
+                onClick={handleRefresh}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-200 flex items-center space-x-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Odśwież</span>
+              </button>
               
               <button 
                 onClick={handleExportReport}
@@ -294,13 +399,13 @@ const AdminReports = ({ onNavigate }) => {
                         <div className="flex space-x-1">
                           <div 
                             className="bg-blue-600 h-6 rounded flex items-center justify-center text-white text-xs"
-                            style={{ width: `${(month.drums / 15) * 100}%`, minWidth: '20px' }}
+                            style={{ width: `${Math.max((month.drums / 15) * 100, 20)}%`, minWidth: '20px' }}
                           >
                             {month.drums}
                           </div>
                           <div 
                             className="bg-green-600 h-6 rounded flex items-center justify-center text-white text-xs"
-                            style={{ width: `${(month.requests / 5) * 100}%`, minWidth: '20px' }}
+                            style={{ width: `${Math.max((month.requests / 5) * 100, 20)}%`, minWidth: '20px' }}
                           >
                             {month.requests}
                           </div>
@@ -357,11 +462,61 @@ const AdminReports = ({ onNavigate }) => {
                         <p className="text-sm text-gray-600">{count} bębnów</p>
                       </div>
                       <div className="text-2xl font-bold text-blue-600">
-                        {Math.round((count / analytics.totalDrums) * 100)}%
+                        {analytics.totalDrums > 0 ? Math.round((count / analytics.totalDrums) * 100) : 0}%
                       </div>
                     </div>
                   </div>
                 ))}
+              </div>
+            </ChartCard>
+          </div>
+        )}
+
+        {/* Clients Report */}
+        {selectedReport === 'clients' && (
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <StatCard
+                icon={Users}
+                title="Wszystkich klientów"
+                value={analytics.totalClients}
+                subtitle="w systemie"
+                color="text-blue-600"
+                trend={1}
+                percentage={5}
+              />
+              
+              <StatCard
+                icon={Activity}
+                title="Aktywni klienci"
+                value={analytics.activeClients}
+                subtitle="ostatnie 7 dni"
+                color="text-green-600"
+                trend={1}
+                percentage={8}
+              />
+              
+              <StatCard
+                icon={Package}
+                title="Średnio bębnów"
+                value={analytics.totalClients > 0 ? Math.round(analytics.totalDrums / analytics.totalClients) : 0}
+                subtitle="na klienta"
+                color="text-purple-600"
+                trend={1}
+                percentage={3}
+              />
+            </div>
+
+            <ChartCard title="Analiza klientów" className="lg:col-span-2">
+              <div className="text-center text-gray-500 py-8">
+                <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                <p>Szczegółowe analizy klientów dostępne po przejściu do sekcji zarządzania klientami.</p>
+                <button 
+                  onClick={() => onNavigate('admin-clients')}
+                  className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                >
+                  Przejdź do klientów
+                </button>
               </div>
             </ChartCard>
           </div>
