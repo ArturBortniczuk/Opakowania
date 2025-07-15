@@ -100,10 +100,10 @@ export const drumsAPI = {
             name,
             email,
             phone,
-            address
-          ),
-          custom_return_periods:nip (
-            return_period_days
+            address,
+            custom_return_periods (
+              return_period_days
+            )
           )
         `);
 
