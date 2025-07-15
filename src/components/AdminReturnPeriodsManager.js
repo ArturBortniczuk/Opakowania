@@ -1,7 +1,6 @@
-// src/components/AdminReturnPeriodsManager.js
-import React, { useState, useMemo } from 'react';
-import { mockCompanies, mockCustomReturnPeriods, getReturnPeriodForClient } from '../data/additionalData';
-
+// src/components/AdminReturnPeriodsManager.js - Zaktualizowany o rzeczywiste dane z Supabase
+import React, { useState, useMemo, useEffect } from 'react';
+import { companiesAPI, returnPeriodsAPI } from '../utils/supabaseApi';
 import { 
   Calendar, 
   Search, 
@@ -16,7 +15,9 @@ import {
   CheckCircle,
   Settings,
   RotateCcw,
-  Info
+  Info,
+  RefreshCw,
+  Loader
 } from 'lucide-react';
 
 const AdminReturnPeriodsManager = ({ onNavigate }) => {
@@ -26,15 +27,50 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
   const [showAddNew, setShowAddNew] = useState(false);
   const [newClientNip, setNewClientNip] = useState('');
   const [newPeriod, setNewPeriod] = useState('85');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Stan przechowujący lokalne zmiany
-  const [localCustomPeriods, setLocalCustomPeriods] = useState([...mockCustomReturnPeriods]);
+  // Stan danych
+  const [companies, setCompanies] = useState([]);
+  const [returnPeriods, setReturnPeriods] = useState([]);
+
+  // Pobierz dane z Supabase
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const [companiesData, periodsData] = await Promise.all([
+          companiesAPI.getCompanies(),
+          returnPeriodsAPI.getReturnPeriods()
+        ]);
+        
+        setCompanies(companiesData);
+        setReturnPeriods(periodsData);
+        
+      } catch (err) {
+        console.error('Błąd podczas pobierania danych:', err);
+        setError('Nie udało się pobrać danych. Spróbuj ponownie.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Funkcja pomocnicza do pobierania terminu zwrotu dla klienta
+  const getReturnPeriodForClient = (nip) => {
+    const customPeriod = returnPeriods.find(period => period.nip === nip);
+    return customPeriod ? customPeriod.return_period_days : 85;
+  };
 
   const enrichedClients = useMemo(() => {
-    return mockCompanies.map(client => {
+    return companies.map(client => {
       const currentPeriod = getReturnPeriodForClient(client.nip);
-      const hasCustomPeriod = localCustomPeriods.some(period => period.nip === client.nip);
+      const hasCustomPeriod = returnPeriods.some(period => period.nip === client.nip);
       
       return {
         ...client,
@@ -43,13 +79,13 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
         isDefault: currentPeriod === 85
       };
     });
-  }, [localCustomPeriods]);
+  }, [companies, returnPeriods]);
 
   const filteredClients = useMemo(() => {
     return enrichedClients.filter(client => 
       client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.nip.includes(searchTerm) ||
-      client.email.toLowerCase().includes(searchTerm.toLowerCase())
+      (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [enrichedClients, searchTerm]);
 
@@ -59,93 +95,119 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
   };
 
   const handleEditSave = async (clientNip) => {
-    setLoading(true);
+    setSaving(true);
+    setError(null);
     
     try {
-      // Symulacja zapisu do API
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
       const periodDays = parseInt(editingPeriod);
       
-      // Zaktualizuj lokalne dane
-      setLocalCustomPeriods(prev => {
-        const filtered = prev.filter(period => period.nip !== clientNip);
-        if (periodDays !== 85) {
-          return [...filtered, { nip: clientNip, returnPeriodDays: periodDays }];
-        }
-        return filtered;
-      });
+      if (periodDays < 1 || periodDays > 365) {
+        throw new Error('Termin zwrotu musi być między 1 a 365 dni');
+      }
+      
+      // Zapisz w bazie danych
+      await returnPeriodsAPI.updateReturnPeriod(clientNip, periodDays);
+      
+      // Odśwież dane
+      const updatedPeriods = await returnPeriodsAPI.getReturnPeriods();
+      setReturnPeriods(updatedPeriods);
       
       setEditingClient(null);
       setEditingPeriod('');
       
-      // W rzeczywistej aplikacji tutaj byłby call do API
-      console.log(`Zapisano nowy termin ${periodDays} dni dla klienta ${clientNip}`);
-      
     } catch (error) {
       console.error('Błąd podczas zapisywania:', error);
-      alert('Wystąpił błąd podczas zapisywania. Spróbuj ponownie.');
+      setError(error.message || 'Wystąpił błąd podczas zapisywania. Spróbuj ponownie.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
   const handleEditCancel = () => {
     setEditingClient(null);
     setEditingPeriod('');
+    setError(null);
   };
 
   const handleAddNew = async () => {
     if (!newClientNip || !newPeriod) {
-      alert('Wypełnij wszystkie pola');
+      setError('Wypełnij wszystkie pola');
       return;
     }
 
     const periodDays = parseInt(newPeriod);
     if (periodDays < 1 || periodDays > 365) {
-      alert('Termin zwrotu musi być między 1 a 365 dni');
+      setError('Termin zwrotu musi być między 1 a 365 dni');
       return;
     }
 
-    setLoading(true);
+    // Sprawdź czy klient istnieje
+    const clientExists = companies.some(company => company.nip === newClientNip);
+    if (!clientExists) {
+      setError('Klient o podanym NIPie nie istnieje w systemie');
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await returnPeriodsAPI.updateReturnPeriod(newClientNip, periodDays);
       
-      setLocalCustomPeriods(prev => {
-        const filtered = prev.filter(period => period.nip !== newClientNip);
-        return [...filtered, { nip: newClientNip, returnPeriodDays: periodDays }];
-      });
+      // Odśwież dane
+      const updatedPeriods = await returnPeriodsAPI.getReturnPeriods();
+      setReturnPeriods(updatedPeriods);
       
       setShowAddNew(false);
       setNewClientNip('');
       setNewPeriod('85');
       
-      alert('✅ Dodano nowy termin zwrotu!');
-      
     } catch (error) {
       console.error('Błąd podczas dodawania:', error);
-      alert('Wystąpił błąd podczas dodawania. Spróbuj ponownie.');
+      setError('Wystąpił błąd podczas dodawania. Spróbuj ponownie.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
   const resetToDefault = async (clientNip) => {
     if (!window.confirm('Czy na pewno chcesz przywrócić domyślny termin 85 dni?')) return;
     
-    setLoading(true);
+    setSaving(true);
+    setError(null);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Usuń niestandardowy termin (przywróć domyślny)
+      await returnPeriodsAPI.updateReturnPeriod(clientNip, 85);
       
-      setLocalCustomPeriods(prev => prev.filter(period => period.nip !== clientNip));
-      
-      alert('✅ Przywrócono domyślny termin 85 dni');
+      // Odśwież dane
+      const updatedPeriods = await returnPeriodsAPI.getReturnPeriods();
+      setReturnPeriods(updatedPeriods);
       
     } catch (error) {
       console.error('Błąd podczas resetowania:', error);
-      alert('Wystąpił błąd. Spróbuj ponownie.');
+      setError('Wystąpił błąd. Spróbuj ponownie.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const refreshData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const [companiesData, periodsData] = await Promise.all([
+        companiesAPI.getCompanies(),
+        returnPeriodsAPI.getReturnPeriods()
+      ]);
+      
+      setCompanies(companiesData);
+      setReturnPeriods(periodsData);
+      
+    } catch (err) {
+      console.error('Błąd podczas odświeżania danych:', err);
+      setError('Nie udało się odświeżyć danych.');
     } finally {
       setLoading(false);
     }
@@ -206,12 +268,12 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
       <div className="flex-1 space-y-3 mb-4">
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-500">Email:</span>
-          <span className="font-medium text-gray-900 truncate ml-2">{client.email}</span>
+          <span className="font-medium text-gray-900 truncate ml-2">{client.email || 'Brak'}</span>
         </div>
         
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-500">Telefon:</span>
-          <span className="font-medium text-gray-900">{client.phone}</span>
+          <span className="font-medium text-gray-900">{client.phone || 'Brak'}</span>
         </div>
         
         <div className="flex items-center justify-between text-sm">
@@ -221,40 +283,37 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
               <div className="flex items-center space-x-2">
                 <input
                   type="number"
-                  min="1"
-                  max="365"
                   value={editingPeriod}
                   onChange={(e) => setEditingPeriod(e.target.value)}
-                  className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={loading}
+                  className="w-16 px-2 py-1 text-xs border border-gray-300 rounded"
+                  min="1"
+                  max="365"
+                  disabled={saving}
                 />
-                <span className="text-sm text-gray-600">dni</span>
                 <button
                   onClick={() => handleEditSave(client.nip)}
-                  disabled={loading}
-                  className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors duration-200"
+                  disabled={saving}
+                  className="p-1 text-green-600 hover:bg-green-100 rounded disabled:opacity-50"
                 >
-                  <Save className="w-4 h-4" />
+                  {saving ? <Loader className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                 </button>
                 <button
                   onClick={handleEditCancel}
-                  disabled={loading}
-                  className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors duration-200"
+                  disabled={saving}
+                  className="p-1 text-red-600 hover:bg-red-100 rounded disabled:opacity-50"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3 h-3" />
                 </button>
               </div>
             ) : (
               <div className="flex items-center space-x-2">
-                <span className={`font-medium ${client.isDefault ? 'text-gray-900' : 'text-blue-600'}`}>
-                  {client.currentReturnPeriod} dni
-                </span>
+                <span className="font-bold text-blue-600">{client.currentReturnPeriod} dni</span>
                 <button
                   onClick={() => handleEditStart(client)}
-                  disabled={loading}
-                  className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors duration-200"
+                  className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                  disabled={saving}
                 >
-                  <Edit className="w-4 h-4" />
+                  <Edit className="w-3 h-3" />
                 </button>
               </div>
             )}
@@ -262,173 +321,164 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
         </div>
       </div>
 
-      <div className="flex space-x-2 mt-auto">
-        <button
-          onClick={() => onNavigate('admin-clients')}
-          className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2 px-3 rounded-xl font-medium hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
-        >
-          <Building2 className="w-4 h-4" />
-          <span>Zobacz klienta</span>
-        </button>
-        
-        {!client.isDefault && (
+      {!client.isDefault && (
+        <div className="mt-auto pt-4 border-t border-gray-100">
           <button
             onClick={() => resetToDefault(client.nip)}
-            disabled={loading}
-            className="bg-gray-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-gray-700 transition-all duration-200 flex items-center justify-center text-sm"
-            title="Przywróć domyślny termin"
+            disabled={saving}
+            className="w-full px-3 py-2 text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2 disabled:opacity-50"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-3 h-3" />
+            <span>Przywróć domyślny (85 dni)</span>
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 
-  const stats = {
-    total: enrichedClients.length,
-    customPeriods: enrichedClients.filter(c => !c.isDefault).length,
-    extended: enrichedClients.filter(c => c.currentReturnPeriod > 85).length,
-    shortened: enrichedClients.filter(c => c.currentReturnPeriod < 85).length
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Ładowanie danych...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 pb-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
-                <Settings className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-800 bg-clip-text text-transparent">
-                  Zarządzanie terminami zwrotu
-                </h1>
-                <p className="text-gray-600">Ustaw indywidualne terminy zwrotu dla klientów</p>
-              </div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                Zarządzanie terminami zwrotu
+              </h1>
+              <p className="text-lg text-gray-600 mt-2">
+                Ustaw niestandardowe terminy zwrotu dla klientów
+              </p>
             </div>
             
-            <button
-              onClick={() => setShowAddNew(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Dodaj termin</span>
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={refreshData}
+                disabled={loading}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors duration-200 flex items-center space-x-2 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <span>Odśwież</span>
+              </button>
+              
+              <button
+                onClick={() => setShowAddNew(!showAddNew)}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center space-x-2 shadow-lg"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Dodaj termin</span>
+              </button>
+            </div>
           </div>
 
           {/* Info Box */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
             <div className="flex items-start space-x-3">
-              <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+              <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
               <div className="text-sm text-blue-800">
-                <p className="font-medium mb-1">Jak działają terminy zwrotu:</p>
-                <ul className="space-y-1 text-blue-700">
-                  <li>• Domyślny termin to <strong>85 dni</strong> od daty wydania bębna</li>
-                  <li>• Możesz ustawić indywidualny termin dla każdego klienta</li>
-                  <li>• Termin jest liczony automatycznie: DATA_WYDANIA + ilość dni</li>
-                  <li>• Zmiany dotyczą wszystkich nowych bębnów wydanych klientowi</li>
+                <p className="font-medium mb-1">Informacje o terminach zwrotu:</p>
+                <ul className="space-y-1">
+                  <li>• Domyślny termin zwrotu to <strong>85 dni</strong> od daty wydania bębna</li>
+                  <li>• Możesz ustawić niestandardowe terminy dla konkretnych klientów</li>
+                  <li>• Terminy można ustawiać w zakresie od 1 do 365 dni</li>
+                  <li>• Zmiany wchodzą w życie natychmiast dla nowych bębnów</li>
                 </ul>
               </div>
             </div>
           </div>
 
-          {/* Search */}
-          <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 mb-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Szukaj klientów po nazwie, NIP lub email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
-              />
+          {/* Error Display */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+              <div className="flex items-center space-x-3">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+                <p className="text-red-800 font-medium">{error}</p>
+              </div>
             </div>
-          </div>
+          )}
+        </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-blue-100 text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-              <div className="text-sm text-gray-600">Wszyscy klienci</div>
+        {/* Search and Filters */}
+        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-blue-100 p-6 mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Szukaj klientów (nazwa, NIP, email)..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
             </div>
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-purple-100 text-center">
-              <div className="text-2xl font-bold text-purple-600">{stats.customPeriods}</div>
-              <div className="text-sm text-gray-600">Niestandardowe terminy</div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-green-100 text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.extended}</div>
-              <div className="text-sm text-gray-600">Przedłużone terminy</div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-yellow-100 text-center">
-              <div className="text-2xl font-bold text-yellow-600">{stats.shortened}</div>
-              <div className="text-sm text-gray-600">Skrócone terminy</div>
+            
+            <div className="text-sm text-gray-600">
+              Wyświetlane: <span className="font-medium">{filteredClients.length}</span> z <span className="font-medium">{companies.length}</span> klientów
             </div>
           </div>
         </div>
 
-        {/* Add New Modal */}
+        {/* Add New Period Form */}
         {showAddNew && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-xl font-bold text-gray-900">Dodaj nowy termin zwrotu</h3>
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl shadow-lg border border-blue-100 p-6 mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Dodaj niestandardowy termin zwrotu</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">NIP klienta</label>
+                <input
+                  type="text"
+                  placeholder="1234567890"
+                  value={newClientNip}
+                  onChange={(e) => setNewClientNip(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={saving}
+                />
               </div>
-              
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    NIP klienta
-                  </label>
-                  <select
-                    value={newClientNip}
-                    onChange={(e) => setNewClientNip(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Wybierz klienta</option>
-                    {mockCompanies.map(company => (
-                      <option key={company.nip} value={company.nip}>
-                        {company.name} (NIP: {company.nip})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Termin zwrotu (dni)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="365"
-                    value={newPeriod}
-                    onChange={(e) => setNewPeriod(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="np. 120"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Domyślny termin to 85 dni. Możesz ustawić od 1 do 365 dni.
-                  </p>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Termin zwrotu (dni)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={newPeriod}
+                  onChange={(e) => setNewPeriod(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={saving}
+                />
               </div>
-              
-              <div className="p-6 border-t border-gray-200 flex space-x-4">
-                <button
-                  onClick={() => setShowAddNew(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors duration-200"
-                >
-                  Anuluj
-                </button>
+              <div className="flex items-end space-x-2">
                 <button
                   onClick={handleAddNew}
-                  disabled={loading || !newClientNip || !newPeriod}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                  disabled={saving || !newClientNip || !newPeriod}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
-                  {loading ? 'Dodawanie...' : 'Dodaj'}
+                  {saving ? <Loader className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  <span>{saving ? 'Dodawanie...' : 'Dodaj'}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddNew(false);
+                    setNewClientNip('');
+                    setNewPeriod('85');
+                    setError(null);
+                  }}
+                  disabled={saving}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-200 disabled:opacity-50"
+                >
+                  Anuluj
                 </button>
               </div>
             </div>
@@ -448,13 +498,17 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
               <Settings className="w-12 h-12 text-gray-400" />
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Nie znaleziono klientów</h3>
-            <p className="text-gray-600 mb-6">Spróbuj zmienić kryteria wyszukiwania</p>
-            <button
-              onClick={() => setSearchTerm('')}
-              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200"
-            >
-              Wyczyść filtry
-            </button>
+            <p className="text-gray-600 mb-6">
+              {searchTerm ? 'Spróbuj zmienić kryteria wyszukiwania' : 'Brak klientów w systemie'}
+            </p>
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200"
+              >
+                Wyczyść filtry
+              </button>
+            )}
           </div>
         )}
       </div>
