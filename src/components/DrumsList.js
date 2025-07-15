@@ -1,7 +1,6 @@
-// src/components/DrumsList.js
-import React, { useState, useMemo } from 'react';
-import { mockDrumsData } from '../data/mockData';
-import { enrichDrumsWithCalculatedDates } from '../data/additionalData';
+// src/components/DrumsList.js - Zaktualizowany o prawdziwe dane
+import React, { useState, useMemo, useEffect } from 'react';
+import { drumsAPI } from '../utils/supabaseApi';
 import { 
   Package, 
   Calendar, 
@@ -12,7 +11,8 @@ import {
   Clock,
   ArrowUpDown,
   ExternalLink,
-  Truck
+  Truck,
+  RefreshCw
 } from 'lucide-react';
 
 const DrumsList = ({ user, onNavigate }) => {
@@ -20,10 +20,31 @@ const DrumsList = ({ user, onNavigate }) => {
   const [sortBy, setSortBy] = useState('KOD_BEBNA');
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [userDrums, setUserDrums] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const userDrums = useMemo(() => {
-    return mockDrumsData.filter(drum => drum.NIP === user.nip);
-  }, [user.nip]);
+  // Pobierz bębny użytkownika
+  useEffect(() => {
+    const fetchUserDrums = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const drums = await drumsAPI.getDrums(user.nip);
+        setUserDrums(drums);
+      } catch (err) {
+        console.error('Błąd podczas pobierania bębnów:', err);
+        setError('Nie udało się pobrać listy bębnów. Spróbuj ponownie.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user?.nip) {
+      fetchUserDrums();
+    }
+  }, [user?.nip]);
 
   const filteredAndSortedDrums = useMemo(() => {
     let filtered = userDrums.filter(drum => {
@@ -92,6 +113,24 @@ const DrumsList = ({ user, onNavigate }) => {
     }
   };
 
+  const getStatistics = () => {
+    const total = userDrums.length;
+    const overdue = userDrums.filter(drum => {
+      const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
+      return returnDate < new Date();
+    }).length;
+    const dueSoon = userDrums.filter(drum => {
+      const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
+      const now = new Date();
+      return returnDate <= new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) && returnDate >= now;
+    }).length;
+    const active = total - overdue - dueSoon;
+    
+    return { total, overdue, dueSoon, active };
+  };
+
+  const stats = getStatistics();
+
   const DrumCard = ({ drum, index }) => {
     const status = getStatusInfo(drum);
     const StatusIcon = status.icon;
@@ -130,7 +169,7 @@ const DrumsList = ({ user, onNavigate }) => {
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-500">Data przyjęcia:</span>
             <span className="font-medium text-gray-900">
-              {new Date(drum['Data przyjęcia na stan']).toLocaleDateString('pl-PL')}
+              {drum.DATA_WYDANIA ? new Date(drum.DATA_WYDANIA).toLocaleDateString('pl-PL') : 'Brak daty'}
             </span>
           </div>
           
@@ -151,7 +190,7 @@ const DrumsList = ({ user, onNavigate }) => {
         </div>
 
         <button
-          onClick={() => onNavigate('return', drum)}
+          onClick={() => onNavigate('return', { drum })}
           className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 px-4 rounded-xl font-medium hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 flex items-center justify-center space-x-2"
         >
           <Truck className="w-4 h-4" />
@@ -171,21 +210,79 @@ const DrumsList = ({ user, onNavigate }) => {
     }
   };
 
+  const handleRefresh = () => {
+    // Odśwież dane
+    setLoading(true);
+    setError(null);
+    
+    drumsAPI.getDrums(user.nip)
+      .then(drums => {
+        setUserDrums(drums);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Błąd podczas odświeżania:', err);
+        setError('Nie udało się odświeżyć danych.');
+        setLoading(false);
+      });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="text-red-600 mb-4">{error}</div>
+            <button 
+              onClick={handleRefresh}
+              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2 mx-auto"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Spróbuj ponownie</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center space-x-4 mb-6">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
-              <Package className="w-6 h-6 text-white" />
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
+                <Package className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                  Twoje bębny
+                </h1>
+                <p className="text-gray-600">Zarządzaj swoimi bębnami i planuj zwroty</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-                Twoje bębny
-              </h1>
-              <p className="text-gray-600">Zarządzaj swoimi bębnami i planuj zwroty</p>
-            </div>
+            
+            <button
+              onClick={handleRefresh}
+              className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Odśwież</span>
+            </button>
           </div>
 
           {/* Filters and Search */}
@@ -250,36 +347,19 @@ const DrumsList = ({ user, onNavigate }) => {
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-blue-100 text-center">
-              <div className="text-2xl font-bold text-blue-600">{userDrums.length}</div>
+              <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
               <div className="text-sm text-gray-600">Wszystkie bębny</div>
             </div>
             <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-green-100 text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {userDrums.filter(drum => {
-                  const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
-                  const now = new Date();
-                  return returnDate > new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-                }).length}
-              </div>
+              <div className="text-2xl font-bold text-green-600">{stats.active}</div>
               <div className="text-sm text-gray-600">Aktywne</div>
             </div>
             <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-yellow-100 text-center">
-              <div className="text-2xl font-bold text-yellow-600">
-                {userDrums.filter(drum => {
-                  const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
-                  const now = new Date();
-                  return returnDate <= new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) && returnDate >= now;
-                }).length}
-              </div>
+              <div className="text-2xl font-bold text-yellow-600">{stats.dueSoon}</div>
               <div className="text-sm text-gray-600">Zbliża się termin</div>
             </div>
             <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-red-100 text-center">
-              <div className="text-2xl font-bold text-red-600">
-                {userDrums.filter(drum => {
-                  const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
-                  return returnDate < new Date();
-                }).length}
-              </div>
+              <div className="text-2xl font-bold text-red-600">{stats.overdue}</div>
               <div className="text-sm text-gray-600">Przekroczony termin</div>
             </div>
           </div>
