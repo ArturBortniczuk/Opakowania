@@ -1,7 +1,6 @@
-// src/components/AdminDashboard.js
+// src/components/AdminDashboard.js - Zaktualizowany o prawdziwe dane
 import React, { useState, useEffect } from 'react';
-import { mockDrumsData } from '../data/mockData';
-import { mockCompanies, mockReturnRequests } from '../data/additionalData';
+import { statsAPI, drumsAPI, returnsAPI } from '../utils/supabaseApi';
 import { 
   Users, 
   Package, 
@@ -33,94 +32,125 @@ const AdminDashboard = ({ onNavigate }) => {
 
   const [recentActivity, setRecentActivity] = useState([]);
   const [urgentItems, setUrgentItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    calculateStats();
-    generateRecentActivity();
-    findUrgentItems();
+    const fetchDashboardData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Pobierz statystyki dla administratora
+        const dashboardStats = await statsAPI.getDashboardStats();
+        setStats(dashboardStats);
+        
+        // Pobierz dane do aktywności i pilnych spraw
+        const [allDrums, allReturns] = await Promise.all([
+          drumsAPI.getDrums(),
+          returnsAPI.getReturns()
+        ]);
+        
+        generateRecentActivity(allDrums, allReturns);
+        findUrgentItems(allDrums, allReturns);
+        
+      } catch (err) {
+        console.error('Błąd podczas pobierania danych dashboardu:', err);
+        setError('Nie udało się pobrać danych. Spróbuj ponownie.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
   }, []);
 
-  const calculateStats = () => {
+  const generateRecentActivity = (drums, returns) => {
+    const activities = [];
     const now = new Date();
-    const totalClients = mockCompanies.length;
-    const totalDrums = mockDrumsData.length;
     
-    const pendingReturns = mockReturnRequests.filter(req => req.status === 'Pending').length;
-    const overdueReturns = mockDrumsData.filter(drum => {
-      const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
-      return returnDate < now;
-    }).length;
-
-    const activeRequests = mockReturnRequests.filter(req => 
-      req.status === 'Pending' || req.status === 'Approved'
-    ).length;
+    // Dodaj aktywność na podstawie rzeczywistych danych
     
-    const completedRequests = mockReturnRequests.filter(req => req.status === 'Completed').length;
-
-    setStats({
-      totalClients,
-      totalDrums,
-      pendingReturns,
-      overdueReturns,
-      activeRequests,
-      completedRequests
+    // Nowe zgłoszenia zwrotów
+    const recentReturns = returns.filter(ret => {
+      const createdDate = new Date(ret.created_at);
+      const hoursDiff = (now - createdDate) / (1000 * 60 * 60);
+      return hoursDiff <= 24; // Ostatnie 24 godziny
     });
-  };
 
-  const generateRecentActivity = () => {
-    const activities = [
-      {
-        id: 1,
+    recentReturns.forEach(ret => {
+      activities.push({
+        id: `new-return-${ret.id}`,
         type: 'new_request',
-        message: 'Nowe zgłoszenie zwrotu od Firma ABC',
-        time: '30 minut temu',
+        message: `Nowe zgłoszenie zwrotu od ${ret.company_name}`,
+        time: getTimeAgo(ret.created_at),
         icon: Truck,
         color: 'text-blue-600',
-        priority: 'normal'
-      },
-      {
-        id: 2,
+        priority: ret.priority === 'High' ? 'high' : 'normal'
+      });
+    });
+
+    // Przeterminowane bębny
+    const overdueDrums = drums.filter(drum => {
+      const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
+      return returnDate < now;
+    });
+
+    overdueDrums.slice(0, 2).forEach(drum => {
+      activities.push({
+        id: `overdue-${drum.kod_bebna}`,
         type: 'overdue',
-        message: 'BEB009 - przekroczony termin zwrotu',
-        time: '2 godziny temu',
+        message: `${drum.kod_bebna} - przekroczony termin zwrotu`,
+        time: getTimeAgo(drum.data_zwrotu_do_dostawcy),
         icon: AlertTriangle,
         color: 'text-red-600',
         priority: 'high'
-      },
-      {
-        id: 3,
+      });
+    });
+
+    // Zakończone zgłoszenia
+    const completedReturns = returns.filter(ret => ret.status === 'Completed');
+    if (completedReturns.length > 0) {
+      const latest = completedReturns[completedReturns.length - 1];
+      activities.push({
+        id: `completed-${latest.id}`,
         type: 'completed',
-        message: 'Zakończono zwrot dla XYZ S.A.',
-        time: '4 godziny temu',
+        message: `Zakończono zwrot dla ${latest.company_name}`,
+        time: getTimeAgo(latest.updated_at || latest.created_at),
         icon: CheckCircle,
         color: 'text-green-600',
         priority: 'normal'
-      },
-      {
-        id: 4,
-        type: 'new_client',
-        message: 'Nowy klient: Fabryka Farb Gamma',
-        time: '1 dzień temu',
-        icon: Users,
-        color: 'text-purple-600',
+      });
+    }
+
+    // Jeśli brak aktywności, dodaj domyślną
+    if (activities.length === 0) {
+      activities.push({
+        id: 'system-status',
+        type: 'info',
+        message: 'System działa prawidłowo',
+        time: 'teraz',
+        icon: Activity,
+        color: 'text-blue-600',
         priority: 'normal'
-      }
-    ];
-    setRecentActivity(activities);
+      });
+    }
+
+    setRecentActivity(activities.slice(0, 4));
   };
 
-  const findUrgentItems = () => {
+  const findUrgentItems = (drums, returns) => {
     const now = new Date();
     const urgent = [];
 
     // Sprawdź przekroczone terminy
-    mockDrumsData.forEach(drum => {
+    drums.forEach(drum => {
       const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
       if (returnDate < now) {
         urgent.push({
           type: 'overdue_drum',
-          title: `Przekroczony termin: ${drum.KOD_BEBNA}`,
-          subtitle: drum.PELNA_NAZWA_KONTRAHENTA,
+          title: `Przekroczony termin: ${drum.kod_bebna}`,
+          subtitle: drum.PELNA_NAZWA_KONTRAHENTA || 'Nieznana firma',
           priority: 'high',
           action: () => onNavigate('admin-drums')
         });
@@ -128,7 +158,7 @@ const AdminDashboard = ({ onNavigate }) => {
     });
 
     // Sprawdź pilne zgłoszenia
-    mockReturnRequests.forEach(request => {
+    returns.forEach(request => {
       if (request.priority === 'High' && request.status === 'Pending') {
         urgent.push({
           type: 'urgent_request',
@@ -141,6 +171,21 @@ const AdminDashboard = ({ onNavigate }) => {
     });
 
     setUrgentItems(urgent.slice(0, 5));
+  };
+
+  const getTimeAgo = (dateString) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'mniej niż godzinę temu';
+    if (diffInHours < 24) return `${diffInHours} godzin temu`;
+    
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays === 1) return 'wczoraj';
+    if (diffInDays < 7) return `${diffInDays} dni temu`;
+    
+    return date.toLocaleDateString('pl-PL');
   };
 
   const StatCard = ({ icon: Icon, title, value, subtitle, color, trend, percentage, onClick }) => (
@@ -193,6 +238,36 @@ const AdminDashboard = ({ onNavigate }) => {
       </div>
     );
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <div className="text-red-600 mb-4">{error}</div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors duration-200"
+            >
+              Odśwież stronę
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
