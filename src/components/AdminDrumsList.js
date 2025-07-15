@@ -61,10 +61,11 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
 
   const filteredAndSortedDrums = useMemo(() => {
     let filtered = drums.filter(drum => {
-      const matchesSearch = drum.KOD_BEBNA.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           drum.NAZWA.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           drum.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           drum.NIP.includes(searchTerm);
+      // Poprawione warunki wyszukiwania
+      const matchesSearch = (drum.KOD_BEBNA?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                           (drum.NAZWA?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                           (drum.PELNA_NAZWA_KONTRAHENTA?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || // Poprawione pole
+                           (drum.NIP || '').includes(searchTerm);
       
       if (!matchesSearch) return false;
       
