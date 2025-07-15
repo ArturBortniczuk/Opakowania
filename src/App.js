@@ -20,7 +20,6 @@ const App = () => {
   const [passwordResetToken, setPasswordResetToken] = useState(null);
   const [selectedDrum, setSelectedDrum] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // NOWY STAN: Dodajemy stan do kontrolowania zwinięcia paska bocznego
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [navigationData, setNavigationData] = useState(null);
 
@@ -145,8 +144,8 @@ const App = () => {
         </>
       )}
       
-      {/* ZMIANA: Dynamiczny margines w zależności od stanu paska bocznego */}
-      <main className={`transition-all duration-300 ${currentUser ? (isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-80') : ''}`}>
+      {/* ZMIANA: Dodano pt-16 i poprawiono logikę marginesu */}
+      <main className={`transition-all duration-300 pt-16 ${currentUser ? (isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-80') : ''}`}>
         {renderContent()}
       </main>
     </div>
