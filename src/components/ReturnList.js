@@ -427,7 +427,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   };
 
   return (
-    <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+    <div className="min-h-screen">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
         {/* Header */}
         <div className="mb-8">
