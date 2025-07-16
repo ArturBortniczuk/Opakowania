@@ -241,7 +241,7 @@ const AdminDashboard = ({ onNavigate }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+      <div className="min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
@@ -253,7 +253,7 @@ const AdminDashboard = ({ onNavigate }) => {
 
   if (error) {
     return (
-      <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+      <div className="min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center py-12">
             <div className="text-red-600 mb-4">{error}</div>
@@ -270,7 +270,7 @@ const AdminDashboard = ({ onNavigate }) => {
   }
 
   return (
-    <div className="min-h-screen pt-6 lg:ml-80 transition-all duration-300">
+    <div className="min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
