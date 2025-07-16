@@ -120,7 +120,7 @@ const AdminNavbar = ({
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-purple-100 shadow-sm">
+      <header className={`fixed top-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-purple-100 shadow-sm transition-all duration-300 ease-in-out${isCollapsed ? 'lg:left-20' : 'lg:left-80'}`}>
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center space-x-4">
             <button
