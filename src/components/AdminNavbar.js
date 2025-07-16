@@ -1,5 +1,4 @@
-// src/components/AdminNavbar.js - Zaktualizowany o zwijanie i przewijanie
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { 
   Menu, 
   X, 
@@ -13,12 +12,10 @@ import {
   UserCheck,
   Shield,
   Settings,
-  Bell,
   Crown,
   Pin,
   PinOff
 } from 'lucide-react';
-import { statsAPI } from '../utils/supabaseApi';
 
 const AdminNavbar = ({ 
   user, 
@@ -30,22 +27,6 @@ const AdminNavbar = ({
   onNavigate, 
   onLogout 
 }) => {
-  const [quickStats, setQuickStats] = useState({ overdueReturns: 0 });
-
-  useEffect(() => {
-    const fetchQuickStats = async () => {
-      try {
-        const stats = await statsAPI.getDashboardStats();
-        setQuickStats({ overdueReturns: stats.overdueReturns || 0 });
-      } catch (error) {
-        console.error('Błąd pobierania statystyk:', error);
-      }
-    };
-    fetchQuickStats();
-    const interval = setInterval(fetchQuickStats, 60000); // Odświeżaj co minutę
-    return () => clearInterval(interval);
-  }, []);
-
   const menuItems = [
     { id: 'admin-dashboard', label: 'Dashboard', icon: Home },
     { id: 'admin-clients', label: 'Zarządzaj klientami', icon: Users },
@@ -88,7 +69,6 @@ const AdminNavbar = ({
 
   return (
     <>
-      {/* Przycisk hamburgera dla mobilnego widoku */}
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
         className="fixed top-4 left-4 z-[60] p-2 rounded-lg text-purple-600 bg-white/80 backdrop-blur-sm hover:bg-purple-100 transition-colors duration-200 lg:hidden"
@@ -100,7 +80,6 @@ const AdminNavbar = ({
       
       <aside className={`fixed top-0 left-0 z-50 h-screen bg-white/95 backdrop-blur-md border-r border-purple-100 shadow-xl transform transition-all duration-300 ease-in-out ${isCollapsed ? 'w-24' : 'w-80'} ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
         <div className="h-full flex flex-col">
-          {/* NOWA SEKCJA NAGŁÓWKA W PASKU BOCZNYM */}
           <div className="flex items-center p-4 h-20 border-b border-purple-100">
             <div className={`flex items-center space-x-3 overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-0 opacity-0' : 'w-full opacity-100'}`}>
               <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-700 rounded-lg flex items-center justify-center shadow-lg flex-shrink-0">
