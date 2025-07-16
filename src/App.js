@@ -144,7 +144,7 @@ const App = () => {
         </>
       )}
       
-      <main className={`transition-all duration-300 pt-24 ${currentUser ? (isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-80') : ''}`}>
+      <main className={`transition-all duration-300 pt-8 ${currentUser ? (isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-80') : ''}`}>
         {renderContent()}
       </main>
     </div>
