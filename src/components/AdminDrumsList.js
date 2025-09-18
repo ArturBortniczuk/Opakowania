@@ -165,7 +165,6 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
       const file = e.target.files[0];
       if (!file) return;
 
-      // Sprawdź czy plik to CSV
       if (!file.name.toLowerCase().endsWith('.csv')) {
         alert('❌ Proszę wybrać plik CSV');
         return;
@@ -177,40 +176,42 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
         console.log('📁 Czytam plik CSV...');
         const csvContent = await file.text();
         
-        // Sprawdź czy plik nie jest pusty
         if (!csvContent.trim()) {
           throw new Error('Plik CSV jest pusty');
         }
 
-        // Pobierz klucz API - spróbuj kilku sposobów
-        let supabaseAnonKey = null;
-        
-        // Sposób 1: zmienne środowiskowe React
-        if (process.env.REACT_APP_SUPABASE_ANON_KEY) {
-          supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
-          console.log('✅ Używam klucza z process.env');
-        }
-        
-        // Sposób 2: window.env (jeśli jest ustawione)
-        if (!supabaseAnonKey && window.env?.REACT_APP_SUPABASE_ANON_KEY) {
-          supabaseAnonKey = window.env.REACT_APP_SUPABASE_ANON_KEY;
-          console.log('✅ Używam klucza z window.env');
-        }
-        
-        // Sposób 3: hardcoded klucz anon (tylko do testów - USUŃ w produkcji!)
-        if (!supabaseAnonKey) {
-          // UWAGA: Zastąp tym swoim prawdziwym kluczem anon, który jest bezpieczny do użycia publicznie
-          supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvYmFmaXRhbXprY2ZwdHVhcWoiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczMjU1NjU0OCwiZXhwIjoyMDQ4MTMyNTQ4fQ.Iz9d_9cgVhcAkvA2jJrI8GqD7jI6J5S8X4tMSAPrPvw';
-          console.log('⚠️ Używam zastępczego klucza anon');
-        }
-        
-        if (!supabaseAnonKey) {
-          throw new Error('Brak klucza API Supabase. Skontaktuj się z administratorem.');
+        // Sprawdź podstawową strukturę CSV
+        const lines = csvContent.trim().split('\n');
+        if (lines.length < 2) {
+          throw new Error('Plik CSV musi zawierać nagłówki i przynajmniej jeden wiersz danych');
         }
 
-        console.log('🚀 Rozpoczynam import CSV...');
-        console.log(`📊 Rozmiar pliku: ${Math.round(csvContent.length / 1024)} KB`);
+        console.log(`📊 Znaleziono ${lines.length - 1} wierszy danych`);
+        console.log(`📊 Nagłówki: ${lines[0]}`);
+
+        // Twój klucz anon - ten jest bezpieczny do użycia publicznie
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvYmFmaXRhbXprY2ZwdHVhcWoiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczMjU1NjU0OCwiZXhwIjoyMDQ4MTMyNTQ4fQ.Iz9d_9cgVhcAkvA2jJrI8GqD7jI6J5S8X4tMSAPrPvw';
+
+        console.log('🚀 Wysyłam dane do funkcji clever-action...');
         
+        // Sprawdź czy funkcja odpowiada na OPTIONS (CORS preflight)
+        try {
+          const optionsResponse = await fetch(
+            'https://pobafitamzkcfptuaqj.supabase.co/functions/v1/clever-action',
+            {
+              method: 'OPTIONS',
+              headers: {
+                'Authorization': `Bearer ${supabaseAnonKey}`,
+                'apikey': supabaseAnonKey,
+              }
+            }
+          );
+          console.log('🔗 CORS preflight:', optionsResponse.ok ? '✅ OK' : '❌ FAILED');
+        } catch (corsError) {
+          console.warn('⚠️ CORS preflight failed:', corsError);
+        }
+
+        // Główne żądanie POST
         const response = await fetch(
           'https://pobafitamzkcfptuaqj.supabase.co/functions/v1/clever-action',
           {
@@ -218,69 +219,108 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
             headers: {
               'Authorization': `Bearer ${supabaseAnonKey}`,
               'apikey': supabaseAnonKey,
-              'Content-Type': 'text/plain'
+              'Content-Type': 'text/plain',
+              'x-client-info': 'dashboard-import/1.0'
             },
             body: csvContent
           }
         );
 
-        console.log('📡 Odpowiedź z serwera:', response.status, response.statusText);
+        console.log(`📡 Status odpowiedzi: ${response.status} ${response.statusText}`);
+        console.log('📡 Headers odpowiedzi:', Object.fromEntries(response.headers.entries()));
 
-        // Sprawdź status odpowiedzi
         if (!response.ok) {
-          let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-          
+          let errorDetails = `Status: ${response.status}`;
           try {
-            const errorData = await response.json();
-            if (errorData.message) {
-              errorMessage = errorData.message;
+            const errorText = await response.text();
+            console.error('❌ Szczegóły błędu:', errorText);
+            
+            if (errorText.startsWith('{')) {
+              const errorJson = JSON.parse(errorText);
+              errorDetails = errorJson.message || errorJson.error || errorText;
+            } else {
+              errorDetails = errorText;
             }
-          } catch (e) {
-            // Jeśli nie można sparsować JSON błędu, zostaw komunikat HTTP
+          } catch (parseError) {
+            errorDetails = `${response.status} ${response.statusText}`;
           }
           
-          throw new Error(errorMessage);
+          throw new Error(`Funkcja zwróciła błąd: ${errorDetails}`);
         }
 
-        const result = await response.json();
-        console.log('✅ Wynik importu:', result);
+        // Parsuj odpowiedź
+        const responseText = await response.text();
+        console.log('📄 Surowa odpowiedź:', responseText);
+
+        let result;
+        try {
+          result = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('❌ Nie można sparsować odpowiedzi JSON:', responseText);
+          throw new Error(`Nieprawidłowa odpowiedź z serwera: ${responseText.substring(0, 100)}...`);
+        }
+
+        console.log('✅ Sparsowana odpowiedź:', result);
         
         if (result.success) {
-          alert(`✅ SUKCES!\n\nImport zakończony pomyślnie:\n• Zaimportowano: ${result.imported} rekordów\n• ${result.message}\n\nCzas: ${new Date().toLocaleTimeString()}`);
+          const message = `✅ IMPORT ZAKOŃCZONY SUKCESEM!\n\n` +
+                        `📊 Wyniki:\n` +
+                        `• Zaimportowano: ${result.imported} rekordów\n` +
+                        `• Status: ${result.message}\n` +
+                        `• Czas: ${new Date(result.timestamp).toLocaleString('pl-PL')}\n\n` +
+                        `🔄 Lista bębnów zostanie teraz odświeżona...`;
           
-          // Odśwież listę bębnów po importie
+          alert(message);
+          
           console.log('🔄 Odświeżam listę bębnów...');
           await handleRefresh();
+          
+        } else if (result.error) {
+          throw new Error(result.message || 'Funkcja zwróciła błąd bez szczegółów');
         } else {
-          // Jeśli funkcja zwróciła błąd
-          throw new Error(result.message || result.error || 'Nieznany błąd podczas importu');
+          console.warn('⚠️ Nieoczekiwana struktura odpowiedzi:', result);
+          throw new Error('Otrzymano nieoczekiwaną odpowiedź z serwera');
         }
         
       } catch (error) {
-        console.error('❌ Błąd importu:', error);
+        console.error('❌ Szczegółowy błąd importu:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
         
-        let userMessage = 'Wystąpił nieoczekiwany błąd podczas importu.';
+        let userMessage = 'Wystąpił błąd podczas importu.';
+        let technicalDetails = '';
         
-        if (error.message.includes('Failed to fetch') || error.message.includes('net::')) {
-          userMessage = 'Nie można połączyć się z serwerem. Sprawdź połączenie internetowe i spróbuj ponownie.';
-        } else if (error.message.includes('HTTP 404')) {
-          userMessage = 'Funkcja importu nie została znaleziona na serwerze. Skontaktuj się z administratorem.';
-        } else if (error.message.includes('HTTP 401') || error.message.includes('HTTP 403')) {
-          userMessage = 'Brak uprawnień do wykonania importu. Sprawdź konfigurację kluczy API.';
-        } else if (error.message.includes('HTTP 500')) {
-          userMessage = 'Błąd serwera podczas przetwarzania importu. Spróbuj ponownie za chwilę.';
+        if (error.message.includes('Failed to fetch')) {
+          userMessage = '🌐 Nie można połączyć się z serwerem funkcji';
+          technicalDetails = 'Sprawdź połączenie internetowe lub skontaktuj się z administratorem';
+        } else if (error.message.includes('ERR_NAME_NOT_RESOLVED')) {
+          userMessage = '🔗 Serwer funkcji nie odpowiada';
+          technicalDetails = 'Funkcja może nie być prawidłowo wdrożona lub wystąpił problem z DNS';
+        } else if (error.message.includes('Status: 404')) {
+          userMessage = '❓ Funkcja clever-action nie została znaleziona';
+          technicalDetails = 'Sprawdź czy funkcja jest prawidłowo wdrożona w Supabase Dashboard';
+        } else if (error.message.includes('Status: 500')) {
+          userMessage = '⚡ Błąd wewnętrzny serwera';
+          technicalDetails = 'Sprawdź logi funkcji w Supabase Dashboard > Edge Functions > clever-action > Logs';
+        } else if (error.message.includes('unauthorized') || error.message.includes('forbidden')) {
+          userMessage = '🔐 Brak uprawnień';
+          technicalDetails = 'Sprawdź konfigurację kluczy API i uprawnień funkcji';
         } else {
           userMessage = error.message;
+          technicalDetails = 'Zobacz szczegóły w konsoli przeglądarki (F12)';
         }
         
-        alert(`❌ BŁĄD IMPORTU:\n\n${userMessage}\n\n⚠️ Więcej szczegółów w konsoli przeglądarki (F12 > Console)`);
+        const alertMessage = `❌ BŁĄD IMPORTU:\n\n${userMessage}\n\n🔧 ${technicalDetails}\n\n⚠️ Jeśli problem się powtarza:\n1. Sprawdź logi funkcji w Supabase Dashboard\n2. Sprawdź sekrety funkcji (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)\n3. Sprawdź konsolę przeglądarki (F12 > Console)`;
+        
+        alert(alertMessage);
       } finally {
         setImportLoading(false);
-        console.log('✅ Import zakończony');
+        console.log('🏁 Import zakończony');
       }
     };
 
-    // Kliknij input file
     input.click();
   };
 
