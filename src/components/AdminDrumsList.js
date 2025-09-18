@@ -150,7 +150,8 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     }
   };
 
-  // FUNKCJA IMPORTU CSV
+  // ZASTĄP tę funkcję w AdminDrumsList.js
+
   const handleImportCSV = async () => {
     if (!window.confirm('⚠️ UWAGA: To zastąpi WSZYSTKIE dane w tabeli drums. Kontynuować?')) {
       return;
@@ -164,39 +165,122 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
       const file = e.target.files[0];
       if (!file) return;
 
+      // Sprawdź czy plik to CSV
+      if (!file.name.toLowerCase().endsWith('.csv')) {
+        alert('❌ Proszę wybrać plik CSV');
+        return;
+      }
+
       setImportLoading(true);
+      
       try {
+        console.log('📁 Czytam plik CSV...');
         const csvContent = await file.text();
+        
+        // Sprawdź czy plik nie jest pusty
+        if (!csvContent.trim()) {
+          throw new Error('Plik CSV jest pusty');
+        }
+
+        // Pobierz klucz API - spróbuj kilku sposobów
+        let supabaseAnonKey = null;
+        
+        // Sposób 1: zmienne środowiskowe React
+        if (process.env.REACT_APP_SUPABASE_ANON_KEY) {
+          supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+          console.log('✅ Używam klucza z process.env');
+        }
+        
+        // Sposób 2: window.env (jeśli jest ustawione)
+        if (!supabaseAnonKey && window.env?.REACT_APP_SUPABASE_ANON_KEY) {
+          supabaseAnonKey = window.env.REACT_APP_SUPABASE_ANON_KEY;
+          console.log('✅ Używam klucza z window.env');
+        }
+        
+        // Sposób 3: hardcoded klucz anon (tylko do testów - USUŃ w produkcji!)
+        if (!supabaseAnonKey) {
+          // UWAGA: Zastąp tym swoim prawdziwym kluczem anon, który jest bezpieczny do użycia publicznie
+          supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvYmFmaXRhbXprY2ZwdHVhcWoiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczMjU1NjU0OCwiZXhwIjoyMDQ4MTMyNTQ4fQ.Iz9d_9cgVhcAkvA2jJrI8GqD7jI6J5S8X4tMSAPrPvw';
+          console.log('⚠️ Używam zastępczego klucza anon');
+        }
+        
+        if (!supabaseAnonKey) {
+          throw new Error('Brak klucza API Supabase. Skontaktuj się z administratorem.');
+        }
+
+        console.log('🚀 Rozpoczynam import CSV...');
+        console.log(`📊 Rozmiar pliku: ${Math.round(csvContent.length / 1024)} KB`);
         
         const response = await fetch(
           'https://pobafitamzkcfptuaqj.supabase.co/functions/v1/clever-action',
           {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
+              'Authorization': `Bearer ${supabaseAnonKey}`,
+              'apikey': supabaseAnonKey,
               'Content-Type': 'text/plain'
             },
             body: csvContent
           }
         );
 
+        console.log('📡 Odpowiedź z serwera:', response.status, response.statusText);
+
+        // Sprawdź status odpowiedzi
+        if (!response.ok) {
+          let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          
+          try {
+            const errorData = await response.json();
+            if (errorData.message) {
+              errorMessage = errorData.message;
+            }
+          } catch (e) {
+            // Jeśli nie można sparsować JSON błędu, zostaw komunikat HTTP
+          }
+          
+          throw new Error(errorMessage);
+        }
+
         const result = await response.json();
+        console.log('✅ Wynik importu:', result);
         
         if (result.success) {
-          alert(`✅ SUKCES!\nZaimportowano: ${result.imported} rekordów\n${result.message}`);
-          handleRefresh(); // Odśwież listę
+          alert(`✅ SUKCES!\n\nImport zakończony pomyślnie:\n• Zaimportowano: ${result.imported} rekordów\n• ${result.message}\n\nCzas: ${new Date().toLocaleTimeString()}`);
+          
+          // Odśwież listę bębnów po importie
+          console.log('🔄 Odświeżam listę bębnów...');
+          await handleRefresh();
         } else {
-          throw new Error(result.message || 'Nieznany błąd');
+          // Jeśli funkcja zwróciła błąd
+          throw new Error(result.message || result.error || 'Nieznany błąd podczas importu');
         }
         
       } catch (error) {
-        console.error('Błąd importu:', error);
-        alert(`❌ BŁĄD: ${error.message}`);
+        console.error('❌ Błąd importu:', error);
+        
+        let userMessage = 'Wystąpił nieoczekiwany błąd podczas importu.';
+        
+        if (error.message.includes('Failed to fetch') || error.message.includes('net::')) {
+          userMessage = 'Nie można połączyć się z serwerem. Sprawdź połączenie internetowe i spróbuj ponownie.';
+        } else if (error.message.includes('HTTP 404')) {
+          userMessage = 'Funkcja importu nie została znaleziona na serwerze. Skontaktuj się z administratorem.';
+        } else if (error.message.includes('HTTP 401') || error.message.includes('HTTP 403')) {
+          userMessage = 'Brak uprawnień do wykonania importu. Sprawdź konfigurację kluczy API.';
+        } else if (error.message.includes('HTTP 500')) {
+          userMessage = 'Błąd serwera podczas przetwarzania importu. Spróbuj ponownie za chwilę.';
+        } else {
+          userMessage = error.message;
+        }
+        
+        alert(`❌ BŁĄD IMPORTU:\n\n${userMessage}\n\n⚠️ Więcej szczegółów w konsoli przeglądarki (F12 > Console)`);
       } finally {
         setImportLoading(false);
+        console.log('✅ Import zakończony');
       }
     };
-    
+
+    // Kliknij input file
     input.click();
   };
 
