@@ -1,4 +1,4 @@
-// src/components/AdminDrumsList.js - Wersja do debugowania
+// src/components/AdminDrumsList.js - Kompletny kod z importem CSV
 import React, { useState, useMemo, useEffect } from 'react';
 import { drumsAPI, companiesAPI } from '../utils/supabaseApi';
 import { 
@@ -16,7 +16,8 @@ import {
   MapPin,
   Truck,
   Download,
-  RefreshCw
+  RefreshCw,
+  Upload
 } from 'lucide-react';
 
 const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
@@ -32,6 +33,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [importLoading, setImportLoading] = useState(false);
 
   // Pobierz bębny i firmy
   useEffect(() => {
@@ -40,14 +42,12 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
       setError(null);
       
       try {
-        // --- ZMIANA DO DEBUGOWANIA ---
-        // Pobieramy WSZYSTKIE bębny, aby sprawdzić połączenie i renderowanie
         const [drumsData, companiesData] = await Promise.all([
-          drumsAPI.getDrums(), // Usunięto filtr NIP
+          drumsAPI.getDrums(),
           companiesAPI.getCompanies()
         ]);
         
-        console.log("Odebrane bębny z API (Admin):", drumsData); // Sprawdź w konsoli przeglądarki
+        console.log("Odebrane bębny z API (Admin):", drumsData);
         if (!Array.isArray(drumsData)) {
           console.error("API nie zwróciło tablicy!", drumsData);
           throw new Error("Otrzymano nieprawidłowe dane z serwera.");
@@ -65,7 +65,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     };
 
     fetchData();
-  }, []); // Pusty dependency array, żeby uruchomić tylko raz
+  }, []);
 
   const filteredAndSortedDrums = useMemo(() => {
     let filtered = drums.filter(drum => {
@@ -115,13 +115,6 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     });
   }, [drums, searchTerm, sortBy, sortOrder, filterStatus, filterClient, filterDateRange]);
 
-  // ... (reszta komponentu pozostaje bez zmian)
-
-  // ... (reszta pliku)
-  // UWAGA: Reszta pliku AdminDrumsList.js pozostaje bez zmian. 
-  // Należy skopiować tylko powyższy fragment, zastępując istniejący.
-  // Poniżej znajduje się tylko fragment dla kompletności.
-
   const handleSort = (field) => {
     if (sortBy === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -157,6 +150,56 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     }
   };
 
+  // FUNKCJA IMPORTU CSV
+  const handleImportCSV = async () => {
+    if (!window.confirm('⚠️ UWAGA: To zastąpi WSZYSTKIE dane w tabeli drums. Kontynuować?')) {
+      return;
+    }
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
+    
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      setImportLoading(true);
+      try {
+        const csvContent = await file.text();
+        
+        const response = await fetch(
+          'https://pobafitamzkcfptuaqj.supabase.co/functions/v1/clever-action',
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
+              'Content-Type': 'text/plain'
+            },
+            body: csvContent
+          }
+        );
+
+        const result = await response.json();
+        
+        if (result.success) {
+          alert(`✅ SUKCES!\nZaimportowano: ${result.imported} rekordów\n${result.message}`);
+          handleRefresh(); // Odśwież listę
+        } else {
+          throw new Error(result.message || 'Nieznany błąd');
+        }
+        
+      } catch (error) {
+        console.error('Błąd importu:', error);
+        alert(`❌ BŁĄD: ${error.message}`);
+      } finally {
+        setImportLoading(false);
+      }
+    };
+    
+    input.click();
+  };
+
   const getStatistics = () => {
     const total = filteredAndSortedDrums.length;
     const overdue = filteredAndSortedDrums.filter(d => d.status === 'overdue').length;
@@ -170,103 +213,60 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
 
   const DrumCard = ({ drum, index }) => (
     <div 
-      className={`bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] h-full flex flex-col ${drum.borderColor}`}
+      className={`bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] h-full flex flex-col ${drum.borderColor || 'border-gray-200'}`}
       style={{ animationDelay: `${index * 50}ms` }}
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-3 min-w-0 flex-1">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+          <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
             <Package className="w-6 h-6 text-white" />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-bold text-gray-900 truncate">{drum.KOD_BEBNA}</h3>
-            <p className="text-sm text-gray-600 line-clamp-2 leading-tight">{drum.NAZWA}</p>
-            <p className="text-xs text-gray-500 truncate">{drum.CECHA}</p>
+            <h3 className="font-bold text-gray-900 truncate text-lg">{drum.KOD_BEBNA}</h3>
+            <p className="text-gray-600 text-sm truncate">{drum.NAZWA}</p>
           </div>
         </div>
-        
-        {/* Kompaktowy status - tylko ikona + liczba */}
-        <div className="flex-shrink-0 ml-2 flex flex-col items-center">
-          {drum.status === 'overdue' && (
-            <>
-              <AlertCircle className="w-5 h-5 text-red-600" />
-              <span className="text-xs font-bold text-red-600 mt-1">-{drum.overdueDays}d</span>
-            </>
-          )}
-          {drum.status === 'due-soon' && (
-            <>
-              <Clock className="w-5 h-5 text-yellow-600" />
-              <span className="text-xs font-bold text-yellow-600 mt-1">{drum.daysDiff}d</span>
-            </>
-          )}
-          {drum.status === 'active' && (
-            <>
-              <CheckCircle className="w-5 h-5 text-green-600" />
-              <span className="text-xs font-medium text-green-600 mt-1">OK</span>
-            </>
-          )}
+        <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.color || 'bg-gray-100 text-gray-600'}`}>
+          {drum.text || drum.STATUS}
         </div>
       </div>
 
-      <div className="flex-1 space-y-3 mb-4">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Firma:</span>
-          <span className="font-medium text-gray-900 truncate ml-2">{drum.company}</span>
+      <div className="space-y-3 flex-1">
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-500">Firma</span>
+          <span className="text-sm font-medium text-gray-900 truncate ml-2">{drum.company || drum.PELNA_NAZWA_KONTRAHENTA}</span>
         </div>
         
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">NIP:</span>
-          <span className="font-medium text-gray-900">{drum.NIP}</span>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-500">NIP</span>
+          <span className="text-sm font-medium text-gray-900">{drum.NIP}</span>
         </div>
         
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Data wydania:</span>
-          <span className="font-medium text-gray-900">
-            {drum.DATA_WYDANIA 
-              ? new Date(drum.DATA_WYDANIA).toLocaleDateString('pl-PL')
-              : 'Brak daty'
-            }
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-500">Termin zwrotu</span>
+          <span className="text-sm font-medium text-gray-900">
+            {drum.DATA_ZWROTU_DO_DOSTAWCY ? new Date(drum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL') : 'Brak'}
           </span>
         </div>
         
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Termin zwrotu:</span>
-          <div className="flex items-center space-x-2">
-            <Calendar className="w-4 h-4 text-gray-400" />
-            <span className={`font-medium ${drum.color}`}>
-              {new Date(drum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL')}
-            </span>
-          </div>
-        </div>
-        
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Dokument:</span>
-          <span className="font-medium text-gray-900 truncate ml-2">{drum.NR_DOKUMENTUPZ}</span>
-        </div>
-        
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Dostawca:</span>
-          <span className="font-medium text-gray-900 truncate ml-2">{drum.KON_DOSTAWCA}</span>
-        </div>
-        
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">W posiadaniu:</span>
-          <span className="font-medium text-gray-900">{drum.daysInPossession} dni</span>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-500">Dni w posiadaniu</span>
+          <span className="text-sm font-medium text-gray-900">{drum.daysInPossession || 0}</span>
         </div>
       </div>
 
-      <div className="flex space-x-2 mt-auto">
+      <div className="flex space-x-2 mt-4">
         <button
           onClick={() => handleViewDrum(drum)}
-          className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2 px-3 rounded-xl font-medium hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
+          className="flex-1 bg-blue-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-blue-700 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
         >
           <Eye className="w-4 h-4" />
           <span>Szczegóły</span>
         </button>
         
         <button
-          onClick={() => onNavigate('admin-clients')}
-          className="flex-1 bg-white border border-gray-300 text-gray-700 py-2 px-3 rounded-xl font-medium hover:bg-gray-50 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
+          onClick={() => onNavigate('admin-clients', { clientNip: drum.NIP })}
+          className="bg-gray-100 text-gray-700 py-2 px-3 rounded-xl font-medium hover:bg-gray-200 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
         >
           <Building2 className="w-4 h-4" />
           <span>Klient</span>
@@ -320,27 +320,11 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                     <p className="text-gray-900">{selectedDrum.CECHA}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Status</label>
-                    <div className={`inline-flex items-center space-x-1 px-2 py-1 rounded ${selectedDrum.bgColor} ${selectedDrum.borderColor} border`}>
-                      {selectedDrum.status === 'overdue' && <AlertCircle className={`w-4 h-4 ${selectedDrum.color}`} />}
-                      {selectedDrum.status === 'due-soon' && <Clock className={`w-4 h-4 ${selectedDrum.color}`} />}
-                      {selectedDrum.status === 'active' && <CheckCircle className={`w-4 h-4 ${selectedDrum.color}`} />}
-                      <span className={`text-sm font-medium ${selectedDrum.color}`}>
-                        {selectedDrum.text}
-                        {selectedDrum.status === 'overdue' && ` (${selectedDrum.overdueDays} dni)`}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
                     <label className="text-sm font-medium text-gray-500">Dostawca</label>
                     <p className="text-gray-900">{selectedDrum.KON_DOSTAWCA}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Typ dokumentu</label>
-                    <p className="text-gray-900">{selectedDrum.TYP_DOK}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Numer dokumentu</label>
+                    <label className="text-sm font-medium text-gray-500">Dokument</label>
                     <p className="text-gray-900">{selectedDrum.NR_DOKUMENTUPZ}</p>
                   </div>
                 </div>
@@ -351,7 +335,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 <div className="space-y-3">
                   <div>
                     <label className="text-sm font-medium text-gray-500">Nazwa firmy</label>
-                    <p className="text-gray-900">{selectedDrum.company}</p>
+                    <p className="text-gray-900">{selectedDrum.company || selectedDrum.PELNA_NAZWA_KONTRAHENTA}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">NIP</label>
@@ -373,12 +357,6 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                       <p className="text-gray-900">{selectedDrum.companyPhone}</p>
                     </div>
                   )}
-                  {selectedDrum.companyAddress && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Adres</label>
-                      <p className="text-gray-900">{selectedDrum.companyAddress}</p>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -391,54 +369,33 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                   <span className="font-medium">
                     {selectedDrum.DATA_WYDANIA 
                       ? new Date(selectedDrum.DATA_WYDANIA).toLocaleDateString('pl-PL')
-                      : 'Brak daty'
+                      : 'Brak'
                     }
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Termin zwrotu do dostawcy</span>
-                  <span className={`font-medium ${selectedDrum.color}`}>
-                    {new Date(selectedDrum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL')}
+                  <span className="text-gray-600">Data przyjęcia na stan</span>
+                  <span className="font-medium">
+                    {selectedDrum['Data przyjęcia na stan'] 
+                      ? new Date(selectedDrum['Data przyjęcia na stan']).toLocaleDateString('pl-PL')
+                      : 'Brak'
+                    }
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Termin zwrotu</span>
+                  <span className="font-medium">
+                    {selectedDrum.DATA_ZWROTU_DO_DOSTAWCY 
+                      ? new Date(selectedDrum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL')
+                      : 'Brak'
+                    }
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Dni w posiadaniu</span>
-                  <span className="font-medium">{selectedDrum.daysInPossession} dni</span>
+                  <span className="font-medium">{selectedDrum.daysInPossession || 0} dni</span>
                 </div>
-                {selectedDrum.daysDiff < 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Dni przeterminowania</span>
-                    <span className="font-medium text-red-600">{Math.abs(selectedDrum.daysDiff)} dni</span>
-                  </div>
-                )}
-                {selectedDrum.daysDiff > 0 && selectedDrum.daysDiff <= 7 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Dni do zwrotu</span>
-                    <span className="font-medium text-yellow-600">{selectedDrum.daysDiff} dni</span>
-                  </div>
-                )}
               </div>
-            </div>
-            
-            <div className="flex space-x-4">
-              <button
-                onClick={() => {
-                  setShowDrumDetails(false);
-                  onNavigate('admin-clients');
-                }}
-                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200"
-              >
-                Zobacz klienta
-              </button>
-              <button
-                onClick={() => {
-                  setShowDrumDetails(false);
-                  onNavigate('admin-returns');
-                }}
-                className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-xl font-medium hover:bg-gray-700 transition-colors duration-200"
-              >
-                Zgłoś zwrot
-              </button>
             </div>
           </div>
         </div>
@@ -448,11 +405,10 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-lg text-gray-600">Ładowanie bębnów...</p>
         </div>
       </div>
     );
@@ -460,100 +416,149 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
 
   if (error) {
     return (
-      <div className="min-h-screen">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center py-12">
-            <div className="text-red-600 mb-4">{error}</div>
-            <button 
-              onClick={handleRefresh}
-              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2 mx-auto"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>Spróbuj ponownie</span>
-            </button>
-          </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Błąd ładowania</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700"
+          >
+            Spróbuj ponownie
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
+      <div className="max-w-7xl mx-auto p-6">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
-                <Package className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-800 bg-clip-text text-transparent">
-                  Wszystkie bębny
-                </h1>
-                <p className="text-gray-600">Monitoruj i zarządzaj wszystkimi bębnami w systemie</p>
-              </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Wszystkie bębny</h1>
+              <p className="text-gray-600">Zarządzaj bębnami w całym systemie</p>
             </div>
             
-            <div className="flex space-x-2">
-              <button className="px-4 py-2 bg-white border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors duration-200 flex items-center space-x-2">
-                <Download className="w-4 h-4" />
-                <span>Export</span>
-              </button>
-              <button 
-                onClick={handleRefresh}
-                className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2"
+            <div className="flex items-center space-x-4">
+              {/* PRZYCISK IMPORT CSV */}
+              <button
+                onClick={handleImportCSV}
+                disabled={importLoading || loading}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 transition-all duration-200"
               >
-                <RefreshCw className="w-4 h-4" />
-                <span>Odśwież</span>
+                {importLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Importuję...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    <span>Import CSV</span>
+                  </>
+                )}
+              </button>
+              
+              <button
+                onClick={handleRefresh}
+                disabled={loading}
+                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                title="Odśwież"
+              >
+                <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
               </button>
             </div>
           </div>
 
-          {/* Filters */}
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100">
+              <div className="flex items-center">
+                <Package className="w-8 h-8 text-blue-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Wszystkie bębny</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-green-100">
+              <div className="flex items-center">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Aktywne</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.active}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-yellow-100">
+              <div className="flex items-center">
+                <Clock className="w-8 h-8 text-yellow-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Zbliża się termin</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.dueSoon}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-red-100">
+              <div className="flex items-center">
+                <AlertCircle className="w-8 h-8 text-red-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Przeterminowane</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.overdue}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Search and Filters */}
           <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Search */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Szukaj bębnów..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                  className="pl-10 w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
-
-              {/* Status Filter */}
+              
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">Wszystkie statusy</option>
                 <option value="active">Aktywne</option>
                 <option value="due-soon">Zbliża się termin</option>
                 <option value="overdue">Przeterminowane</option>
               </select>
-
-              {/* Client Filter */}
+              
               <select
                 value={filterClient}
                 onChange={(e) => setFilterClient(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Wszyscy klienci</option>
                 {companies.map(company => (
-                  <option key={company.nip} value={company.nip}>{company.name}</option>
+                  <option key={company.nip} value={company.nip}>
+                    {company.name}
+                  </option>
                 ))}
               </select>
-
-              {/* Date Range Filter */}
+              
               <select
                 value={filterDateRange}
                 onChange={(e) => setFilterDateRange(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">Wszystkie terminy</option>
                 <option value="this-week">Ten tydzień</option>
@@ -561,85 +566,14 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 <option value="overdue">Przeterminowane</option>
               </select>
             </div>
-
-            {/* Sort buttons */}
-            <div className="flex flex-wrap gap-2 mt-4">
-              <button
-                onClick={() => handleSort('KOD_BEBNA')}
-                className={`px-3 py-2 rounded-lg border transition-all duration-200 flex items-center space-x-2 text-sm ${
-                  sortBy === 'KOD_BEBNA' 
-                    ? 'bg-blue-600 text-white border-blue-600' 
-                    : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
-                }`}
-              >
-                <span>Kod</span>
-                <ArrowUpDown className="w-3 h-3" />
-              </button>
-              
-              <button
-                onClick={() => handleSort('DATA_ZWROTU_DO_DOSTAWCY')}
-                className={`px-3 py-2 rounded-lg border transition-all duration-200 flex items-center space-x-2 text-sm ${
-                  sortBy === 'DATA_ZWROTU_DO_DOSTAWCY' 
-                    ? 'bg-blue-600 text-white border-blue-600' 
-                    : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
-                }`}
-              >
-                <span>Termin zwrotu</span>
-                <ArrowUpDown className="w-3 h-3" />
-              </button>
-              
-              <button
-                onClick={() => handleSort('company')}
-                className={`px-3 py-2 rounded-lg border transition-all duration-200 flex items-center space-x-2 text-sm ${
-                  sortBy === 'company' 
-                    ? 'bg-blue-600 text-white border-blue-600' 
-                    : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
-                }`}
-              >
-                <span>Klient</span>
-                <ArrowUpDown className="w-3 h-3" />
-              </button>
-              
-              <button
-                onClick={() => handleSort('daysInPossession')}
-                className={`px-3 py-2 rounded-lg border transition-all duration-200 flex items-center space-x-2 text-sm ${
-                  sortBy === 'daysInPossession' 
-                    ? 'bg-blue-600 text-white border-blue-600' 
-                    : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
-                }`}
-              >
-                <span>Dni w posiadaniu</span>
-                <ArrowUpDown className="w-3 h-3" />
-              </button>
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-blue-100 text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-              <div className="text-sm text-gray-600">Wszystkie bębny</div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-green-100 text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.active}</div>
-              <div className="text-sm text-gray-600">Aktywne</div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-yellow-100 text-center">
-              <div className="text-2xl font-bold text-yellow-600">{stats.dueSoon}</div>
-              <div className="text-sm text-gray-600">Zbliża się termin</div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-red-100 text-center">
-              <div className="text-2xl font-bold text-red-600">{stats.overdue}</div>
-              <div className="text-sm text-gray-600">Przeterminowane</div>
-            </div>
           </div>
         </div>
 
-        {/* Drums Grid */}
+        {/* Results */}
         {filteredAndSortedDrums.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-8 items-stretch">
             {filteredAndSortedDrums.map((drum, index) => (
-              <DrumCard key={drum.KOD_BEBNA} drum={drum} index={index} />
+              <DrumCard key={drum.KOD_BEBNA || index} drum={drum} index={index} />
             ))}
           </div>
         ) : (
