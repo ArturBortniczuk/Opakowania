@@ -197,7 +197,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
         // Sprawdź czy funkcja odpowiada na OPTIONS (CORS preflight)
         try {
           const optionsResponse = await fetch(
-            'https://pobafitamzkcfptuaqj.supabase.co/functions/v1/clever-action',
+            'https://pobafitamzkzcfptuaqj.supabase.co/functions/v1/clever-action',
             {
               method: 'OPTIONS',
               headers: {
@@ -213,7 +213,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
 
         // Główne żądanie POST
         const response = await fetch(
-          'https://pobafitamzkcfptuaqj.supabase.co/functions/v1/clever-action',
+          'https://pobafitamzkzcfptuaqj.supabase.co/functions/v1/clever-action',
           {
             method: 'POST',
             headers: {
