@@ -197,6 +197,8 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
             method: 'POST',
             headers: {
               'Content-Type': 'text/plain',
+              'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+              'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
               'x-client-info': 'dashboard-import/1.0'
             },
             body: csvContent
