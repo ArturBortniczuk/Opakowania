@@ -217,8 +217,6 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
           {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${supabaseAnonKey}`,
-              'apikey': supabaseAnonKey,
               'Content-Type': 'text/plain',
               'x-client-info': 'dashboard-import/1.0'
             },
