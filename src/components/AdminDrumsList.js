@@ -1,4 +1,4 @@
-// src/components/AdminDrumsList.js - Kompletny kod z importem CSV
+// src/components/AdminDrumsList.js - POPRAWIONY KOMPLETNY KOD
 import React, { useState, useMemo, useEffect } from 'react';
 import { drumsAPI, companiesAPI } from '../utils/supabaseApi';
 import { 
@@ -150,8 +150,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     }
   };
 
-  // ZASTĄP tę funkcję w AdminDrumsList.js
-
+  // POPRAWIONA FUNKCJA IMPORT CSV - bez autoryzacji w headerach
   const handleImportCSV = async () => {
     if (!window.confirm('⚠️ UWAGA: To zastąpi WSZYSTKIE dane w tabeli drums. Kontynuować?')) {
       return;
@@ -189,29 +188,9 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
         console.log(`📊 Znaleziono ${lines.length - 1} wierszy danych`);
         console.log(`📊 Nagłówki: ${lines[0]}`);
 
-        // Twój klucz anon - ten jest bezpieczny do użycia publicznie
-        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBvYmFmaXRhbXprY2ZwdHVhcWoiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczMjU1NjU0OCwiZXhwIjoyMDQ4MTMyNTQ4fQ.Iz9d_9cgVhcAkvA2jJrI8GqD7jI6J5S8X4tMSAPrPvw';
-
         console.log('🚀 Wysyłam dane do funkcji clever-action...');
-        
-        // Sprawdź czy funkcja odpowiada na OPTIONS (CORS preflight)
-        try {
-          const optionsResponse = await fetch(
-            'https://pobafitamzkzcfptuaqj.supabase.co/functions/v1/clever-action',
-            {
-              method: 'OPTIONS',
-              headers: {
-                'Authorization': `Bearer ${supabaseAnonKey}`,
-                'apikey': supabaseAnonKey,
-              }
-            }
-          );
-          console.log('🔗 CORS preflight:', optionsResponse.ok ? '✅ OK' : '❌ FAILED');
-        } catch (corsError) {
-          console.warn('⚠️ CORS preflight failed:', corsError);
-        }
 
-        // Główne żądanie POST
+        // POPRAWIONY POST REQUEST - BEZ AUTORYZACJI
         const response = await fetch(
           'https://pobafitamzkzcfptuaqj.supabase.co/functions/v1/clever-action',
           {
@@ -305,12 +284,15 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
         } else if (error.message.includes('unauthorized') || error.message.includes('forbidden')) {
           userMessage = '🔐 Brak uprawnień';
           technicalDetails = 'Sprawdź konfigurację kluczy API i uprawnień funkcji';
+        } else if (error.message.includes('foreign key constraint')) {
+          userMessage = '📋 Problem z danymi CSV';
+          technicalDetails = 'Niektóre NIP-y w pliku CSV nie istnieją w systemie. Sprawdź czy wszystkie firmy są dodane do bazy danych.';
         } else {
           userMessage = error.message;
           technicalDetails = 'Zobacz szczegóły w konsoli przeglądarki (F12)';
         }
         
-        const alertMessage = `❌ BŁĄD IMPORTU:\n\n${userMessage}\n\n🔧 ${technicalDetails}\n\n⚠️ Jeśli problem się powtarza:\n1. Sprawdź logi funkcji w Supabase Dashboard\n2. Sprawdź sekrety funkcji (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)\n3. Sprawdź konsolę przeglądarki (F12 > Console)`;
+        const alertMessage = `❌ BŁĄD IMPORTU:\n\n${userMessage}\n\n🔧 ${technicalDetails}\n\n⚠️ Jeśli problem się powtarza:\n1. Sprawdź logi funkcji w Supabase Dashboard\n2. Sprawdź czy wszystkie firmy z CSV istnieją w tabeli companies\n3. Sprawdź konsolę przeglądarki (F12 > Console)`;
         
         alert(alertMessage);
       } finally {
