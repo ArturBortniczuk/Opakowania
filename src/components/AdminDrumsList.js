@@ -150,7 +150,8 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     }
   };
 
-  // KOMPLETNA FUNKCJA IMPORTU CSV I XLSX
+  // DODAJ te zabezpieczenia w handleImportFile w AdminDrumsList.js:
+
   const handleImportFile = async () => {
     if (!window.confirm('⚠️ UWAGA: To zastąpi WSZYSTKIE dane w tabeli drums. Kontynuować?')) {
       return;
@@ -158,7 +159,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
 
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.csv,.xlsx,.xls'; // Obsługa obu formatów
+    input.accept = '.csv,.xlsx,.xls';
     
     input.onchange = async (e) => {
       const file = e.target.files[0];
@@ -170,57 +171,62 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
         return;
       }
 
+      // SPRAWDŹ ROZMIAR PLIKU
+      const maxFileSize = 50 * 1024 * 1024; // 50MB limit
+      if (file.size > maxFileSize) {
+        alert(`❌ Plik jest za duży: ${Math.round(file.size / 1024 / 1024)}MB. Maksymalny rozmiar: 50MB`);
+        return;
+      }
+
+      console.log(`📁 Plik: ${file.name}, rozmiar: ${Math.round(file.size / 1024)}KB`);
+
       setImportLoading(true);
       
       try {
-        console.log(`📁 Importuję plik: ${file.name} (${file.size} bajtów)`);
-        
         let bodyData;
         let contentType;
         
         if (fileName.endsWith('.csv')) {
-          console.log('📄 Tryb CSV - próbuję naprawić kodowanie...');
+          console.log('📄 Tryb CSV...');
           
-          // Dla CSV: spróbuj różne kodowania
-          const encodings = ['UTF-8', 'windows-1252', 'ISO-8859-2', 'windows-1250'];
-          let bestContent = '';
-          let bestScore = -1;
-          let bestEncoding = 'UTF-8';
+          // Dla dużych CSV, użyj tylko UTF-8 (szybciej)
+          const csvContent = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = () => reject(new Error('Błąd odczytu CSV'));
+            reader.readAsText(file, 'UTF-8');
+          });
           
-          for (const encoding of encodings) {
-            try {
-              const content = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (e) => resolve(e.target.result);
-                reader.onerror = () => reject(new Error('Read error'));
-                reader.readAsText(file, encoding);
-              });
-              
-              const polishCount = (content.match(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g) || []).length;
-              const questionCount = (content.match(/�/g) || []).length;
-              const score = polishCount - (questionCount * 10);
-              
-              console.log(`📊 ${encoding}: polskie=${polishCount}, pytajniki=${questionCount}, score=${score}`);
-              
-              if (score > bestScore) {
-                bestScore = score;
-                bestContent = content;
-                bestEncoding = encoding;
-              }
-            } catch (e) {
-              console.log(`❌ Błąd ${encoding}:`, e.message);
+          // SPRAWDŹ LICZBĘ LINII
+          const lines = csvContent.split('\n').filter(line => line.trim());
+          console.log(`📊 CSV ma ${lines.length} linii`);
+          
+          if (lines.length > 10000) {
+            const proceed = window.confirm(
+              `⚠️ UWAGA: Plik ma ${lines.length} linii.\n\n` +
+              'Duże pliki mogą powodować problemy z pamięcią.\n' +
+              'Zalecamy podzielenie na mniejsze części.\n\n' +
+              'Czy kontynuować?'
+            );
+            if (!proceed) {
+              setImportLoading(false);
+              return;
             }
           }
           
-          console.log(`✅ Najlepsze kodowanie dla CSV: ${bestEncoding}`);
-          
-          bodyData = bestContent;
+          bodyData = csvContent;
           contentType = 'text/plain; charset=utf-8';
           
         } else {
-          console.log('📊 Tryb XLSX - konwersja do Base64...');
+          console.log('📊 Tryb XLSX...');
           
-          // Dla XLSX: konwertuj do Base64
+          // Dla XLSX: sprawdź rozmiar przed konwersją
+          if (file.size > 10 * 1024 * 1024) { // 10MB limit dla XLSX
+            alert('❌ Plik XLSX jest za duży. Maksymalny rozmiar dla Excel: 10MB');
+            setImportLoading(false);
+            return;
+          }
+          
           const arrayBuffer = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => resolve(e.target.result);
@@ -228,7 +234,20 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
             reader.readAsArrayBuffer(file);
           });
           
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          // PODZIEL DUŻE PLIKI na chunks przy konwersji Base64
+          const chunkSize = 1024 * 1024; // 1MB chunks
+          const bytes = new Uint8Array(arrayBuffer);
+          let base64 = '';
+          
+          for (let i = 0; i < bytes.length; i += chunkSize) {
+            const chunk = bytes.slice(i, i + chunkSize);
+            base64 += btoa(String.fromCharCode(...chunk));
+            
+            // Yield control co jakiś czas
+            if (i % (chunkSize * 10) === 0) {
+              await new Promise(resolve => setTimeout(resolve, 1));
+            }
+          }
           
           bodyData = JSON.stringify({
             type: 'xlsx',
@@ -238,15 +257,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
           contentType = 'application/json; charset=utf-8';
         }
         
-        // Test polskich znaków przed wysłaniem
-        const hasPolishChars = fileName.endsWith('.csv') ? 
-          /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/.test(bodyData) : 
-          true; // XLSX zawsze obsługuje polskie znaki
-        
-        console.log(`🇵🇱 Polskie znaki przed wysłaniem: ${hasPolishChars ? '✅' : '❌'}`);
-        
-        // Wysłanie do funkcji Supabase
-        console.log('🚀 Wysyłam do funkcji Supabase...');
+        console.log('🚀 Wysyłam do Supabase...');
         
         const response = await fetch(
           'https://pobafitamzkzcfptuaqj.supabase.co/functions/v1/clever-action',
@@ -274,8 +285,8 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                         `📊 Format: ${fileName.endsWith('.csv') ? 'CSV' : 'XLSX'}\n` +
                         `🇵🇱 Polskie znaki: ${result.hasPolishChars ? 'OK' : 'Brak'}\n` +
                         `📦 Importowano: ${result.imported} rekordów\n` +
-                        `🏢 Dodano firm: ${result.companiesAdded}\n` +
-                        `⚠️ Pominięto: ${result.skipped} błędnych`;
+                        `🏢 Dodano firm: ${result.companiesAdded || 0}\n` +
+                        `⚠️ Pominięto: ${result.skipped || 0} błędnych`;
           
           alert(message);
           await handleRefresh();
@@ -288,10 +299,14 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
         
         let userMessage = `❌ Błąd importu: ${error.message}`;
         
-        if (error.message.includes('Failed to fetch')) {
-          userMessage += '\n\n🔧 Sprawdź połączenie internetowe lub logi funkcji w Supabase Dashboard.';
-        } else if (error.message.includes('polskie znaki')) {
-          userMessage += '\n\n💡 Spróbuj użyć pliku XLSX zamiast CSV - format Excel lepiej obsługuje polskie znaki.';
+        if (error.message.includes('Maximum call stack')) {
+          userMessage = `❌ Plik jest za duży lub zawiera błędy formatowania.\n\n` +
+                      `💡 Rozwiązania:\n` +
+                      `• Podziel plik na mniejsze części (max 2000 wierszy)\n` +
+                      `• Sprawdź czy nie ma uszkodzonych znaków w danych\n` +
+                      `• Użyj XLSX zamiast CSV dla lepszej kompatybilności`;
+        } else if (error.message.includes('Failed to fetch')) {
+          userMessage += '\n\n🔧 Sprawdź połączenie internetowe lub spróbuj ponownie za chwilę.';
         }
         
         alert(userMessage);
