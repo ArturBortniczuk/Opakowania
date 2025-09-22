@@ -150,7 +150,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     }
   };
 
-  // POPRAWIONA FUNKCJA IMPORT CSV - bez autoryzacji w headerach
+
   const handleImportCSV = async () => {
     if (!window.confirm('⚠️ UWAGA: To zastąpi WSZYSTKIE dane w tabeli drums. Kontynuować?')) {
       return;
@@ -172,137 +172,174 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
       setImportLoading(true);
       
       try {
-        console.log('📁 Czytam plik CSV...');
-        const csvContent = await file.text();
+        console.log('🔧 Naprawiam kodowanie polskich znaków...');
         
-        if (!csvContent.trim()) {
-          throw new Error('Plik CSV jest pusty');
+        // KROK 1: Przeczytaj plik jako Windows-1252 (prawdopodobne źródłowe kodowanie)
+        const fixedContent = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            let content = event.target.result;
+            
+            // Test różnych kodowań
+            const utf8Test = /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/.test(content);
+            const questionTest = /�/.test(content);
+            
+            console.log('📊 UTF-8 test - polskie znaki:', utf8Test);
+            console.log('📊 UTF-8 test - znaki zapytania:', questionTest);
+            
+            if (utf8Test && !questionTest) {
+              console.log('✅ Plik już ma poprawne UTF-8');
+              resolve(content);
+              return;
+            }
+            
+            console.log('🔄 Plik wymaga naprawy kodowania');
+            resolve(content);
+          };
+          reader.onerror = () => reject(new Error('Błąd odczytu pliku'));
+          
+          // Najpierw spróbuj Windows-1252
+          reader.readAsText(file, 'windows-1252');
+        });
+        
+        // KROK 2: Jeśli nadal są problemy, spróbuj inne kodowania
+        let bestContent = fixedContent;
+        let bestScore = 0;
+        let bestEncoding = 'windows-1252';
+        
+        const encodings = ['windows-1252', 'ISO-8859-2', 'windows-1250', 'UTF-8'];
+        
+        for (const encoding of encodings) {
+          try {
+            const testContent = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = (e) => resolve(e.target.result);
+              reader.onerror = () => reject(new Error('Read error'));
+              reader.readAsText(file, encoding);
+            });
+            
+            const polishCount = (testContent.match(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g) || []).length;
+            const questionCount = (testContent.match(/�/g) || []).length;
+            const strangeCount = (testContent.match(/[ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏðñòóôõö]/g) || []).length;
+            
+            const score = polishCount - (questionCount * 10) - (strangeCount * 2);
+            
+            console.log(`📊 ${encoding}: polskie=${polishCount}, pytajniki=${questionCount}, dziwne=${strangeCount}, score=${score}`);
+            
+            if (score > bestScore) {
+              bestScore = score;
+              bestContent = testContent;
+              bestEncoding = encoding;
+            }
+          } catch (e) {
+            console.log(`❌ Błąd z kodowaniem ${encoding}:`, e.message);
+          }
         }
-
-        // Sprawdź podstawową strukturę CSV
-        const lines = csvContent.trim().split('\n');
+        
+        console.log(`✅ Najlepsze kodowanie: ${bestEncoding} (score: ${bestScore})`);
+        
+        // KROK 3: Jeśli nadal są problemy, spróbuj mapowanie ręczne
+        if (bestScore <= 0) {
+          console.log('🛠️ Próbuję ręczne mapowanie znaków...');
+          
+          // Mapowanie typowych problemów z kodowaniem
+          const charMap = {
+            'Ä…': 'ą', 'Ä†': 'ć', 'Ä™': 'ę', 'Å‚': 'ł', 'Å„': 'ń', 
+            'Ã³': 'ó', 'Å›': 'ś', 'Åº': 'ź', 'Å¼': 'ż',
+            'Ä„': 'Ą', 'Ä†': 'Ć', 'Ä˜': 'Ę', 'Å': 'Ł', 'Åƒ': 'Ń',
+            'Ã"': 'Ó', 'Åš': 'Ś', 'Å¹': 'Ź', 'Å»': 'Ż',
+            // Dodatkowe mapowania
+            'Ã±': 'ą', 'Ã§': 'ć', 'Ã¨': 'ę', 'Ã³': 'ł', 'Ã±': 'ń',
+            'Ã¶': 'ó', 'Å¡': 'ś', 'Å¾': 'ź', 'Å¿': 'ż'
+          };
+          
+          let mappedContent = bestContent;
+          let mappedCount = 0;
+          
+          for (const [wrong, correct] of Object.entries(charMap)) {
+            const oldContent = mappedContent;
+            mappedContent = mappedContent.replace(new RegExp(wrong, 'g'), correct);
+            if (mappedContent !== oldContent) {
+              mappedCount++;
+            }
+          }
+          
+          if (mappedCount > 0) {
+            console.log(`🔧 Naprawiono ${mappedCount} typów nieprawidłowych znaków`);
+            bestContent = mappedContent;
+          }
+        }
+        
+        // KROK 4: Test finalny
+        const finalPolishTest = /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/.test(bestContent);
+        const finalQuestionTest = /�/.test(bestContent);
+        
+        console.log('🎯 WYNIK NAPRAWY:');
+        console.log('🇵🇱 Polskie znaki:', finalPolishTest ? '✅' : '❌');
+        console.log('❓ Znaki zapytania:', finalQuestionTest ? '❌' : '✅');
+        
+        if (!finalPolishTest) {
+          const userChoice = window.confirm(
+            '⚠️ UWAGA: Nadal nie wykryto polskich znaków w pliku.\n\n' +
+            'Możliwe przyczyny:\n' +
+            '• Plik rzeczywiście nie zawiera polskich znaków\n' +
+            '• System generujący CSV używa nietypowego kodowania\n\n' +
+            'Czy kontynuować import mimo tego?'
+          );
+          
+          if (!userChoice) {
+            setImportLoading(false);
+            return;
+          }
+        }
+        
+        // KROK 5: Sprawdź strukturę CSV
+        const lines = bestContent.trim().split('\n');
         if (lines.length < 2) {
           throw new Error('Plik CSV musi zawierać nagłówki i przynajmniej jeden wiersz danych');
         }
 
-        console.log(`📊 Znaleziono ${lines.length - 1} wierszy danych`);
+        console.log(`📊 Struktura: ${lines.length} linii`);
         console.log(`📊 Nagłówki: ${lines[0]}`);
+        console.log(`📊 Kodowanie używane: ${bestEncoding}`);
 
-        console.log('🚀 Wysyłam dane do funkcji clever-action...');
+        // KROK 6: Wyślij naprawione dane
+        console.log('🚀 Wysyłam naprawione dane...');
 
-        // POPRAWIONY POST REQUEST - BEZ AUTORYZACJI
         const response = await fetch(
           'https://pobafitamzkzcfptuaqj.supabase.co/functions/v1/clever-action',
           {
             method: 'POST',
             headers: {
-              'Content-Type': 'text/plain',
-              'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
-              'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY,
-              'x-client-info': 'dashboard-import/1.0'
+              'Content-Type': 'text/plain; charset=utf-8',
+              'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`
             },
-            body: csvContent
+            body: bestContent
           }
         );
 
-        console.log(`📡 Status odpowiedzi: ${response.status} ${response.statusText}`);
-        console.log('📡 Headers odpowiedzi:', Object.fromEntries(response.headers.entries()));
-
         if (!response.ok) {
-          let errorDetails = `Status: ${response.status}`;
-          try {
-            const errorText = await response.text();
-            console.error('❌ Szczegóły błędu:', errorText);
-            
-            if (errorText.startsWith('{')) {
-              const errorJson = JSON.parse(errorText);
-              errorDetails = errorJson.message || errorJson.error || errorText;
-            } else {
-              errorDetails = errorText;
-            }
-          } catch (parseError) {
-            errorDetails = `${response.status} ${response.statusText}`;
-          }
-          
-          throw new Error(`Funkcja zwróciła błąd: ${errorDetails}`);
+          const errorText = await response.text();
+          throw new Error(`Błąd HTTP ${response.status}: ${errorText}`);
         }
 
-        // Parsuj odpowiedź
-        const responseText = await response.text();
-        console.log('📄 Surowa odpowiedź:', responseText);
-
-        let result;
-        try {
-          result = JSON.parse(responseText);
-        } catch (parseError) {
-          console.error('❌ Nie można sparsować odpowiedzi JSON:', responseText);
-          throw new Error(`Nieprawidłowa odpowiedź z serwera: ${responseText.substring(0, 100)}...`);
-        }
-
-        console.log('✅ Sparsowana odpowiedź:', result);
+        const result = await response.json();
         
         if (result.success) {
-          const message = `✅ IMPORT ZAKOŃCZONY SUKCESEM!\n\n` +
-                        `📊 Wyniki:\n` +
-                        `• Zaimportowano: ${result.imported} rekordów\n` +
-                        `• Status: ${result.message}\n` +
-                        `• Czas: ${new Date(result.timestamp).toLocaleString('pl-PL')}\n\n` +
-                        `🔄 Lista bębnów zostanie teraz odświeżona...`;
-          
-          alert(message);
-          
-          console.log('🔄 Odświeżam listę bębnów...');
+          alert(`✅ SUKCES!\n\n${result.message}\n\nKodowanie: ${bestEncoding}\nPolskie znaki: ${finalPolishTest ? 'Naprawione' : 'Brak'}`);
           await handleRefresh();
-          
-        } else if (result.error) {
-          throw new Error(result.message || 'Funkcja zwróciła błąd bez szczegółów');
         } else {
-          console.warn('⚠️ Nieoczekiwana struktura odpowiedzi:', result);
-          throw new Error('Otrzymano nieoczekiwaną odpowiedź z serwera');
+          throw new Error(result.message || 'Nieznany błąd importu');
         }
         
       } catch (error) {
-        console.error('❌ Szczegółowy błąd importu:', {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        });
-        
-        let userMessage = 'Wystąpił błąd podczas importu.';
-        let technicalDetails = '';
-        
-        if (error.message.includes('Failed to fetch')) {
-          userMessage = '🌐 Nie można połączyć się z serwerem funkcji';
-          technicalDetails = 'Sprawdź połączenie internetowe lub skontaktuj się z administratorem';
-        } else if (error.message.includes('ERR_NAME_NOT_RESOLVED')) {
-          userMessage = '🔗 Serwer funkcji nie odpowiada';
-          technicalDetails = 'Funkcja może nie być prawidłowo wdrożona lub wystąpił problem z DNS';
-        } else if (error.message.includes('Status: 404')) {
-          userMessage = '❓ Funkcja clever-action nie została znaleziona';
-          technicalDetails = 'Sprawdź czy funkcja jest prawidłowo wdrożona w Supabase Dashboard';
-        } else if (error.message.includes('Status: 500')) {
-          userMessage = '⚡ Błąd wewnętrzny serwera';
-          technicalDetails = 'Sprawdź logi funkcji w Supabase Dashboard > Edge Functions > clever-action > Logs';
-        } else if (error.message.includes('unauthorized') || error.message.includes('forbidden')) {
-          userMessage = '🔐 Brak uprawnień';
-          technicalDetails = 'Sprawdź konfigurację kluczy API i uprawnień funkcji';
-        } else if (error.message.includes('foreign key constraint')) {
-          userMessage = '📋 Problem z danymi CSV';
-          technicalDetails = 'Niektóre NIP-y w pliku CSV nie istnieją w systemie. Sprawdź czy wszystkie firmy są dodane do bazy danych.';
-        } else {
-          userMessage = error.message;
-          technicalDetails = 'Zobacz szczegóły w konsoli przeglądarki (F12)';
-        }
-        
-        const alertMessage = `❌ BŁĄD IMPORTU:\n\n${userMessage}\n\n🔧 ${technicalDetails}\n\n⚠️ Jeśli problem się powtarza:\n1. Sprawdź logi funkcji w Supabase Dashboard\n2. Sprawdź czy wszystkie firmy z CSV istnieją w tabeli companies\n3. Sprawdź konsolę przeglądarki (F12 > Console)`;
-        
-        alert(alertMessage);
+        console.error('❌ Błąd importu:', error);
+        alert(`❌ Błąd importu: ${error.message}\n\nSprawdź konsolę (F12) dla szczegółów.`);
       } finally {
         setImportLoading(false);
-        console.log('🏁 Import zakończony');
       }
     };
-
+    
     input.click();
   };
 
