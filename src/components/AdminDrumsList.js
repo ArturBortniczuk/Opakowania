@@ -1,4 +1,4 @@
-// src/components/AdminDrumsList.js - POPRAWIONY KOMPLETNY KOD
+// src/components/AdminDrumsList.js - KOMPLETNY KOD Z OBSŁUGĄ CSV I XLSX
 import React, { useState, useMemo, useEffect } from 'react';
 import { drumsAPI, companiesAPI } from '../utils/supabaseApi';
 import { 
@@ -150,183 +150,134 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     }
   };
 
-
-  const handleImportCSV = async () => {
+  // KOMPLETNA FUNKCJA IMPORTU CSV I XLSX
+  const handleImportFile = async () => {
     if (!window.confirm('⚠️ UWAGA: To zastąpi WSZYSTKIE dane w tabeli drums. Kontynuować?')) {
       return;
     }
 
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.csv';
+    input.accept = '.csv,.xlsx,.xls'; // Obsługa obu formatów
     
     input.onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
-      if (!file.name.toLowerCase().endsWith('.csv')) {
-        alert('❌ Proszę wybrać plik CSV');
+      const fileName = file.name.toLowerCase();
+      if (!fileName.endsWith('.csv') && !fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
+        alert('❌ Proszę wybrać plik CSV lub XLSX');
         return;
       }
 
       setImportLoading(true);
       
       try {
-        console.log('🔧 Naprawiam kodowanie polskich znaków...');
+        console.log(`📁 Importuję plik: ${file.name} (${file.size} bajtów)`);
         
-        // KROK 1: Przeczytaj plik jako Windows-1252 (prawdopodobne źródłowe kodowanie)
-        const fixedContent = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            let content = event.target.result;
-            
-            // Test różnych kodowań
-            const utf8Test = /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/.test(content);
-            const questionTest = /�/.test(content);
-            
-            console.log('📊 UTF-8 test - polskie znaki:', utf8Test);
-            console.log('📊 UTF-8 test - znaki zapytania:', questionTest);
-            
-            if (utf8Test && !questionTest) {
-              console.log('✅ Plik już ma poprawne UTF-8');
-              resolve(content);
-              return;
-            }
-            
-            console.log('🔄 Plik wymaga naprawy kodowania');
-            resolve(content);
-          };
-          reader.onerror = () => reject(new Error('Błąd odczytu pliku'));
+        let bodyData;
+        let contentType;
+        
+        if (fileName.endsWith('.csv')) {
+          console.log('📄 Tryb CSV - próbuję naprawić kodowanie...');
           
-          // Najpierw spróbuj Windows-1252
-          reader.readAsText(file, 'windows-1252');
-        });
-        
-        // KROK 2: Jeśli nadal są problemy, spróbuj inne kodowania
-        let bestContent = fixedContent;
-        let bestScore = 0;
-        let bestEncoding = 'windows-1252';
-        
-        const encodings = ['windows-1252', 'ISO-8859-2', 'windows-1250', 'UTF-8'];
-        
-        for (const encoding of encodings) {
-          try {
-            const testContent = await new Promise((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = (e) => resolve(e.target.result);
-              reader.onerror = () => reject(new Error('Read error'));
-              reader.readAsText(file, encoding);
-            });
-            
-            const polishCount = (testContent.match(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g) || []).length;
-            const questionCount = (testContent.match(/�/g) || []).length;
-            const strangeCount = (testContent.match(/[ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏðñòóôõö]/g) || []).length;
-            
-            const score = polishCount - (questionCount * 10) - (strangeCount * 2);
-            
-            console.log(`📊 ${encoding}: polskie=${polishCount}, pytajniki=${questionCount}, dziwne=${strangeCount}, score=${score}`);
-            
-            if (score > bestScore) {
-              bestScore = score;
-              bestContent = testContent;
-              bestEncoding = encoding;
-            }
-          } catch (e) {
-            console.log(`❌ Błąd z kodowaniem ${encoding}:`, e.message);
-          }
-        }
-        
-        console.log(`✅ Najlepsze kodowanie: ${bestEncoding} (score: ${bestScore})`);
-        
-        // KROK 3: Jeśli nadal są problemy, spróbuj mapowanie ręczne
-        if (bestScore <= 0) {
-          console.log('🛠️ Próbuję ręczne mapowanie znaków...');
+          // Dla CSV: spróbuj różne kodowania
+          const encodings = ['UTF-8', 'windows-1252', 'ISO-8859-2', 'windows-1250'];
+          let bestContent = '';
+          let bestScore = -1;
+          let bestEncoding = 'UTF-8';
           
-          // Mapowanie typowych problemów z kodowaniem
-          const charMap = {
-            'Ä…': 'ą', 'Ä†': 'ć', 'Ä™': 'ę', 'Å‚': 'ł', 'Å„': 'ń', 
-            'Ã³': 'ó', 'Å›': 'ś', 'Åº': 'ź', 'Å¼': 'ż',
-            'Ä„': 'Ą', 'Ä†': 'Ć', 'Ä˜': 'Ę', 'Å': 'Ł', 'Åƒ': 'Ń',
-            'Ã"': 'Ó', 'Åš': 'Ś', 'Å¹': 'Ź', 'Å»': 'Ż',
-            // Dodatkowe mapowania
-            'Ã±': 'ą', 'Ã§': 'ć', 'Ã¨': 'ę', 'Ã³': 'ł', 'Ã±': 'ń',
-            'Ã¶': 'ó', 'Å¡': 'ś', 'Å¾': 'ź', 'Å¿': 'ż'
-          };
-          
-          let mappedContent = bestContent;
-          let mappedCount = 0;
-          
-          for (const [wrong, correct] of Object.entries(charMap)) {
-            const oldContent = mappedContent;
-            mappedContent = mappedContent.replace(new RegExp(wrong, 'g'), correct);
-            if (mappedContent !== oldContent) {
-              mappedCount++;
+          for (const encoding of encodings) {
+            try {
+              const content = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = () => reject(new Error('Read error'));
+                reader.readAsText(file, encoding);
+              });
+              
+              const polishCount = (content.match(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g) || []).length;
+              const questionCount = (content.match(/�/g) || []).length;
+              const score = polishCount - (questionCount * 10);
+              
+              console.log(`📊 ${encoding}: polskie=${polishCount}, pytajniki=${questionCount}, score=${score}`);
+              
+              if (score > bestScore) {
+                bestScore = score;
+                bestContent = content;
+                bestEncoding = encoding;
+              }
+            } catch (e) {
+              console.log(`❌ Błąd ${encoding}:`, e.message);
             }
           }
           
-          if (mappedCount > 0) {
-            console.log(`🔧 Naprawiono ${mappedCount} typów nieprawidłowych znaków`);
-            bestContent = mappedContent;
-          }
-        }
-        
-        // KROK 4: Test finalny
-        const finalPolishTest = /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/.test(bestContent);
-        const finalQuestionTest = /�/.test(bestContent);
-        
-        console.log('🎯 WYNIK NAPRAWY:');
-        console.log('🇵🇱 Polskie znaki:', finalPolishTest ? '✅' : '❌');
-        console.log('❓ Znaki zapytania:', finalQuestionTest ? '❌' : '✅');
-        
-        if (!finalPolishTest) {
-          const userChoice = window.confirm(
-            '⚠️ UWAGA: Nadal nie wykryto polskich znaków w pliku.\n\n' +
-            'Możliwe przyczyny:\n' +
-            '• Plik rzeczywiście nie zawiera polskich znaków\n' +
-            '• System generujący CSV używa nietypowego kodowania\n\n' +
-            'Czy kontynuować import mimo tego?'
-          );
+          console.log(`✅ Najlepsze kodowanie dla CSV: ${bestEncoding}`);
           
-          if (!userChoice) {
-            setImportLoading(false);
-            return;
-          }
+          bodyData = bestContent;
+          contentType = 'text/plain; charset=utf-8';
+          
+        } else {
+          console.log('📊 Tryb XLSX - konwersja do Base64...');
+          
+          // Dla XLSX: konwertuj do Base64
+          const arrayBuffer = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = () => reject(new Error('Błąd odczytu XLSX'));
+            reader.readAsArrayBuffer(file);
+          });
+          
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          
+          bodyData = JSON.stringify({
+            type: 'xlsx',
+            data: base64,
+            filename: file.name
+          });
+          contentType = 'application/json; charset=utf-8';
         }
         
-        // KROK 5: Sprawdź strukturę CSV
-        const lines = bestContent.trim().split('\n');
-        if (lines.length < 2) {
-          throw new Error('Plik CSV musi zawierać nagłówki i przynajmniej jeden wiersz danych');
-        }
-
-        console.log(`📊 Struktura: ${lines.length} linii`);
-        console.log(`📊 Nagłówki: ${lines[0]}`);
-        console.log(`📊 Kodowanie używane: ${bestEncoding}`);
-
-        // KROK 6: Wyślij naprawione dane
-        console.log('🚀 Wysyłam naprawione dane...');
-
+        // Test polskich znaków przed wysłaniem
+        const hasPolishChars = fileName.endsWith('.csv') ? 
+          /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/.test(bodyData) : 
+          true; // XLSX zawsze obsługuje polskie znaki
+        
+        console.log(`🇵🇱 Polskie znaki przed wysłaniem: ${hasPolishChars ? '✅' : '❌'}`);
+        
+        // Wysłanie do funkcji Supabase
+        console.log('🚀 Wysyłam do funkcji Supabase...');
+        
         const response = await fetch(
           'https://pobafitamzkzcfptuaqj.supabase.co/functions/v1/clever-action',
           {
             method: 'POST',
             headers: {
-              'Content-Type': 'text/plain; charset=utf-8',
+              'Content-Type': contentType,
               'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`
             },
-            body: bestContent
+            body: bodyData
           }
         );
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`Błąd HTTP ${response.status}: ${errorText}`);
+          console.error('❌ Błąd HTTP:', response.status, errorText);
+          throw new Error(`Błąd serwera ${response.status}: ${errorText}`);
         }
 
         const result = await response.json();
+        console.log('📝 Odpowiedź serwera:', result);
         
         if (result.success) {
-          alert(`✅ SUKCES!\n\n${result.message}\n\nKodowanie: ${bestEncoding}\nPolskie znaki: ${finalPolishTest ? 'Naprawione' : 'Brak'}`);
+          const message = `✅ SUKCES!\n\n${result.message}\n\n` +
+                        `📊 Format: ${fileName.endsWith('.csv') ? 'CSV' : 'XLSX'}\n` +
+                        `🇵🇱 Polskie znaki: ${result.hasPolishChars ? 'OK' : 'Brak'}\n` +
+                        `📦 Importowano: ${result.imported} rekordów\n` +
+                        `🏢 Dodano firm: ${result.companiesAdded}\n` +
+                        `⚠️ Pominięto: ${result.skipped} błędnych`;
+          
+          alert(message);
           await handleRefresh();
         } else {
           throw new Error(result.message || 'Nieznany błąd importu');
@@ -334,7 +285,16 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
         
       } catch (error) {
         console.error('❌ Błąd importu:', error);
-        alert(`❌ Błąd importu: ${error.message}\n\nSprawdź konsolę (F12) dla szczegółów.`);
+        
+        let userMessage = `❌ Błąd importu: ${error.message}`;
+        
+        if (error.message.includes('Failed to fetch')) {
+          userMessage += '\n\n🔧 Sprawdź połączenie internetowe lub logi funkcji w Supabase Dashboard.';
+        } else if (error.message.includes('polskie znaki')) {
+          userMessage += '\n\n💡 Spróbuj użyć pliku XLSX zamiast CSV - format Excel lepiej obsługuje polskie znaki.';
+        }
+        
+        alert(userMessage);
       } finally {
         setImportLoading(false);
       }
@@ -587,9 +547,9 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
             </div>
             
             <div className="flex items-center space-x-4">
-              {/* PRZYCISK IMPORT CSV */}
+              {/* PRZYCISK IMPORT CSV/XLSX */}
               <button
-                onClick={handleImportCSV}
+                onClick={handleImportFile}
                 disabled={importLoading || loading}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 transition-all duration-200"
               >
@@ -601,7 +561,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 ) : (
                   <>
                     <Upload className="w-4 h-4" />
-                    <span>Import CSV</span>
+                    <span>Import CSV/XLSX</span>
                   </>
                 )}
               </button>
