@@ -179,6 +179,13 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
       }
 
       console.log(`📁 Plik: ${file.name}, rozmiar: ${Math.round(file.size / 1024)}KB`);
+      console.log(`🔍 DEBUG - rozmiar pliku:`);
+      console.log(`- file.size: ${file.size} bajtów`);
+      console.log(`- file.size w KB: ${Math.round(file.size / 1024)} KB`);
+      console.log(`- file.size w MB: ${Math.round(file.size / 1024 / 1024 * 100) / 100} MB`);
+      console.log(`- maxFileSize: ${maxFileSize} bajtów`);
+      console.log(`- maxFileSize w MB: ${Math.round(maxFileSize / 1024 / 1024)} MB`);
+      console.log(`- Warunek file.size > maxFileSize: ${file.size > maxFileSize}`);
 
       setImportLoading(true);
       
