@@ -150,7 +150,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     }
   };
 
-  // POPRAWIONA FUNKCJA IMPORT CSV - bez autoryzacji w headerach
+  // Uproszczona funkcja handleImportCSV - tylko CSV
   const handleImportCSV = async () => {
     if (!window.confirm('⚠️ UWAGA: To zastąpi WSZYSTKIE dane w tabeli drums. Kontynuować?')) {
       return;
@@ -158,115 +158,107 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
 
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.csv,.xlsx,.xls'; // Dodajemy obsługę Excel
+    input.accept = '.csv'; // Tylko CSV na razie
     
     input.onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
-      const fileName = file.name.toLowerCase();
-      const isXLSX = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
-      const isCSV = fileName.endsWith('.csv');
-      
-      if (!isXLSX && !isCSV) {
-        alert('❌ Proszę wybrać plik CSV lub XLSX');
+      if (!file.name.toLowerCase().endsWith('.csv')) {
+        alert('❌ Proszę wybrać plik CSV');
         return;
       }
 
       setImportLoading(true);
       
       try {
-        console.log(`📁 Czytam plik ${isXLSX ? 'XLSX' : 'CSV'}: ${file.name}`);
+        console.log('📁 Czytam plik CSV:', file.name);
         
-        // Odczytaj plik jako ArrayBuffer (dla XLSX i CSV)
-        const arrayBuffer = await file.arrayBuffer();
+        // Odczytaj plik jako tekst z UTF-8
+        const csvContent = await file.text();
         
-        console.log(`📊 Rozmiar pliku: ${arrayBuffer.byteLength} bajtów`);
-        console.log(`📋 Typ pliku: ${isXLSX ? 'Microsoft Excel' : 'CSV'}`);
+        console.log(`📊 Rozmiar: ${csvContent.length} znaków`);
 
-        // Sprawdź czy plik zawiera polskie znaki (dla CSV)
-        if (isCSV) {
-          const text = new TextDecoder('utf-8').decode(arrayBuffer);
-          const hasPolishChars = /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/.test(text);
-          if (hasPolishChars) {
-            console.log('🇵🇱 Wykryto polskie znaki w pliku CSV');
-          }
-        } else {
-          console.log('📊 Plik XLSX - polskie znaki powinny być automatycznie obsługiwane');
+        if (!csvContent.trim()) {
+          throw new Error('Plik CSV jest pusty');
         }
 
-        console.log('🚀 Wysyłam dane do funkcji clever-action...');
+        // Sprawdź polskie znaki
+        const hasPolishChars = /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/.test(csvContent);
+        if (hasPolishChars) {
+          console.log('🇵🇱 Wykryto polskie znaki w pliku');
+        }
 
-        // Wyślij plik jako ArrayBuffer
+        // Sprawdź podstawową strukturę
+        const lines = csvContent.trim().split('\n');
+        if (lines.length < 2) {
+          throw new Error('Plik CSV musi zawierać nagłówki i dane');
+        }
+
+        console.log(`📋 Znaleziono ${lines.length - 1} wierszy danych`);
+        console.log(`📋 Nagłówki: ${lines[0]}`);
+
+        console.log('🚀 Wysyłam dane do funkcji...');
+
+        // Wyślij jako zwykły tekst
         const response = await fetch(
           'https://pobafitamzkzcfptuaqj.supabase.co/functions/v1/clever-action',
           {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/octet-stream', // Dla plików binarnych
-              'Accept': 'application/json; charset=utf-8'
+              'Content-Type': 'text/plain; charset=utf-8'
             },
-            body: arrayBuffer // Wyślij jako ArrayBuffer
+            body: csvContent
           }
         );
 
-        console.log(`📡 Odpowiedź serwera: ${response.status} ${response.statusText}`);
+        console.log(`📡 Status odpowiedzi: ${response.status}`);
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('❌ Błąd odpowiedzi serwera:', errorText);
-          throw new Error(`Status: ${response.status} - ${errorText}`);
+          console.error('❌ Błąd serwera:', errorText);
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
 
         const result = await response.json();
-        console.log('✅ Wynik importu:', result);
+        console.log('✅ Rezultat:', result);
 
         if (result.success) {
-          const fileTypeInfo = result.fileType ? ` (${result.fileType})` : '';
-          const polishCharsInfo = result.hasPolishChars ? '\n🇵🇱 Polskie znaki zostały zachowane!' : '';
-          const databasePolishInfo = result.polishCharsInDatabase > 0 ? `\n✅ Znaleziono ${result.polishCharsInDatabase} rekordów z polskimi znakami w bazie` : '';
+          alert(`🎉 SUKCES!\n\n✅ Zaimportowano: ${result.imported} rekordów\n${result.companiesAdded > 0 ? `🏢 Dodano firm: ${result.companiesAdded}\n` : ''}${result.skipped > 0 ? `⚠️ Pominięto: ${result.skipped} błędnych wierszy\n` : ''}${result.hasPolishChars ? '🇵🇱 Polskie znaki zachowane\n' : ''}\n🕒 ${new Date(result.timestamp).toLocaleString('pl-PL')}`);
           
-          alert(`🎉 SUKCES!\n\n✅ Zaimportowano: ${result.imported} rekordów${fileTypeInfo}\n${result.companiesAdded > 0 ? `🏢 Dodano firm: ${result.companiesAdded}\n` : ''}${result.skipped > 0 ? `⚠️ Pominięto: ${result.skipped} błędnych wierszy\n` : ''}${polishCharsInfo}${databasePolishInfo}\n🕒 Czas: ${new Date(result.timestamp).toLocaleString('pl-PL')}`);
-          
-          // Odśwież dane po sukcesie
+          // Odśwież dane
           await handleRefresh();
         } else {
-          throw new Error(result.message || 'Nieznany błąd podczas importu');
+          throw new Error(result.message || 'Błąd importu');
         }
 
       } catch (error) {
-        console.error('❌ BŁĄD IMPORTU:', error);
+        console.error('❌ BŁĄD:', error);
         
-        // Ulepszona obsługa błędów
-        let userMessage = 'Wystąpił nieoczekiwany błąd podczas importu';
-        let technicalDetails = '';
+        let userMessage = 'Wystąpił błąd podczas importu';
+        let details = '';
         
         if (error.message.includes('Failed to fetch')) {
-          userMessage = '🌐 Nie można połączyć się z serwerem funkcji';
-          technicalDetails = 'Sprawdź połączenie internetowe lub skontaktuj się z administratorem';
-        } else if (error.message.includes('Status: 404')) {
-          userMessage = '❓ Funkcja clever-action nie została znaleziona';
-          technicalDetails = 'Sprawdź czy funkcja jest prawidłowo wdrożona w Supabase Dashboard';
-        } else if (error.message.includes('Status: 500')) {
-          userMessage = '⚡ Błąd wewnętrzny serwera';
-          technicalDetails = 'Sprawdź logi funkcji w Supabase Dashboard > Edge Functions > clever-action > Logs';
-        } else if (error.message.includes('foreign key constraint')) {
-          userMessage = '📋 Problem z danymi w pliku';
-          technicalDetails = 'Niektóre NIP-y w pliku nie istnieją w systemie. Sprawdź czy wszystkie firmy są dodane do bazy danych.';
-        } else if (error.message.includes('XLSX')) {
-          userMessage = '📊 Problem z plikiem Excel';
-          technicalDetails = 'Sprawdź czy plik Excel nie jest uszkodzony i zawiera prawidłowe dane';
+          userMessage = 'Nie można połączyć z serwerem';
+          details = 'Sprawdź połączenie internetowe';
+        } else if (error.message.includes('HTTP 401')) {
+          userMessage = 'Błąd autoryzacji funkcji';
+          details = 'Sprawdź konfigurację funkcji w Supabase Dashboard';
+        } else if (error.message.includes('HTTP 404')) {
+          userMessage = 'Funkcja clever-action nie znaleziona';
+          details = 'Sprawdź czy funkcja jest wdrożona';
+        } else if (error.message.includes('HTTP 500')) {
+          userMessage = 'Błąd wewnętrzny serwera';
+          details = 'Sprawdź logi funkcji w Supabase Dashboard';
         } else {
           userMessage = error.message;
-          technicalDetails = 'Zobacz szczegóły w konsoli przeglądarki (F12)';
+          details = 'Zobacz konsol przeglądarki (F12)';
         }
         
-        const alertMessage = `❌ BŁĄD IMPORTU:\n\n${userMessage}\n\n🔧 ${technicalDetails}\n\n📝 ROZWIĄZANIA:\n1. Spróbuj z plikiem XLSX zamiast CSV\n2. Sprawdź czy wszystkie firmy z pliku istnieją w systemie\n3. Sprawdź konsolę przeglądarki (F12 > Console)\n4. Sprawdź logi funkcji w Supabase Dashboard`;
+        alert(`❌ BŁĄD IMPORTU:\n\n${userMessage}\n\n🔧 ${details}\n\nSprawdź:\n1. Czy funkcja clever-action jest wdrożona\n2. Logi w Supabase Dashboard\n3. Konsola przeglądarki (F12)`);
         
-        alert(alertMessage);
       } finally {
         setImportLoading(false);
-        console.log('🏁 Import zakończony');
       }
     };
 
