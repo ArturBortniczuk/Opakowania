@@ -150,7 +150,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     }
   };
 
-  // Funkcja handleImportCSV z obsługą XLSX i CSV
+  // POPRAWIONA FUNKCJA IMPORT CSV - bez autoryzacji w headerach
   const handleImportCSV = async () => {
     if (!window.confirm('⚠️ UWAGA: To zastąpi WSZYSTKIE dane w tabeli drums. Kontynuować?')) {
       return;
@@ -158,103 +158,154 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
 
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.csv,.xlsx,.xls'; // Obsługa CSV i Excel
+    input.accept = '.csv';
     
     input.onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
-      const fileName = file.name.toLowerCase();
-      const isXLSX = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
-      const isCSV = fileName.endsWith('.csv');
-      
-      if (!isXLSX && !isCSV) {
-        alert('❌ Proszę wybrać plik CSV lub XLSX/XLS');
+      if (!file.name.toLowerCase().endsWith('.csv')) {
+        alert('❌ Proszę wybrać plik CSV');
         return;
       }
 
       setImportLoading(true);
       
       try {
-        console.log(`📁 Ładuję plik ${isXLSX ? 'Excel' : 'CSV'}: ${file.name}`);
-        console.log(`📊 Rozmiar: ${file.size} bajtów`);
+        console.log('📁 Czytam plik CSV...');
+        const csvContent = await file.text();
         
-        // Odczytaj plik jako ArrayBuffer (dla obu typów)
-        const arrayBuffer = await file.arrayBuffer();
-        
+        if (!csvContent.trim()) {
+          throw new Error('Plik CSV jest pusty');
+        }
+
+        // Sprawdź podstawową strukturę CSV
+        const lines = csvContent.trim().split('\n');
+        if (lines.length < 2) {
+          throw new Error('Plik CSV musi zawierać nagłówki i przynajmniej jeden wiersz danych');
+        }
+
+        console.log(`📊 Znaleziono ${lines.length - 1} wierszy danych`);
+        console.log(`📊 Nagłówki: ${lines[0]}`);
+
         console.log('🚀 Wysyłam dane do funkcji clever-action...');
 
-        // Wyślij jako ArrayBuffer
+        // POPRAWIONY POST REQUEST - BEZ AUTORYZACJI
         const response = await fetch(
           'https://pobafitamzkzcfptuaqj.supabase.co/functions/v1/clever-action',
           {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/octet-stream'
+              'Content-Type': 'text/plain',
+              'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
+              'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY,
+              'x-client-info': 'dashboard-import/1.0'
             },
-            body: arrayBuffer
+            body: csvContent
           }
         );
 
-        console.log(`📡 Status: ${response.status} ${response.statusText}`);
+        console.log(`📡 Status odpowiedzi: ${response.status} ${response.statusText}`);
+        console.log('📡 Headers odpowiedzi:', Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('❌ Błąd serwera:', errorText);
-          throw new Error(`HTTP ${response.status}: ${errorText}`);
+          let errorDetails = `Status: ${response.status}`;
+          try {
+            const errorText = await response.text();
+            console.error('❌ Szczegóły błędu:', errorText);
+            
+            if (errorText.startsWith('{')) {
+              const errorJson = JSON.parse(errorText);
+              errorDetails = errorJson.message || errorJson.error || errorText;
+            } else {
+              errorDetails = errorText;
+            }
+          } catch (parseError) {
+            errorDetails = `${response.status} ${response.statusText}`;
+          }
+          
+          throw new Error(`Funkcja zwróciła błąd: ${errorDetails}`);
         }
 
-        const result = await response.json();
-        console.log('✅ Rezultat:', result);
+        // Parsuj odpowiedź
+        const responseText = await response.text();
+        console.log('📄 Surowa odpowiedź:', responseText);
 
-        if (result.success) {
-          const fileTypeInfo = result.fileType ? ` z pliku ${result.fileType}` : '';
-          const polishInfo = result.hasPolishChars ? '\n🇵🇱 Polskie znaki zachowane!' : '';
-          const dbPolishInfo = result.polishCharsInDatabase > 0 ? `\n✅ ${result.polishCharsInDatabase} rekordów z polskimi znakami w bazie` : '';
-          
-          alert(`🎉 SUKCES!\n\n✅ Zaimportowano: ${result.imported} rekordów${fileTypeInfo}\n${result.companiesAdded > 0 ? `🏢 Dodano firm: ${result.companiesAdded}\n` : ''}${result.skipped > 0 ? `⚠️ Pominięto: ${result.skipped} błędnych wierszy\n` : ''}${polishInfo}${dbPolishInfo}\n🕒 ${new Date(result.timestamp).toLocaleString('pl-PL')}`);
-          
-          // Odśwież dane
-          await handleRefresh();
-        } else {
-          throw new Error(result.message || 'Błąd importu');
+        let result;
+        try {
+          result = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('❌ Nie można sparsować odpowiedzi JSON:', responseText);
+          throw new Error(`Nieprawidłowa odpowiedź z serwera: ${responseText.substring(0, 100)}...`);
         }
 
-      } catch (error) {
-        console.error('❌ BŁĄD:', error);
+        console.log('✅ Sparsowana odpowiedź:', result);
         
-        let userMessage = 'Wystąpił błąd podczas importu';
-        let details = '';
+        if (result.success) {
+          const message = `✅ IMPORT ZAKOŃCZONY SUKCESEM!\n\n` +
+                        `📊 Wyniki:\n` +
+                        `• Zaimportowano: ${result.imported} rekordów\n` +
+                        `• Status: ${result.message}\n` +
+                        `• Czas: ${new Date(result.timestamp).toLocaleString('pl-PL')}\n\n` +
+                        `🔄 Lista bębnów zostanie teraz odświeżona...`;
+          
+          alert(message);
+          
+          console.log('🔄 Odświeżam listę bębnów...');
+          await handleRefresh();
+          
+        } else if (result.error) {
+          throw new Error(result.message || 'Funkcja zwróciła błąd bez szczegółów');
+        } else {
+          console.warn('⚠️ Nieoczekiwana struktura odpowiedzi:', result);
+          throw new Error('Otrzymano nieoczekiwaną odpowiedź z serwera');
+        }
+        
+      } catch (error) {
+        console.error('❌ Szczegółowy błąd importu:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
+        
+        let userMessage = 'Wystąpił błąd podczas importu.';
+        let technicalDetails = '';
         
         if (error.message.includes('Failed to fetch')) {
-          userMessage = 'Nie można połączyć z serwerem';
-          details = 'Sprawdź połączenie internetowe';
-        } else if (error.message.includes('HTTP 401')) {
-          userMessage = 'Błąd autoryzacji funkcji';
-          details = 'Sprawdź konfigurację funkcji w Supabase Dashboard → Edge Functions → clever-action → Settings → wyłącz "Authentication required"';
-        } else if (error.message.includes('HTTP 404')) {
-          userMessage = 'Funkcja clever-action nie znaleziona';
-          details = 'Sprawdź czy funkcja jest wdrożona w Supabase Dashboard';
-        } else if (error.message.includes('HTTP 500')) {
-          userMessage = 'Błąd wewnętrzny serwera';
-          details = 'Sprawdź logi funkcji w Supabase Dashboard → Edge Functions → clever-action → Logs';
-        } else if (error.message.includes('XLSX')) {
-          userMessage = 'Problem z plikiem Excel';
-          details = 'Sprawdź czy plik nie jest uszkodzony i spróbuj zapisać jako CSV';
+          userMessage = '🌐 Nie można połączyć się z serwerem funkcji';
+          technicalDetails = 'Sprawdź połączenie internetowe lub skontaktuj się z administratorem';
+        } else if (error.message.includes('ERR_NAME_NOT_RESOLVED')) {
+          userMessage = '🔗 Serwer funkcji nie odpowiada';
+          technicalDetails = 'Funkcja może nie być prawidłowo wdrożona lub wystąpił problem z DNS';
+        } else if (error.message.includes('Status: 404')) {
+          userMessage = '❓ Funkcja clever-action nie została znaleziona';
+          technicalDetails = 'Sprawdź czy funkcja jest prawidłowo wdrożona w Supabase Dashboard';
+        } else if (error.message.includes('Status: 500')) {
+          userMessage = '⚡ Błąd wewnętrzny serwera';
+          technicalDetails = 'Sprawdź logi funkcji w Supabase Dashboard > Edge Functions > clever-action > Logs';
+        } else if (error.message.includes('unauthorized') || error.message.includes('forbidden')) {
+          userMessage = '🔐 Brak uprawnień';
+          technicalDetails = 'Sprawdź konfigurację kluczy API i uprawnień funkcji';
+        } else if (error.message.includes('foreign key constraint')) {
+          userMessage = '📋 Problem z danymi CSV';
+          technicalDetails = 'Niektóre NIP-y w pliku CSV nie istnieją w systemie. Sprawdź czy wszystkie firmy są dodane do bazy danych.';
         } else {
           userMessage = error.message;
-          details = 'Zobacz konsolę przeglądarki (F12)';
+          technicalDetails = 'Zobacz szczegóły w konsoli przeglądarki (F12)';
         }
         
-        alert(`❌ BŁĄD IMPORTU:\n\n${userMessage}\n\n🔧 ${details}\n\n📝 ZALECENIA:\n1. ${isXLSX ? 'Spróbuj zapisać plik jako CSV z kodowaniem UTF-8' : 'Sprawdź kodowanie pliku CSV'}\n2. Sprawdź logi funkcji w Supabase Dashboard\n3. Upewnij się że funkcja clever-action jest wdrożona`);
+        const alertMessage = `❌ BŁĄD IMPORTU:\n\n${userMessage}\n\n🔧 ${technicalDetails}\n\n⚠️ Jeśli problem się powtarza:\n1. Sprawdź logi funkcji w Supabase Dashboard\n2. Sprawdź czy wszystkie firmy z CSV istnieją w tabeli companies\n3. Sprawdź konsolę przeglądarki (F12 > Console)`;
         
+        alert(alertMessage);
       } finally {
         setImportLoading(false);
+        console.log('🏁 Import zakończony');
       }
     };
 
     input.click();
   };
+
   const getStatistics = () => {
     const total = filteredAndSortedDrums.length;
     const overdue = filteredAndSortedDrums.filter(d => d.status === 'overdue').length;
