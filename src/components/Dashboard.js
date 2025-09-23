@@ -36,7 +36,7 @@ const Dashboard = ({ user, onNavigate }) => {
         setStats(dashboardStats);
         
         // Pobierz ostatnie bębny dla aktywności
-        const userDrums = await drumsAPI.getDrums(user.nip);
+        const userDrums = await drumsAPI.getAllDrums(user.nip);
         generateRecentActivity(userDrums);
         
       } catch (err) {
