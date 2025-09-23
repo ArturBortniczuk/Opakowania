@@ -242,13 +242,17 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
           });
           
           // PODZIEL DUŻE PLIKI na chunks przy konwersji Base64
-          const chunkSize = 1024 * 1024; // 1MB chunks
+          const chunkSize = 8192;
           const bytes = new Uint8Array(arrayBuffer);
           let base64 = '';
           
           for (let i = 0; i < bytes.length; i += chunkSize) {
             const chunk = bytes.slice(i, i + chunkSize);
-            base64 += btoa(String.fromCharCode(...chunk));
+            let chunkString = '';
+            for (let j = 0; j < chunk.length; j++) {
+              chunkString += String.fromCharCode(chunk[j]);
+            }
+            base64 += btoa(chunkString);
             
             // Yield control co jakiś czas
             if (i % (chunkSize * 10) === 0) {
