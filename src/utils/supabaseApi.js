@@ -1,5 +1,5 @@
 // src/utils/supabaseApi.js
-// FINALNA, KOMPLETNA WERSJA - Przeznaczona do pracy z rzeczywistymi danymi z Supabase.
+// FINALNA, KOMPLETNA WERSJA Z PAGINACJĄ - Przeznaczona do pracy z rzeczywistymi danymi z Supabase.
 
 import { supabase, supabaseHelpers } from '../lib/supabase';
 
@@ -112,16 +112,149 @@ export const authAPI = {
 };
 
 // ==================================
-//  API do Bębnów
+//  API do Bębnów Z PAGINACJĄ
 // ==================================
 export const drumsAPI = {
   /**
-   * Pobiera listę bębnów, opcjonalnie filtrując po NIP.
+   * Pobiera listę bębnów, opcjonalnie filtrując po NIP z paginacją.
    * @param {string|null} nip - NIP klienta do filtrowania.
-   * @returns {Promise<Array>} Lista obiektów bębnów.
+   * @param {object} options - Opcje paginacji i sortowania.
+   * @returns {Promise<object>} Obiekt z danymi bębnów, paginacją i metadanymi.
    */
-  async getDrums(nip = null) {
+  async getDrums(nip = null, options = {}) {
     try {
+      const {
+        page = 1,
+        limit = 100,
+        sortBy = 'kod_bebna',
+        sortOrder = 'asc',
+        search = '',
+        status = 'all'
+      } = options;
+
+      console.log(`🔄 getDrums wywołane z: nip=${nip}, page=${page}, limit=${limit}, search="${search}"`);
+
+      // Podstawowe zapytanie
+      let query = supabase
+        .from('drums')
+        .select(`*, companies (name, email, phone, address)`, { count: 'exact' });
+
+      // Filtrowanie po NIP
+      if (nip) {
+        query = query.eq('nip', nip);
+      }
+
+      // Filtrowanie po wyszukiwaniu
+      if (search) {
+        query = query.or(`kod_bebna.ilike.%${search}%,nazwa.ilike.%${search}%,pelna_nazwa_kontrahenta.ilike.%${search}%`);
+      }
+
+      // Filtrowanie po statusie (jeśli potrzebne w przyszłości)
+      if (status !== 'all') {
+        // Można dodać logikę statusu
+        // query = query.eq('status', status);
+      }
+
+      // Sortowanie
+      const dbSortBy = sortBy === 'KOD_BEBNA' ? 'kod_bebna' : 
+                       sortBy === 'NAZWA' ? 'nazwa' :
+                       sortBy === 'DATA_ZWROTU_DO_DOSTAWCY' ? 'data_zwrotu_do_dostawcy' :
+                       sortBy === 'pelna_nazwa_kontrahenta' ? 'pelna_nazwa_kontrahenta' :
+                       sortBy;
+      
+      query = query.order(dbSortBy, { ascending: sortOrder === 'asc' });
+
+      // Paginacja - KLUCZOWE!
+      const offset = (page - 1) * limit;
+      query = query.range(offset, offset + limit - 1);
+
+      const { data, error, count } = await query;
+      
+      if (error) throw error;
+
+      console.log(`✅ Pobrano ${data?.length || 0} rekordów z ${count || 0} łącznie`);
+
+      // Mapowanie danych do spójnego formatu używanego w komponentach
+      const mappedData = data.map(drum => {
+        const status = supabaseHelpers.getDrumStatus(drum.data_zwrotu_do_dostawcy);
+        const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
+        const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
+
+        return {
+          ...drum,
+          // Zachowaj oryginalne nazwy kolumn z bazy
+          kod_bebna: drum.kod_bebna,
+          nazwa: drum.nazwa,
+          cecha: drum.cecha,
+          data_zwrotu_do_dostawcy: drum.data_zwrotu_do_dostawcy,
+          kon_dostawca: drum.kon_dostawca,
+          pelna_nazwa_kontrahenta: drum.companies?.name || drum.pelna_nazwa_kontrahenta,
+          nip: drum.nip,
+          typ_dok: drum.typ_dok,
+          nr_dokumentupz: drum.nr_dokumentupz,
+          data_przyjecia_na_stan: drum.data_przyjecia_na_stan,
+          kontrahent: drum.kontrahent,
+          status: drum.status,
+          data_wydania: drum.data_wydania,
+          
+          // DODATKOWO: Zachowaj kompatybilność z WIELKIMI LITERAMI (stary kod)
+          KOD_BEBNA: drum.kod_bebna,
+          NAZWA: drum.nazwa,
+          CECHA: drum.cecha,
+          DATA_ZWROTU_DO_DOSTAWCY: drum.data_zwrotu_do_dostawcy,
+          KON_DOSTAWCA: drum.kon_dostawca,
+          PELNA_NAZWA_KONTRAHENTA: drum.companies?.name || drum.pelna_nazwa_kontrahenta,
+          NIP: drum.nip,
+          TYP_DOK: drum.typ_dok,
+          NR_DOKUMENTUPZ: drum.nr_dokumentupz,
+          'Data przyjęcia na stan': drum.data_przyjecia_na_stan,
+          KONTRAHENT: drum.kontrahent,
+          STATUS: drum.status,
+          DATA_WYDANIA: drum.data_wydania,
+          
+          company: drum.companies?.name || drum.pelna_nazwa_kontrahenta,
+          companyPhone: drum.companies?.phone,
+          companyEmail: drum.companies?.email,
+          companyAddress: drum.companies?.address,
+          daysInPossession: daysInPossession > 0 ? daysInPossession : 0,
+          ...status
+        };
+      });
+
+      // Zwróć dane z metadanymi paginacji
+      return {
+        data: mappedData,
+        pagination: {
+          page,
+          limit,
+          total: count || 0,
+          totalPages: Math.ceil((count || 0) / limit),
+          hasNext: page < Math.ceil((count || 0) / limit),
+          hasPrev: page > 1
+        },
+        meta: {
+          sortBy,
+          sortOrder,
+          search,
+          status,
+          nip
+        }
+      };
+    } catch (error) {
+      console.error('❌ Błąd API bębnów:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * WSTECZNA KOMPATYBILNOŚĆ: Pobiera WSZYSTKIE bębny bez paginacji (dla starych komponentów)
+   * @param {string|null} nip - NIP klienta do filtrowania.
+   * @returns {Promise<Array>} Lista wszystkich bębnów.
+   */
+  async getAllDrums(nip = null) {
+    try {
+      console.log('🔄 getAllDrums - pobieranie WSZYSTKICH bębnów...');
+      
       let query = supabase
         .from('drums')
         .select(`*, companies (name, email, phone, address)`);
@@ -130,11 +263,14 @@ export const drumsAPI = {
         query = query.eq('nip', nip);
       }
 
+      // USUWAMY LIMIT - pobieramy wszystko
       const { data, error } = await query.order('kod_bebna');
       
       if (error) throw error;
 
-      // Mapowanie danych do spójnego formatu używanego w komponentach
+      console.log(`✅ getAllDrums pobrał ${data.length} bębnów z bazy`);
+
+      // Mapowanie danych (identyczne jak w getDrums)
       return data.map(drum => {
         const status = supabaseHelpers.getDrumStatus(drum.data_zwrotu_do_dostawcy);
         const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
@@ -142,6 +278,21 @@ export const drumsAPI = {
 
         return {
           ...drum,
+          kod_bebna: drum.kod_bebna,
+          nazwa: drum.nazwa,
+          cecha: drum.cecha,
+          data_zwrotu_do_dostawcy: drum.data_zwrotu_do_dostawcy,
+          kon_dostawca: drum.kon_dostawca,
+          pelna_nazwa_kontrahenta: drum.companies?.name || drum.pelna_nazwa_kontrahenta,
+          nip: drum.nip,
+          typ_dok: drum.typ_dok,
+          nr_dokumentupz: drum.nr_dokumentupz,
+          data_przyjecia_na_stan: drum.data_przyjecia_na_stan,
+          kontrahent: drum.kontrahent,
+          status: drum.status,
+          data_wydania: drum.data_wydania,
+          
+          // Kompatybilność z WIELKIMI LITERAMI
           KOD_BEBNA: drum.kod_bebna,
           NAZWA: drum.nazwa,
           CECHA: drum.cecha,
@@ -165,7 +316,7 @@ export const drumsAPI = {
         };
       });
     } catch (error) {
-      console.error('Błąd API bębnów:', error);
+      console.error('❌ Błąd API wszystkich bębnów:', error);
       throw error;
     }
   },
@@ -402,11 +553,12 @@ export const returnPeriodsAPI = {
 };
 
 // ==================================
-//  API do Statystyk
+//  API do Statystyk (NAPRAWIONE - BEZ LIMITU 1000)
 // ==================================
 export const statsAPI = {
   /**
-   * Pobiera statystyki dla dashboardu (klienta lub admina).
+   * Pobiera statystyki dashboardu dla klienta lub administratora.
+   * NAPRAWIONE: Używa head: true i count: 'exact' żeby nie było limitu 1000
    * @param {string|null} nip - NIP klienta (jeśli dotyczy).
    * @returns {Promise<object>} Obiekt ze statystykami.
    */
@@ -415,29 +567,108 @@ export const statsAPI = {
       const now = new Date().toISOString();
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      if (nip) { // Statystyki dla klienta
-        const [{ count: totalDrums }, { count: activeDrums }, { count: pendingReturns }, { count: recentReturns }] = await Promise.all([
+      console.log(`🔄 Pobieranie statystyk dla NIP: ${nip || 'ADMIN'}`);
+
+      if (nip) { 
+        // Statystyki dla klienta - NAPRAWIONE: head: true oznacza że pobieramy TYLKO COUNT
+        console.log(`👤 Liczenie bębnów dla klienta ${nip}...`);
+        
+        const [
+          { count: totalDrums }, 
+          { count: activeDrums }, 
+          { count: pendingReturns }, 
+          { count: recentReturns }
+        ] = await Promise.all([
           supabase.from('drums').select('*', { count: 'exact', head: true }).eq('nip', nip),
           supabase.from('drums').select('*', { count: 'exact', head: true }).eq('nip', nip).gt('data_zwrotu_do_dostawcy', now),
           supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('user_nip', nip).eq('status', 'Pending'),
           supabase.from('drums').select('*', { count: 'exact', head: true }).eq('nip', nip).gte('data_wydania', thirtyDaysAgo)
         ]);
-        return { totalDrums: totalDrums || 0, activeDrums: activeDrums || 0, pendingReturns: pendingReturns || 0, recentReturns: recentReturns || 0 };
+
+        console.log(`✅ Statystyki klienta ${nip}: ${totalDrums} bębnów, ${activeDrums} aktywnych`);
+        return { 
+          totalDrums: totalDrums || 0, 
+          activeDrums: activeDrums || 0, 
+          pendingReturns: pendingReturns || 0, 
+          recentReturns: recentReturns || 0 
+        };
       }
 
-      // Statystyki dla admina
-      const [{ count: totalClients }, { count: totalDrums }, { count: pendingReturns }, { count: overdueReturns }, { count: activeRequests }, { count: completedRequests }] = await Promise.all([
+      // Statystyki dla admina - NAPRAWIONE: head: true oznacza że pobieramy TYLKO COUNT
+      console.log(`👨‍💼 Liczenie statystyk dla administratora...`);
+      
+      const [
+        { count: totalClients }, 
+        { count: totalDrums }, 
+        { count: pendingReturns }, 
+        { count: overdueReturns }, 
+        { count: activeRequests }, 
+        { count: completedRequests }
+      ] = await Promise.all([
         supabase.from('companies').select('*', { count: 'exact', head: true }),
-        supabase.from('drums').select('*', { count: 'exact', head: true }),
+        supabase.from('drums').select('*', { count: 'exact', head: true }), // ⭐ TO JEST KLUCZ - BEZ LIMITU!
         supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Pending'),
         supabase.from('drums').select('*', { count: 'exact', head: true }).lt('data_zwrotu_do_dostawcy', now),
         supabase.from('return_requests').select('*', { count: 'exact', head: true }).in('status', ['Pending', 'Approved']),
         supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Completed').gte('updated_at', thirtyDaysAgo)
       ]);
-      return { totalClients: totalClients || 0, totalDrums: totalDrums || 0, pendingReturns: pendingReturns || 0, overdueReturns: overdueReturns || 0, activeRequests: activeRequests || 0, completedRequests: completedRequests || 0 };
+
+      console.log(`✅ Statystyki admina: ${totalDrums} bębnów, ${totalClients} klientów, ${pendingReturns} zwrotów`);
+      
+      return { 
+        totalClients: totalClients || 0, 
+        totalDrums: totalDrums || 0, 
+        pendingReturns: pendingReturns || 0, 
+        overdueReturns: overdueReturns || 0, 
+        activeRequests: activeRequests || 0, 
+        completedRequests: completedRequests || 0 
+      };
 
     } catch (error) {
-      console.error('Błąd API statystyk:', error);
+      console.error('❌ Błąd API statystyk:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Pobiera szczegółowe statystyki bębnów (dla raportów).
+   * @returns {Promise<object>} Szczegółowe statystyki.
+   */
+  async getDetailedDrumStats() {
+    try {
+      console.log('🔄 Pobieranie szczegółowych statystyk bębnów...');
+      
+      const now = new Date().toISOString();
+      const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      const [
+        { count: totalDrums },
+        { count: activeDrums },
+        { count: overdueDrums },
+        { count: dueSoonDrums }
+      ] = await Promise.all([
+        // Wszystkie bębny
+        supabase.from('drums').select('*', { count: 'exact', head: true }),
+        // Aktywne (termin zwrotu w przyszłości, więcej niż 7 dni)
+        supabase.from('drums').select('*', { count: 'exact', head: true }).gt('data_zwrotu_do_dostawcy', sevenDaysFromNow),
+        // Przeterminowane (termin zwrotu w przeszłości)
+        supabase.from('drums').select('*', { count: 'exact', head: true }).lt('data_zwrotu_do_dostawcy', now),
+        // Zbliża się termin (między dziś a 7 dni)
+        supabase.from('drums').select('*', { count: 'exact', head: true })
+          .gte('data_zwrotu_do_dostawcy', now)
+          .lte('data_zwrotu_do_dostawcy', sevenDaysFromNow)
+      ]);
+
+      console.log(`✅ Szczegółowe statystyki: ${totalDrums} łącznie, ${overdueDrums} przeterminowane, ${dueSoonDrums} zbliża się termin`);
+
+      return {
+        totalDrums: totalDrums || 0,
+        activeDrums: activeDrums || 0,
+        overdueDrums: overdueDrums || 0,
+        dueSoonDrums: dueSoonDrums || 0
+      };
+    } catch (error) {
+      console.error('❌ Błąd szczegółowych statystyk:', error);
       throw error;
     }
   }
