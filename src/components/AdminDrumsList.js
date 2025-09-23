@@ -1,5 +1,5 @@
-// src/components/AdminDrumsList.js - KOMPLETNY KOD Z OBSŁUGĄ CSV I XLSX
-import React, { useState, useMemo, useEffect } from 'react';
+// src/components/AdminDrumsList.js - KOMPLETNY KOD Z PAGINACJĄ I IMPORTEM
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { drumsAPI, companiesAPI } from '../utils/supabaseApi';
 import { 
   Package, 
@@ -17,103 +17,127 @@ import {
   Truck,
   Download,
   RefreshCw,
-  Upload
+  Upload,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Loader
 } from 'lucide-react';
 
 const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('KOD_BEBNA');
+  const [sortBy, setSortBy] = useState('kod_bebna');
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterStatus, setFilterStatus] = useState((initialFilter && initialFilter.clientNip) ? 'client' : 'all');
   const [filterClient, setFilterClient] = useState((initialFilter && initialFilter.clientNip) || '');
   const [filterDateRange, setFilterDateRange] = useState('all');
   const [selectedDrum, setSelectedDrum] = useState(null);
   const [showDrumDetails, setShowDrumDetails] = useState(false);
-  const [drums, setDrums] = useState([]);
+  
+  // DODANE: Stan paginacji
+  const [drumsData, setDrumsData] = useState({
+    data: [],
+    pagination: {
+      page: 1,
+      limit: 100, // 100 na stronę dla adminów
+      total: 0,
+      totalPages: 1,
+      hasNext: false,
+      hasPrev: false
+    }
+  });
+  
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
 
-  // Pobierz bębny i firmy
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
+  // DODANE: Funkcja pobierająca bębny z paginacją
+  const fetchDrums = useCallback(async (options = {}) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const requestOptions = {
+        page: drumsData.pagination.page,
+        limit: 100,
+        sortBy,
+        sortOrder,
+        search: searchTerm,
+        status: filterStatus,
+        ...options
+      };
+
+      console.log(`🔄 Admin pobiera bębny, strona: ${requestOptions.page}`);
       
-      try {
-        const [drumsData, companiesData] = await Promise.all([
-          drumsAPI.getDrums(),
-          companiesAPI.getCompanies()
-        ]);
-        
-        console.log("Odebrane bębny z API (Admin):", drumsData);
-        if (!Array.isArray(drumsData)) {
-          console.error("API nie zwróciło tablicy!", drumsData);
-          throw new Error("Otrzymano nieprawidłowe dane z serwera.");
-        }
+      // Admin pobiera WSZYSTKIE bębny (bez filtra NIP)
+      const result = await drumsAPI.getDrums(null, requestOptions);
+      
+      console.log(`✅ Admin pobrał ${result.data.length} bębnów ze strony ${result.pagination.page}/${result.pagination.totalPages}`);
+      console.log(`📊 Łącznie w bazie: ${result.pagination.total} bębnów`);
+      
+      setDrumsData(result);
+    } catch (err) {
+      console.error('❌ Błąd podczas pobierania bębnów:', err);
+      setError('Nie udało się pobrać listy bębnów. Spróbuj ponownie.');
+    } finally {
+      setLoading(false);
+    }
+  }, [sortBy, sortOrder, searchTerm, filterStatus, filterClient]);
 
-        setDrums(drumsData);
-        setCompanies(companiesData);
-        
-      } catch (err) {
-        console.error('Błąd podczas pobierania danych:', err);
-        setError('Nie udało się pobrać danych. Spróbuj ponownie.');
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Pobierz firmy
+  const fetchCompanies = async () => {
+    try {
+      const companiesData = await companiesAPI.getCompanies();
+      setCompanies(companiesData);
+    } catch (err) {
+      console.error('Błąd podczas pobierania firm:', err);
+    }
+  };
 
-    fetchData();
+  // Pobierz dane przy pierwszym ładowaniu i zmianie parametrów
+  useEffect(() => {
+    fetchDrums({ page: 1 }); // Resetuj do pierwszej strony przy zmianie filtrów
+  }, [sortBy, sortOrder, searchTerm, filterStatus, filterClient]);
+
+  // Pobierz firmy na starcie
+  useEffect(() => {
+    fetchCompanies();
   }, []);
 
-  const filteredAndSortedDrums = useMemo(() => {
-    let filtered = drums.filter(drum => {
-      const matchesSearch = (drum.KOD_BEBNA?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                           (drum.NAZWA?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                           (drum.PELNA_NAZWA_KONTRAHENTA?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                           (drum.NIP || '').includes(searchTerm);
-      
-      if (!matchesSearch) return false;
-      
-      if (filterClient && drum.NIP !== filterClient) return false;
-      
-      if (filterStatus !== 'all' && drum.status !== filterStatus) return false;
-      
-      if (filterDateRange === 'this-week') {
-        const weekFromNow = new Date();
-        weekFromNow.setDate(weekFromNow.getDate() + 7);
-        const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
-        if (returnDate > weekFromNow) return false;
-      } else if (filterDateRange === 'this-month') {
-        const monthFromNow = new Date();
-        monthFromNow.setMonth(monthFromNow.getMonth() + 1);
-        const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
-        if (returnDate > monthFromNow) return false;
-      } else if (filterDateRange === 'overdue') {
-        if (drum.status !== 'overdue') return false;
+  // Obsługa początkowego filtra
+  useEffect(() => {
+    if (initialFilter) {
+      if (initialFilter.nip) {
+        setFilterClient(initialFilter.nip);
       }
-      
-      return true;
-    });
+      if (initialFilter.status) {
+        setFilterStatus(initialFilter.status);
+      }
+    }
+  }, [initialFilter]);
 
-    return filtered.sort((a, b) => {
-      let aValue = a[sortBy];
-      let bValue = b[sortBy];
-      
-      if (sortBy === 'DATA_ZWROTU_DO_DOSTAWCY' || sortBy === 'DATA_WYDANIA') {
-        aValue = new Date(aValue);
-        bValue = new Date(bValue);
-      } else if (sortBy === 'daysDiff' || sortBy === 'daysInPossession') {
-        aValue = Number(aValue);
-        bValue = Number(bValue);
-      }
-      
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [drums, searchTerm, sortBy, sortOrder, filterStatus, filterClient, filterDateRange]);
+  // DODANE: Funkcje nawigacji po stronach
+  const goToPage = (page) => {
+    setDrumsData(prev => ({ ...prev, pagination: { ...prev.pagination, page } }));
+    fetchDrums({ page });
+  };
+
+  const nextPage = () => {
+    if (drumsData.pagination.hasNext) {
+      goToPage(drumsData.pagination.page + 1);
+    }
+  };
+
+  const prevPage = () => {
+    if (drumsData.pagination.hasPrev) {
+      goToPage(drumsData.pagination.page - 1);
+    }
+  };
+
+  const firstPage = () => goToPage(1);
+  const lastPage = () => goToPage(drumsData.pagination.totalPages);
 
   const handleSort = (field) => {
     if (sortBy === field) {
@@ -130,28 +154,11 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
   };
 
   const handleRefresh = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const [drumsData, companiesData] = await Promise.all([
-        drumsAPI.getDrums(),
-        companiesAPI.getCompanies()
-      ]);
-      
-      setDrums(drumsData);
-      setCompanies(companiesData);
-      
-    } catch (err) {
-      console.error('Błąd podczas odświeżania:', err);
-      setError('Nie udało się odświeżyć danych.');
-    } finally {
-      setLoading(false);
-    }
+    await fetchDrums();
+    await fetchCompanies();
   };
 
-  // DODAJ te zabezpieczenia w handleImportFile w AdminDrumsList.js:
-
+  // ZACHOWANE: Funkcja importu z twojego kodu
   const handleImportFile = async () => {
     if (!window.confirm('⚠️ UWAGA: To zastąpi WSZYSTKIE dane w tabeli drums. Kontynuować?')) {
       return;
@@ -179,13 +186,6 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
       }
 
       console.log(`📁 Plik: ${file.name}, rozmiar: ${Math.round(file.size / 1024)}KB`);
-      console.log(`🔍 DEBUG - rozmiar pliku:`);
-      console.log(`- file.size: ${file.size} bajtów`);
-      console.log(`- file.size w KB: ${Math.round(file.size / 1024)} KB`);
-      console.log(`- file.size w MB: ${Math.round(file.size / 1024 / 1024 * 100) / 100} MB`);
-      console.log(`- maxFileSize: ${maxFileSize} bajtów`);
-      console.log(`- maxFileSize w MB: ${Math.round(maxFileSize / 1024 / 1024)} MB`);
-      console.log(`- Warunek file.size > maxFileSize: ${file.size > maxFileSize}`);
 
       setImportLoading(true);
       
@@ -196,7 +196,6 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
         if (fileName.endsWith('.csv')) {
           console.log('📄 Tryb CSV...');
           
-          // Dla dużych CSV, użyj tylko UTF-8 (szybciej)
           const csvContent = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => resolve(e.target.result);
@@ -227,18 +226,15 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
         } else {
           console.log('📊 Tryb XLSX...');
           
-          // Dla XLSX: sprawdź rozmiar przed konwersją
-          if (file.size > 50 * 1024 * 1024) { // 50MB limit dla XLSX
+          if (file.size > 50 * 1024 * 1024) {
             alert('❌ Plik XLSX jest za duży. Maksymalny rozmiar dla Excel: 50MB');
             setImportLoading(false);
             return;
           }
           
-          // POPRAWNE kodowanie Base64 - używamy FileReader
           const base64 = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => {
-              // Usuń prefix "data:application/...;base64," i zostaw sam Base64
               const base64Data = e.target.result.split(',')[1];
               resolve(base64Data);
             };
@@ -263,8 +259,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
               'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`
             },
             body: bodyData,
-            timeout: 300000 // 5 minut zamiast domyślnych 30 sekund
-
+            timeout: 300000
           }
         );
 
@@ -315,17 +310,19 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     input.click();
   };
 
+  // ZACHOWANE: Statystyki z twojego kodu
   const getStatistics = () => {
-    const total = filteredAndSortedDrums.length;
-    const overdue = filteredAndSortedDrums.filter(d => d.status === 'overdue').length;
-    const dueSoon = filteredAndSortedDrums.filter(d => d.status === 'due-soon').length;
-    const active = filteredAndSortedDrums.filter(d => d.status === 'active').length;
+    const total = drumsData.data.length;
+    const overdue = drumsData.data.filter(d => d.status === 'overdue').length;
+    const dueSoon = drumsData.data.filter(d => d.status === 'due-soon').length;
+    const active = drumsData.data.filter(d => d.status === 'active').length;
     
     return { total, overdue, dueSoon, active };
   };
 
   const stats = getStatistics();
 
+  // ZACHOWANE: DrumCard z twojego kodu
   const DrumCard = ({ drum, index }) => (
     <div 
       className={`bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] h-full flex flex-col ${drum.borderColor || 'border-gray-200'}`}
@@ -337,30 +334,35 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
             <Package className="w-6 h-6 text-white" />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="font-bold text-gray-900 truncate text-lg">{drum.KOD_BEBNA}</h3>
-            <p className="text-gray-600 text-sm truncate">{drum.NAZWA}</p>
+            <h3 className="font-bold text-gray-900 truncate text-lg">{drum.kod_bebna}</h3>
+            <p className="text-gray-600 text-sm truncate">{drum.nazwa}</p>
           </div>
         </div>
         <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.color || 'bg-gray-100 text-gray-600'}`}>
-          {drum.text || drum.STATUS}
+          {drum.text || drum.status}
         </div>
       </div>
 
       <div className="space-y-3 flex-1">
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-500">Firma</span>
-          <span className="text-sm font-medium text-gray-900 truncate ml-2">{drum.company || drum.PELNA_NAZWA_KONTRAHENTA}</span>
+          <span className="text-sm font-medium text-gray-900 truncate ml-2">
+            {drum.company || drum.pelna_nazwa_kontrahenta}
+          </span>
         </div>
         
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-500">NIP</span>
-          <span className="text-sm font-medium text-gray-900">{drum.NIP}</span>
+          <span className="text-sm font-medium text-gray-900">{drum.nip}</span>
         </div>
         
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-500">Termin zwrotu</span>
           <span className="text-sm font-medium text-gray-900">
-            {drum.DATA_ZWROTU_DO_DOSTAWCY ? new Date(drum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL') : 'Brak'}
+            {drum.data_zwrotu_do_dostawcy ? 
+              new Date(drum.data_zwrotu_do_dostawcy).toLocaleDateString('pl-PL') : 
+              'Brak'
+            }
           </span>
         </div>
         
@@ -380,7 +382,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
         </button>
         
         <button
-          onClick={() => onNavigate('admin-clients', { clientNip: drum.NIP })}
+          onClick={() => onNavigate('admin-clients', { clientNip: drum.nip })}
           className="bg-gray-100 text-gray-700 py-2 px-3 rounded-xl font-medium hover:bg-gray-200 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
         >
           <Building2 className="w-4 h-4" />
@@ -399,6 +401,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     </div>
   );
 
+  // ZACHOWANE: DrumDetailsModal z twojego kodu
   const DrumDetailsModal = () => {
     if (!showDrumDetails || !selectedDrum) return null;
 
@@ -407,7 +410,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
         <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">Szczegóły bębna {selectedDrum.KOD_BEBNA}</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Szczegóły bębna {selectedDrum.kod_bebna}</h2>
               <button
                 onClick={() => setShowDrumDetails(false)}
                 className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
@@ -424,23 +427,23 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 <div className="space-y-3">
                   <div>
                     <label className="text-sm font-medium text-gray-500">Kod bębna</label>
-                    <p className="text-gray-900 font-medium">{selectedDrum.KOD_BEBNA}</p>
+                    <p className="text-gray-900 font-medium">{selectedDrum.kod_bebna}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Nazwa</label>
-                    <p className="text-gray-900">{selectedDrum.NAZWA}</p>
+                    <p className="text-gray-900">{selectedDrum.nazwa}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Cecha</label>
-                    <p className="text-gray-900">{selectedDrum.CECHA}</p>
+                    <p className="text-gray-900">{selectedDrum.cecha}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Dostawca</label>
-                    <p className="text-gray-900">{selectedDrum.KON_DOSTAWCA}</p>
+                    <p className="text-gray-900">{selectedDrum.kon_dostawca}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Dokument</label>
-                    <p className="text-gray-900">{selectedDrum.NR_DOKUMENTUPZ}</p>
+                    <p className="text-gray-900">{selectedDrum.nr_dokumentupz}</p>
                   </div>
                 </div>
               </div>
@@ -450,15 +453,15 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 <div className="space-y-3">
                   <div>
                     <label className="text-sm font-medium text-gray-500">Nazwa firmy</label>
-                    <p className="text-gray-900">{selectedDrum.company || selectedDrum.PELNA_NAZWA_KONTRAHENTA}</p>
+                    <p className="text-gray-900">{selectedDrum.company || selectedDrum.pelna_nazwa_kontrahenta}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">NIP</label>
-                    <p className="text-gray-900">{selectedDrum.NIP}</p>
+                    <p className="text-gray-900">{selectedDrum.nip}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Kontrahent</label>
-                    <p className="text-gray-900">{selectedDrum.KONTRAHENT}</p>
+                    <p className="text-gray-900">{selectedDrum.kontrahent}</p>
                   </div>
                   {selectedDrum.companyEmail && (
                     <div>
@@ -482,8 +485,8 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Data wydania</span>
                   <span className="font-medium">
-                    {selectedDrum.DATA_WYDANIA 
-                      ? new Date(selectedDrum.DATA_WYDANIA).toLocaleDateString('pl-PL')
+                    {selectedDrum.data_wydania 
+                      ? new Date(selectedDrum.data_wydania).toLocaleDateString('pl-PL')
                       : 'Brak'
                     }
                   </span>
@@ -491,8 +494,8 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Data przyjęcia na stan</span>
                   <span className="font-medium">
-                    {selectedDrum['Data przyjęcia na stan'] 
-                      ? new Date(selectedDrum['Data przyjęcia na stan']).toLocaleDateString('pl-PL')
+                    {selectedDrum.data_przyjecia_na_stan 
+                      ? new Date(selectedDrum.data_przyjecia_na_stan).toLocaleDateString('pl-PL')
                       : 'Brak'
                     }
                   </span>
@@ -500,8 +503,8 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Termin zwrotu</span>
                   <span className="font-medium">
-                    {selectedDrum.DATA_ZWROTU_DO_DOSTAWCY 
-                      ? new Date(selectedDrum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL')
+                    {selectedDrum.data_zwrotu_do_dostawcy 
+                      ? new Date(selectedDrum.data_zwrotu_do_dostawcy).toLocaleDateString('pl-PL')
                       : 'Brak'
                     }
                   </span>
@@ -517,6 +520,100 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
       </div>
     );
   };
+
+  // DODANE: Komponent paginacji
+  const PaginationControls = () => (
+    <div className="flex items-center justify-between px-6 py-3 bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-blue-100 mt-6">
+      <div className="flex-1 flex justify-between sm:hidden">
+        <button
+          onClick={prevPage}
+          disabled={!drumsData.pagination.hasPrev}
+          className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Poprzednia
+        </button>
+        <button
+          onClick={nextPage}
+          disabled={!drumsData.pagination.hasNext}
+          className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Następna
+        </button>
+      </div>
+      <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm text-gray-700">
+            Wyświetlane <span className="font-medium">{((drumsData.pagination.page - 1) * drumsData.pagination.limit) + 1}</span> do{' '}
+            <span className="font-medium">
+              {Math.min(drumsData.pagination.page * drumsData.pagination.limit, drumsData.pagination.total)}
+            </span>{' '}
+            z <span className="font-medium">{drumsData.pagination.total}</span> bębnów
+          </p>
+        </div>
+        <div>
+          <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+            <button
+              onClick={firstPage}
+              disabled={!drumsData.pagination.hasPrev}
+              className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronsLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={prevPage}
+              disabled={!drumsData.pagination.hasPrev}
+              className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            
+            {/* Numerowanie stron */}
+            {[...Array(Math.min(5, drumsData.pagination.totalPages))].map((_, idx) => {
+              let pageNum;
+              if (drumsData.pagination.totalPages <= 5) {
+                pageNum = idx + 1;
+              } else if (drumsData.pagination.page <= 3) {
+                pageNum = idx + 1;
+              } else if (drumsData.pagination.page >= drumsData.pagination.totalPages - 2) {
+                pageNum = drumsData.pagination.totalPages - 4 + idx;
+              } else {
+                pageNum = drumsData.pagination.page - 2 + idx;
+              }
+
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => goToPage(pageNum)}
+                  className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                    drumsData.pagination.page === pageNum
+                      ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                      : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+
+            <button
+              onClick={nextPage}
+              disabled={!drumsData.pagination.hasNext}
+              className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <button
+              onClick={lastPage}
+              disabled={!drumsData.pagination.hasNext}
+              className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ChevronsRight className="h-4 w-4" />
+            </button>
+          </nav>
+        </div>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -555,7 +652,9 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Wszystkie bębny</h1>
-              <p className="text-gray-600">Zarządzaj bębnami w całym systemie</p>
+              <p className="text-gray-600">
+                Zarządzaj bazą {drumsData.pagination.total} bębnów
+              </p>
             </div>
             
             <div className="flex items-center space-x-4">
@@ -589,14 +688,14 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
             </div>
           </div>
 
-          {/* Stats Cards */}
+          {/* Stats Cards - POPRAWIONE: używa pagination.total zamiast filteredAndSortedDrums.length */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100">
               <div className="flex items-center">
                 <Package className="w-8 h-8 text-blue-600" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Wszystkie bębny</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                  <p className="text-2xl font-bold text-gray-900">{drumsData.pagination.total}</p>
                 </div>
               </div>
             </div>
@@ -684,31 +783,36 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
           </div>
         </div>
 
-        {/* Results */}
-        {filteredAndSortedDrums.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-8 items-stretch">
-            {filteredAndSortedDrums.map((drum, index) => (
-              <DrumCard key={drum.KOD_BEBNA || index} drum={drum} index={index} />
-            ))}
-          </div>
+        {/* Results - ZMIENIONE: używa drumsData.data zamiast filteredAndSortedDrums */}
+        {drumsData.data.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-8 items-stretch">
+              {drumsData.data.map((drum, index) => (
+                <DrumCard key={drum.kod_bebna || index} drum={drum} index={index} />
+              ))}
+            </div>
+
+            {/* DODANE: Paginacja */}
+            {drumsData.pagination.totalPages > 1 && <PaginationControls />}
+          </>
         ) : (
           <div className="text-center py-12">
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <Package className="w-12 h-12 text-gray-400" />
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Nie znaleziono bębnów</h3>
-            <p className="text-gray-600 mb-6">Spróbuj zmienić kryteria wyszukiwania lub filtry</p>
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setFilterStatus('all');
-                setFilterClient('');
-                setFilterDateRange('all');
-              }}
-              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200"
-            >
-              Wyczyść filtry
-            </button>
+            <p className="text-gray-600 mb-6">
+              {searchTerm ? 'Spróbuj zmienić kryteria wyszukiwania.' : 'Baza danych jest pusta.'}
+            </p>
+            {!searchTerm && (
+              <button
+                onClick={handleImportFile}
+                className="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors duration-200 flex items-center mx-auto"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Zaimportuj pierwszy plik
+              </button>
+            )}
           </div>
         )}
 
