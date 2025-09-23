@@ -274,7 +274,9 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
               'Content-Type': contentType,
               'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`
             },
-            body: bodyData
+            body: bodyData,
+            timeout: 300000 // 5 minut zamiast domyślnych 30 sekund
+
           }
         );
 
