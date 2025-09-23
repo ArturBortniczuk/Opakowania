@@ -42,7 +42,7 @@ const AdminClientsList = ({ onNavigate }) => {
       try {
         const [companiesData, allDrums, allReturns] = await Promise.all([
           companiesAPI.getCompanies(),
-          drumsAPI.getDrums(),
+          drumsAPI.getAllDrums(),
           returnsAPI.getReturns()
         ]);
         
@@ -135,7 +135,7 @@ const AdminClientsList = ({ onNavigate }) => {
     try {
       const [companiesData, allDrums, allReturns] = await Promise.all([
         companiesAPI.getCompanies(),
-        drumsAPI.getDrums(),
+        drumsAPI.getAllDrums(),
         returnsAPI.getReturns()
       ]);
       

@@ -51,7 +51,7 @@ const AdminReports = ({ onNavigate }) => {
       try {
         const [dashboardStats, allDrums, allCompanies, allReturns] = await Promise.all([
           statsAPI.getDashboardStats(),
-          drumsAPI.getDrums(),
+          drumsAPI.getAllDrums(),
           companiesAPI.getCompanies(),
           returnsAPI.getReturns()
         ]);
