@@ -47,7 +47,7 @@ const AdminDashboard = ({ onNavigate }) => {
         
         // Pobierz dane do aktywności i pilnych spraw
         const [allDrums, allReturns] = await Promise.all([
-          drumsAPI.getDrums(),
+          drumsAPI.getAllDrums(),
           returnsAPI.getReturns()
         ]);
         
