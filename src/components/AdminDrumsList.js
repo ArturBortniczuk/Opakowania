@@ -228,37 +228,23 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
           console.log('📊 Tryb XLSX...');
           
           // Dla XLSX: sprawdź rozmiar przed konwersją
-          if (file.size > 10 * 1024 * 1024) { // 10MB limit dla XLSX
-            alert('❌ Plik XLSX jest za duży. Maksymalny rozmiar dla Excel: 10MB');
+          if (file.size > 50 * 1024 * 1024) { // 50MB limit dla XLSX
+            alert('❌ Plik XLSX jest za duży. Maksymalny rozmiar dla Excel: 50MB');
             setImportLoading(false);
             return;
           }
           
-          const arrayBuffer = await new Promise((resolve, reject) => {
+          // POPRAWNE kodowanie Base64 - używamy FileReader
+          const base64 = await new Promise((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target.result);
+            reader.onload = (e) => {
+              // Usuń prefix "data:application/...;base64," i zostaw sam Base64
+              const base64Data = e.target.result.split(',')[1];
+              resolve(base64Data);
+            };
             reader.onerror = () => reject(new Error('Błąd odczytu XLSX'));
-            reader.readAsArrayBuffer(file);
+            reader.readAsDataURL(file);
           });
-          
-          // PODZIEL DUŻE PLIKI na chunks przy konwersji Base64
-          const chunkSize = 8192;
-          const bytes = new Uint8Array(arrayBuffer);
-          let base64 = '';
-          
-          for (let i = 0; i < bytes.length; i += chunkSize) {
-            const chunk = bytes.slice(i, i + chunkSize);
-            let chunkString = '';
-            for (let j = 0; j < chunk.length; j++) {
-              chunkString += String.fromCharCode(chunk[j]);
-            }
-            base64 += btoa(chunkString);
-            
-            // Yield control co jakiś czas
-            if (i % (chunkSize * 10) === 0) {
-              await new Promise(resolve => setTimeout(resolve, 1));
-            }
-          }
           
           bodyData = JSON.stringify({
             type: 'xlsx',
@@ -267,8 +253,6 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
           });
           contentType = 'application/json; charset=utf-8';
         }
-        
-        console.log('🚀 Wysyłam do Supabase...');
         
         const response = await fetch(
           'https://pobafitamzkzcfptuaqj.supabase.co/functions/v1/clever-action',
