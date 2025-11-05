@@ -1,4 +1,4 @@
-// src/components/DrumsList.js - Wersja do debugowania
+// src/components/DrumsList.js - NAPRAWIONA WERSJA
 import React, { useState, useMemo, useEffect } from 'react';
 import { drumsAPI } from '../utils/supabaseApi';
 import { 
@@ -10,14 +10,13 @@ import {
   CheckCircle,
   Clock,
   ArrowUpDown,
-  ExternalLink,
   Truck,
   RefreshCw
 } from 'lucide-react';
 
 const DrumsList = ({ user, onNavigate }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('KOD_BEBNA');
+  const [sortBy, setSortBy] = useState('kod_bebna');
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterStatus, setFilterStatus] = useState('all');
   const [userDrums, setUserDrums] = useState([]);
@@ -29,21 +28,37 @@ const DrumsList = ({ user, onNavigate }) => {
     const fetchUserDrums = async () => {
       setLoading(true);
       setError(null);
-      console.log(`Pobieranie bębnów dla NIP: ${user.nip}`);
+      console.log(`🔄 Pobieranie bębnów dla klienta NIP: ${user.nip}`);
       
       try {
-        // --- ZMIANA DO DEBUGOWANIA ---
-        // Pobieramy WSZYSTKIE bębny, ignorując NIP, aby sprawdzić połączenie i renderowanie
-        const drums = await drumsAPI.getDrums(user.nip); 
-        console.log("Odebrane bębny z API:", drums); // Sprawdź w konsoli przeglądarki, co tu przychodzi
+        // NAPRAWIONE: Przekazujemy poprawne opcje jako drugi parametr
+        const options = {
+          page: 1,
+          limit: 1000, // Klient dostaje wszystkie swoje bębny
+          sortBy: 'kod_bebna',
+          sortOrder: 'asc'
+        };
+
+        const result = await drumsAPI.getDrums(user.nip, options);
+        console.log("✅ Odebrane dane z API:", result);
+        
+        // Sprawdź czy otrzymaliśmy obiekt z paginacją czy tablicę
+        const drums = result.data || result;
+        
         if (!Array.isArray(drums)) {
-          console.error("API nie zwróciło tablicy!", drums);
+          console.error("❌ API nie zwróciło tablicy!", drums);
           throw new Error("Otrzymano nieprawidłowe dane z serwera.");
         }
+        
+        console.log(`✅ Załadowano ${drums.length} bębnów dla klienta`);
         setUserDrums(drums);
+        
+        if (drums.length === 0) {
+          console.warn("⚠️ Brak bębnów dla tego klienta");
+        }
       } catch (err) {
-        console.error('Błąd podczas pobierania bębnów:', err);
-        setError('Nie udało się pobrać listy bębnów. Spróbuj ponownie.');
+        console.error('❌ Błąd podczas pobierania bębnów:', err);
+        setError('Nie udało się pobrać listy bębnów. ' + err.message);
       } finally {
         setLoading(false);
       }
@@ -51,28 +66,59 @@ const DrumsList = ({ user, onNavigate }) => {
 
     if (user?.nip) {
       fetchUserDrums();
+    } else {
+      setLoading(false);
+      setError('Brak danych użytkownika');
     }
   }, [user?.nip]);
 
+  const handleRefresh = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const options = {
+        page: 1,
+        limit: 1000,
+        sortBy,
+        sortOrder
+      };
+
+      const result = await drumsAPI.getDrums(user.nip, options);
+      const drums = result.data || result;
+      
+      if (!Array.isArray(drums)) {
+        throw new Error("Otrzymano nieprawidłowe dane z serwera.");
+      }
+      
+      setUserDrums(drums);
+    } catch (err) {
+      console.error('❌ Błąd odświeżania:', err);
+      setError('Nie udało się odświeżyć listy. ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredAndSortedDrums = useMemo(() => {
     let filtered = userDrums.filter(drum => {
-      const matchesSearch = (drum.KOD_BEBNA?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      const matchesSearch = (drum.kod_bebna?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                           (drum.nazwa?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                           (drum.KOD_BEBNA?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
                            (drum.NAZWA?.toLowerCase() || '').includes(searchTerm.toLowerCase());
       
       if (!matchesSearch) return false;
       
       if (filterStatus === 'all') return true;
       
-      if (drum.status === filterStatus) return true;
-      
-      return false;
+      return drum.status === filterStatus;
     });
 
     return filtered.sort((a, b) => {
-      let aValue = a[sortBy];
-      let bValue = b[sortBy];
+      let aValue = a[sortBy] || a[sortBy.toUpperCase()];
+      let bValue = b[sortBy] || b[sortBy.toUpperCase()];
       
-      if (sortBy === 'DATA_ZWROTU_DO_DOSTAWCY') {
+      if (sortBy === 'data_zwrotu_do_dostawcy' || sortBy === 'DATA_ZWROTU_DO_DOSTAWCY') {
         aValue = new Date(aValue);
         bValue = new Date(bValue);
       }
@@ -81,121 +127,7 @@ const DrumsList = ({ user, onNavigate }) => {
       if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [userDrums, searchTerm, sortBy, sortOrder, filterStatus]);
-
-  const getStatusInfo = (drum) => {
-    const now = new Date();
-    const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
-    const isOverdue = returnDate < now;
-    const isDueSoon = returnDate <= new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) && returnDate >= now;
-    
-    if (isOverdue) {
-      return {
-        icon: AlertCircle,
-        text: 'Przekroczony termin',
-        color: 'text-red-600',
-        bgColor: 'bg-red-100',
-        borderColor: 'border-red-200'
-      };
-    } else if (isDueSoon) {
-      return {
-        icon: Clock,
-        text: 'Zbliża się termin',
-        color: 'text-yellow-600',
-        bgColor: 'bg-yellow-100',
-        borderColor: 'border-yellow-200'
-      };
-    } else {
-      return {
-        icon: CheckCircle,
-        text: 'Aktywny',
-        color: 'text-green-600',
-        bgColor: 'bg-green-100',
-        borderColor: 'border-green-200'
-      };
-    }
-  };
-
-  const getStatistics = () => {
-    const total = userDrums.length;
-    const overdue = userDrums.filter(drum => getStatusInfo(drum).status === 'overdue').length;
-    const dueSoon = userDrums.filter(drum => getStatusInfo(drum).status === 'due-soon').length;
-    const active = total - overdue - dueSoon;
-    
-    return { total, overdue, dueSoon, active };
-  };
-
-  const stats = getStatistics();
-
-  const DrumCard = ({ drum, index }) => {
-    const status = getStatusInfo(drum);
-    const StatusIcon = status.icon;
-    
-    return (
-      <div 
-        className={`
-          bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border transition-all duration-300 
-          hover:shadow-xl transform hover:scale-[1.02] ${status.borderColor}
-        `}
-        style={{ animationDelay: `${index * 100}ms` }}
-      >
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
-              <Package className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">{drum.KOD_BEBNA}</h3>
-              <p className="text-sm text-gray-600">{drum.NAZWA}</p>
-            </div>
-          </div>
-          
-          <div className={`px-3 py-1 rounded-full ${status.bgColor} flex items-center space-x-1`}>
-            <StatusIcon className={`w-4 h-4 ${status.color}`} />
-            <span className={`text-xs font-medium ${status.color}`}>{status.text}</span>
-          </div>
-        </div>
-
-        <div className="space-y-3 mb-6">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-500">Cecha:</span>
-            <span className="font-medium text-gray-900">{drum.CECHA}</span>
-          </div>
-          
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-500">Data przyjęcia:</span>
-            <span className="font-medium text-gray-900">
-              {drum.DATA_WYDANIA ? new Date(drum.DATA_WYDANIA).toLocaleDateString('pl-PL') : 'Brak daty'}
-            </span>
-          </div>
-          
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-500">Termin zwrotu:</span>
-            <div className="flex items-center space-x-2">
-              <Calendar className="w-4 h-4 text-gray-400" />
-              <span className={`font-medium ${status.color}`}>
-                {new Date(drum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL')}
-              </span>
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-500">Dokument:</span>
-            <span className="font-medium text-gray-900">{drum.NR_DOKUMENTUPZ}</span>
-          </div>
-        </div>
-
-        <button
-          onClick={() => onNavigate('return', { drum })}
-          className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 px-4 rounded-xl font-medium hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 transform hover:scale-105 flex items-center justify-center space-x-2"
-        >
-          <Truck className="w-4 h-4" />
-          <span>Zgłoś zwrot</span>
-          <ExternalLink className="w-4 h-4" />
-        </button>
-      </div>
-    );
-  };
+  }, [userDrums, searchTerm, filterStatus, sortBy, sortOrder]);
 
   const handleSort = (field) => {
     if (sortBy === field) {
@@ -206,21 +138,81 @@ const DrumsList = ({ user, onNavigate }) => {
     }
   };
 
-  const handleRefresh = () => {
-    // Odśwież dane
-    setLoading(true);
-    setError(null);
+  const getStatistics = () => {
+    const total = filteredAndSortedDrums.length;
+    const overdue = filteredAndSortedDrums.filter(d => d.status === 'overdue').length;
+    const dueSoon = filteredAndSortedDrums.filter(d => d.status === 'due-soon').length;
+    const active = filteredAndSortedDrums.filter(d => d.status === 'active').length;
     
-    drumsAPI.getDrums(user.nip)
-      .then(drums => {
-        setUserDrums(drums);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Błąd podczas odświeżania:', err);
-        setError('Nie udało się odświeżyć danych.');
-        setLoading(false);
-      });
+    return { total, overdue, dueSoon, active };
+  };
+
+  const stats = getStatistics();
+
+  const DrumCard = ({ drum, index }) => {
+    const kodBebna = drum.kod_bebna || drum.KOD_BEBNA;
+    const nazwa = drum.nazwa || drum.NAZWA;
+    const returnDate = drum.data_zwrotu_do_dostawcy || drum.DATA_ZWROTU_DO_DOSTAWCY;
+    const company = drum.company || drum.pelna_nazwa_kontrahenta || drum.PELNA_NAZWA_KONTRAHENTA;
+    const nip = drum.nip || drum.NIP;
+    
+    return (
+      <div 
+        className={`bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] ${drum.borderColor || 'border-gray-200'}`}
+        style={{ animationDelay: `${index * 50}ms` }}
+      >
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
+              <Package className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900 text-lg">{kodBebna}</h3>
+              <p className="text-gray-600 text-sm">{nazwa}</p>
+            </div>
+          </div>
+          <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.color || 'bg-gray-100 text-gray-600'}`}>
+            {drum.text || drum.status || 'Aktywny'}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">Firma</span>
+            <span className="text-sm font-medium text-gray-900 truncate">{company}</span>
+          </div>
+          
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">NIP</span>
+            <span className="text-sm font-medium text-gray-900">{nip}</span>
+          </div>
+          
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">Termin zwrotu</span>
+            <span className="text-sm font-medium text-gray-900">
+              {returnDate ? new Date(returnDate).toLocaleDateString('pl-PL') : 'Brak danych'}
+            </span>
+          </div>
+
+          {drum.daysInPossession !== undefined && (
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Dni w posiadaniu</span>
+              <span className="text-sm font-medium text-gray-900">{drum.daysInPossession}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <button
+            onClick={() => onNavigate('return', { drum })}
+            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2 px-4 rounded-xl font-medium hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2"
+          >
+            <Truck className="w-4 h-4" />
+            <span>Zgłoś zwrot</span>
+          </button>
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -228,7 +220,10 @@ const DrumsList = ({ user, onNavigate }) => {
       <div className="min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Ładowanie bębnów...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -240,7 +235,11 @@ const DrumsList = ({ user, onNavigate }) => {
       <div className="min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center py-12">
-            <div className="text-red-600 mb-4">{error}</div>
+            <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertCircle className="w-12 h-12 text-red-600" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Wystąpił błąd</h3>
+            <p className="text-red-600 mb-6">{error}</p>
             <button 
               onClick={handleRefresh}
               className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2 mx-auto"
@@ -266,57 +265,95 @@ const DrumsList = ({ user, onNavigate }) => {
               </div>
               <div>
                 <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-                  Twoje bębny
+                  Moje bębny
                 </h1>
-                <p className="text-gray-600">Zarządzaj swoimi bębnami i planuj zwroty</p>
+                <p className="text-gray-600">Zarządzaj swoimi bębnami i terminami zwrotów</p>
               </div>
             </div>
             
             <button
               onClick={handleRefresh}
-              className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2"
+              disabled={loading}
+              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               <span>Odśwież</span>
             </button>
           </div>
 
-          {/* Filters and Search */}
-          <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 mb-6">
+          {/* Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-blue-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+                  <div className="text-sm text-gray-600">Wszystkie bębny</div>
+                </div>
+                <Package className="w-8 h-8 text-blue-600" />
+              </div>
+            </div>
+            
+            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-green-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-2xl font-bold text-green-600">{stats.active}</div>
+                  <div className="text-sm text-gray-600">Aktywne</div>
+                </div>
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+            </div>
+            
+            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-yellow-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-2xl font-bold text-yellow-600">{stats.dueSoon}</div>
+                  <div className="text-sm text-gray-600">Zbliża się termin</div>
+                </div>
+                <Clock className="w-8 h-8 text-yellow-600" />
+              </div>
+            </div>
+            
+            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-red-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-2xl font-bold text-red-600">{stats.overdue}</div>
+                  <div className="text-sm text-gray-600">Przeterminowane</div>
+                </div>
+                <AlertCircle className="w-8 h-8 text-red-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div className="bg-white/80 backdrop-blur-lg rounded-xl p-6 shadow-lg border border-gray-200">
             <div className="flex flex-col md:flex-row gap-4">
-              {/* Search */}
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
                   placeholder="Szukaj po kodzie lub nazwie bębna..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
-
-              {/* Filter */}
-              <div className="relative">
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="appearance-none bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                >
-                  <option value="all">Wszystkie</option>
-                  <option value="active">Aktywne</option>
-                  <option value="due-soon">Zbliża się termin</option>
-                  <option value="overdue">Przekroczony termin</option>
-                </select>
-                <Filter className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
-
-              {/* Sort */}
-              <div className="flex space-x-2">
+              
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">Wszystkie statusy</option>
+                <option value="active">Aktywne</option>
+                <option value="due-soon">Zbliża się termin</option>
+                <option value="overdue">Przeterminowane</option>
+              </select>
+              
+              <div className="flex gap-2">
                 <button
-                  onClick={() => handleSort('KOD_BEBNA')}
+                  onClick={() => handleSort('kod_bebna')}
                   className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 ${
-                    sortBy === 'KOD_BEBNA' 
+                    sortBy === 'kod_bebna' 
                       ? 'bg-blue-600 text-white border-blue-600' 
                       : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
                   }`}
@@ -326,46 +363,26 @@ const DrumsList = ({ user, onNavigate }) => {
                 </button>
                 
                 <button
-                  onClick={() => handleSort('DATA_ZWROTU_DO_DOSTAWCY')}
+                  onClick={() => handleSort('data_zwrotu_do_dostawcy')}
                   className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 ${
-                    sortBy === 'DATA_ZWROTU_DO_DOSTAWCY' 
+                    sortBy === 'data_zwrotu_do_dostawcy' 
                       ? 'bg-blue-600 text-white border-blue-600' 
                       : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
                   }`}
                 >
-                  <span>Data</span>
+                  <span>Termin</span>
                   <ArrowUpDown className="w-4 h-4" />
                 </button>
               </div>
             </div>
           </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-blue-100 text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-              <div className="text-sm text-gray-600">Wszystkie bębny</div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-green-100 text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.active}</div>
-              <div className="text-sm text-gray-600">Aktywne</div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-yellow-100 text-center">
-              <div className="text-2xl font-bold text-yellow-600">{stats.dueSoon}</div>
-              <div className="text-sm text-gray-600">Zbliża się termin</div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-red-100 text-center">
-              <div className="text-2xl font-bold text-red-600">{stats.overdue}</div>
-              <div className="text-sm text-gray-600">Przekroczony termin</div>
-            </div>
-          </div>
         </div>
 
-        {/* Drums Grid */}
+        {/* Results */}
         {filteredAndSortedDrums.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
             {filteredAndSortedDrums.map((drum, index) => (
-              <DrumCard key={drum.KOD_BEBNA} drum={drum} index={index} />
+              <DrumCard key={drum.kod_bebna || drum.KOD_BEBNA || index} drum={drum} index={index} />
             ))}
           </div>
         ) : (
