@@ -1,4 +1,4 @@
-// src/components/ReturnForm.js - Zaktualizowany o rzeczywiste dane z Supabase
+// src/components/ReturnForm.js - NAPRAWIONA WERSJA
 import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
@@ -20,7 +20,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     collectionDate: new Date().toISOString().split('T')[0],
-    companyName: user.companyName,
+    companyName: user.companyName || user.name,
     street: '',
     postalCode: '',
     city: '',
@@ -28,7 +28,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
     loadingHours: '',
     availableEquipment: '',
     notes: '',
-    selectedDrums: selectedDrum ? [selectedDrum.KOD_BEBNA] : [],
+    selectedDrums: selectedDrum ? [selectedDrum.kod_bebna || selectedDrum.KOD_BEBNA] : [],
     confirmType: false,
     confirmEmpty: false
   });
@@ -36,15 +36,37 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   const [userDrums, setUserDrums] = useState([]);
   const [drumsLoading, setDrumsLoading] = useState(true);
 
-  // Pobierz bębny użytkownika
+  // Pobierz bębny użytkownika - NAPRAWIONE!
   useEffect(() => {
     const fetchUserDrums = async () => {
       setDrumsLoading(true);
       try {
-        const drums = await drumsAPI.getDrums(user.nip);
-        setUserDrums(drums);
+        console.log('🔄 ReturnForm: Pobieranie bębnów dla', user.nip);
+        
+        // NAPRAWIONE: Dodaj opcje i obsłuż oba formaty odpowiedzi
+        const options = {
+          page: 1,
+          limit: 1000,
+          sortBy: 'kod_bebna',
+          sortOrder: 'asc'
+        };
+        
+        const result = await drumsAPI.getDrums(user.nip, options);
+        console.log('✅ ReturnForm: Otrzymano dane:', result);
+        
+        // WAŻNE: Obsłuż oba formaty - obiekt z paginacją lub bezpośrednio tablica
+        const drums = result.data || result;
+        
+        if (!Array.isArray(drums)) {
+          console.error('❌ ReturnForm: Dane nie są tablicą!', drums);
+          setUserDrums([]);
+        } else {
+          console.log(`✅ ReturnForm: Załadowano ${drums.length} bębnów`);
+          setUserDrums(drums);
+        }
       } catch (err) {
-        console.error('Błąd podczas pobierania bębnów:', err);
+        console.error('❌ Błąd podczas pobierania bębnów:', err);
+        setUserDrums([]);
       } finally {
         setDrumsLoading(false);
       }
@@ -52,6 +74,9 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
 
     if (user?.nip) {
       fetchUserDrums();
+    } else {
+      setDrumsLoading(false);
+      setUserDrums([]);
     }
   }, [user?.nip]);
 
@@ -132,49 +157,30 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   };
 
   const StepIndicator = () => (
-    <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 mb-8">
-      <div className="flex items-center justify-between">
-        {steps.map((step, index) => {
-          const Icon = step.icon;
-          const isActive = currentStep === step.id;
-          const isCompleted = currentStep > step.id;
-          const isAccessible = validateStep(step.id - 1) || step.id === 1;
-          
-          return (
-            <React.Fragment key={step.id}>
-              <div className="flex flex-col items-center space-y-2">
-                <button
-                  onClick={() => isAccessible && setCurrentStep(step.id)}
-                  disabled={!isAccessible}
-                  className={`
-                    w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300
-                    ${isActive 
-                      ? 'bg-blue-600 text-white shadow-lg transform scale-110' 
-                      : isCompleted 
-                        ? 'bg-green-600 text-white' 
-                        : isAccessible
-                          ? 'bg-gray-200 text-gray-600 hover:bg-blue-100 hover:text-blue-600'
-                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }
-                  `}
-                >
-                  {isCompleted ? <CheckCircle className="w-6 h-6" /> : <Icon className="w-6 h-6" />}
-                </button>
-                <span className={`text-xs font-medium text-center ${
-                  isActive ? 'text-blue-600' : isCompleted ? 'text-green-600' : 'text-gray-500'
-                }`}>
-                  {step.title}
-                </span>
-              </div>
-              {index < steps.length - 1 && (
-                <div className={`flex-1 h-1 mx-4 rounded-full transition-all duration-300 ${
-                  currentStep > step.id ? 'bg-green-600' : 'bg-gray-200'
-                }`} />
-              )}
-            </React.Fragment>
-          );
-        })}
-      </div>
+    <div className="flex items-center justify-center mb-8">
+      {steps.map((step, index) => (
+        <React.Fragment key={step.id}>
+          <div className="flex flex-col items-center">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
+              currentStep >= step.id 
+                ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg' 
+                : 'bg-gray-200 text-gray-500'
+            }`}>
+              <step.icon className="w-6 h-6" />
+            </div>
+            <span className={`text-sm mt-2 font-medium ${
+              currentStep >= step.id ? 'text-blue-600' : 'text-gray-500'
+            }`}>
+              {step.title}
+            </span>
+          </div>
+          {index < steps.length - 1 && (
+            <div className={`w-16 h-1 mx-2 rounded transition-all duration-300 ${
+              currentStep > step.id ? 'bg-blue-600' : 'bg-gray-200'
+            }`} />
+          )}
+        </React.Fragment>
+      ))}
     </div>
   );
 
@@ -185,34 +191,36 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
           <div className="space-y-6">
             <div className="text-center mb-6">
               <Building2 className="w-16 h-16 mx-auto text-blue-600 mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900">Dane podstawowe</h2>
-              <p className="text-gray-600">Sprawdź i uzupełnij podstawowe informacje</p>
+              <h2 className="text-2xl font-bold text-gray-900">Podstawowe informacje</h2>
+              <p className="text-gray-600">Określ datę i firmę dla odbioru</p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Calendar className="inline w-4 h-4 mr-2" />
-                  Data zgłoszenia odbioru
+                  Data odbioru *
                 </label>
                 <input
                   type="date"
                   value={formData.collectionDate}
                   onChange={(e) => setFormData(prev => ({ ...prev, collectionDate: e.target.value }))}
+                  min={new Date().toISOString().split('T')[0]}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <User className="inline w-4 h-4 mr-2" />
-                  Nazwa firmy
+                  <Building2 className="inline w-4 h-4 mr-2" />
+                  Nazwa firmy *
                 </label>
                 <input
                   type="text"
                   value={formData.companyName}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-100 text-gray-700"
-                  disabled
+                  onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                  placeholder="Pełna nazwa firmy"
                 />
               </div>
             </div>
@@ -225,7 +233,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
             <div className="text-center mb-6">
               <MapPin className="w-16 h-16 mx-auto text-blue-600 mb-4" />
               <h2 className="text-2xl font-bold text-gray-900">Adres odbioru</h2>
-              <p className="text-gray-600">Podaj adres gdzie mają zostać odebrane bębny</p>
+              <p className="text-gray-600">Podaj dokładny adres skąd mają być odebrane bębny</p>
             </div>
             
             <div className="space-y-6">
@@ -365,36 +373,46 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
             {drumsLoading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <p className="ml-4 text-gray-600">Ładowanie bębnów...</p>
+              </div>
+            ) : userDrums.length === 0 ? (
+              <div className="text-center py-8">
+                <Package className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-600">Brak dostępnych bębnów do zwrotu</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-                {userDrums.map((drum, index) => (
-                  <div
-                    key={index}
-                    className={`border-2 rounded-xl p-4 transition-all duration-200 cursor-pointer ${
-                      formData.selectedDrums.includes(drum.KOD_BEBNA)
-                        ? 'border-blue-600 bg-blue-50'
-                        : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
-                    }`}
-                    onClick={() => handleDrumToggle(drum.KOD_BEBNA)}
-                  >
-                    <div className="flex items-start space-x-3">
-                      <input
-                        type="checkbox"
-                        checked={formData.selectedDrums.includes(drum.KOD_BEBNA)}
-                        onChange={() => handleDrumToggle(drum.KOD_BEBNA)}
-                        className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900">{drum.KOD_BEBNA}</h3>
-                        <p className="text-sm text-gray-600">{drum.NAZWA}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Termin zwrotu: {new Date(drum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL')}
-                        </p>
+                {userDrums.map((drum, index) => {
+                  const drumCode = drum.kod_bebna || drum.KOD_BEBNA;
+                  const drumName = drum.nazwa || drum.NAZWA;
+                  const returnDate = drum.data_zwrotu_do_dostawcy || drum.DATA_ZWROTU_DO_DOSTAWCY;
+                  
+                  return (
+                    <div
+                      key={drumCode || index}
+                      className={`border-2 rounded-xl p-4 transition-all duration-200 cursor-pointer ${
+                        formData.selectedDrums.includes(drumCode)
+                          ? 'border-blue-600 bg-blue-50'
+                          : 'border-gray-200 hover:border-blue-300 bg-white'
+                      }`}
+                      onClick={() => handleDrumToggle(drumCode)}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-semibold text-gray-900">{drumCode}</span>
+                        <input
+                          type="checkbox"
+                          checked={formData.selectedDrums.includes(drumCode)}
+                          onChange={() => {}}
+                          className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
                       </div>
+                      <p className="text-sm text-gray-600 mb-2">{drumName}</p>
+                      <p className="text-xs text-gray-500">
+                        Termin: {returnDate ? new Date(returnDate).toLocaleDateString('pl-PL') : 'Brak'}
+                      </p>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -408,39 +426,41 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
               <h2 className="text-2xl font-bold text-gray-900">Potwierdzenie</h2>
               <p className="text-gray-600">Sprawdź dane i potwierdź zgłoszenie</p>
             </div>
-
-            {/* Summary */}
+            
             <div className="bg-gray-50 rounded-xl p-6 space-y-4">
-              <h3 className="font-semibold text-gray-900 mb-4">Podsumowanie zgłoszenia:</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <span className="text-gray-600">Data odbioru:</span>
-                  <span className="ml-2 font-medium">{new Date(formData.collectionDate).toLocaleDateString('pl-PL')}</span>
+                  <p className="text-sm text-gray-500">Data odbioru</p>
+                  <p className="font-medium text-gray-900">
+                    {new Date(formData.collectionDate).toLocaleDateString('pl-PL')}
+                  </p>
                 </div>
                 <div>
-                  <span className="text-gray-600">Adres:</span>
-                  <span className="ml-2 font-medium">{formData.street}, {formData.postalCode} {formData.city}</span>
+                  <p className="text-sm text-gray-500">Firma</p>
+                  <p className="font-medium text-gray-900">{formData.companyName}</p>
                 </div>
                 <div>
-                  <span className="text-gray-600">Email:</span>
-                  <span className="ml-2 font-medium">{formData.email}</span>
+                  <p className="text-sm text-gray-500">Adres</p>
+                  <p className="font-medium text-gray-900">
+                    {formData.street}, {formData.postalCode} {formData.city}
+                  </p>
                 </div>
                 <div>
-                  <span className="text-gray-600">Godziny:</span>
-                  <span className="ml-2 font-medium">{formData.loadingHours}</span>
+                  <p className="text-sm text-gray-500">Email</p>
+                  <p className="font-medium text-gray-900">{formData.email}</p>
                 </div>
-                <div className="md:col-span-2">
-                  <span className="text-gray-600">Wybrane bębny:</span>
-                  <span className="ml-2 font-medium">{formData.selectedDrums.join(', ')}</span>
+                <div>
+                  <p className="text-sm text-gray-500">Ilość bębnów</p>
+                  <p className="font-medium text-gray-900">{formData.selectedDrums.length}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Godziny załadunku</p>
+                  <p className="font-medium text-gray-900">{formData.loadingHours}</p>
                 </div>
               </div>
             </div>
 
-            {/* Confirmations */}
-            <div className="space-y-4 border border-gray-200 rounded-xl p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Potwierdzenia wymagane:</h3>
-              
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 space-y-3">
               <label className="flex items-start space-x-3 cursor-pointer">
                 <input
                   type="checkbox"
@@ -449,7 +469,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                   className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
                 <span className="text-sm text-gray-900">
-                  Potwierdzam rodzaj i ilość zwracanych opakowań zgodnie z powyższą listą
+                  Potwierdzam, że zwracam bębny tego samego typu i wielkości co otrzymane
                 </span>
               </label>
 
@@ -511,20 +531,28 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                 <button
                   onClick={handleNext}
                   disabled={!validateStep(currentStep)}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium flex items-center space-x-2"
+                  className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 flex items-center space-x-2 ${
+                    validateStep(currentStep)
+                      ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-lg'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
                 >
                   <span>Dalej</span>
-                  <Calendar className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               ) : (
                 <button
                   onClick={handleSubmit}
                   disabled={!validateStep(5) || loading}
-                  className="px-6 py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl hover:from-green-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium flex items-center space-x-2"
+                  className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 flex items-center space-x-2 ${
+                    validateStep(5) && !loading
+                      ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 shadow-lg'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
                 >
                   {loading ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                       <span>Wysyłanie...</span>
                     </>
                   ) : (
@@ -542,5 +570,11 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
     </div>
   );
 };
+
+const ArrowRight = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+  </svg>
+);
 
 export default ReturnForm;
