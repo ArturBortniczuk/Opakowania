@@ -1,28 +1,27 @@
-// src/components/DrumsList.js - NAPRAWIONA WERSJA Z GRUPOWANIEM PO CESZE
+// src/components/DrumsList.js - NAPRAWIONA WERSJA
 import React, { useState, useMemo, useEffect } from 'react';
 import { drumsAPI } from '../utils/supabaseApi';
 import { 
   Package, 
+  Calendar, 
   Search, 
+  Filter, 
   AlertCircle,
   CheckCircle,
   Clock,
   ArrowUpDown,
   Truck,
-  RefreshCw,
-  ChevronDown,
-  ChevronRight
+  RefreshCw
 } from 'lucide-react';
 
 const DrumsList = ({ user, onNavigate }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('cecha'); // ZMIANA: sortuj po cesze domyślnie
+  const [sortBy, setSortBy] = useState('kod_bebna');
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterStatus, setFilterStatus] = useState('all');
   const [userDrums, setUserDrums] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [expandedGroups, setExpandedGroups] = useState(new Set()); // DODANE: stan rozwiniętych grup
 
   // Pobierz bębny użytkownika
   useEffect(() => {
@@ -32,16 +31,18 @@ const DrumsList = ({ user, onNavigate }) => {
       console.log(`🔄 Pobieranie bębnów dla klienta NIP: ${user.nip}`);
       
       try {
+        // NAPRAWIONE: Przekazujemy poprawne opcje jako drugi parametr
         const options = {
           page: 1,
-          limit: 1000,
-          sortBy: 'cecha', // ZMIANA: sortuj po cesze
+          limit: 1000, // Klient dostaje wszystkie swoje bębny
+          sortBy: 'kod_bebna',
           sortOrder: 'asc'
         };
 
         const result = await drumsAPI.getDrums(user.nip, options);
         console.log("✅ Odebrane dane z API:", result);
         
+        // Sprawdź czy otrzymaliśmy obiekt z paginacją czy tablicę
         const drums = result.data || result;
         
         if (!Array.isArray(drums)) {
@@ -51,10 +52,6 @@ const DrumsList = ({ user, onNavigate }) => {
         
         console.log(`✅ Załadowano ${drums.length} bębnów dla klienta`);
         setUserDrums(drums);
-        
-        // DODANE: Rozwiń wszystkie grupy domyślnie
-        const allGroups = new Set(drums.map(d => d.cecha || d.CECHA).filter(Boolean));
-        setExpandedGroups(allGroups);
         
         if (drums.length === 0) {
           console.warn("⚠️ Brak bębnów dla tego klienta");
@@ -83,8 +80,8 @@ const DrumsList = ({ user, onNavigate }) => {
       const options = {
         page: 1,
         limit: 1000,
-        sortBy: 'cecha',
-        sortOrder: 'asc'
+        sortBy,
+        sortOrder
       };
 
       const result = await drumsAPI.getDrums(user.nip, options);
@@ -103,17 +100,12 @@ const DrumsList = ({ user, onNavigate }) => {
     }
   };
 
-  // NOWE: Grupowanie bębnów po cesze
-  const groupedDrums = useMemo(() => {
-    // Najpierw filtruj
+  const filteredAndSortedDrums = useMemo(() => {
     let filtered = userDrums.filter(drum => {
-      const matchesSearch = 
-        (drum.kod_bebna?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (drum.nazwa?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (drum.cecha?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (drum.KOD_BEBNA?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (drum.NAZWA?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-        (drum.CECHA?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+      const matchesSearch = (drum.kod_bebna?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                           (drum.nazwa?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                           (drum.KOD_BEBNA?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                           (drum.NAZWA?.toLowerCase() || '').includes(searchTerm.toLowerCase());
       
       if (!matchesSearch) return false;
       
@@ -122,84 +114,41 @@ const DrumsList = ({ user, onNavigate }) => {
       return drum.status === filterStatus;
     });
 
-    // Grupuj po cesze
-    const groups = {};
-    filtered.forEach(drum => {
-      const cecha = drum.cecha || drum.CECHA || 'Bez cechy';
-      if (!groups[cecha]) {
-        groups[cecha] = [];
+    return filtered.sort((a, b) => {
+      let aValue = a[sortBy] || a[sortBy.toUpperCase()];
+      let bValue = b[sortBy] || b[sortBy.toUpperCase()];
+      
+      if (sortBy === 'data_zwrotu_do_dostawcy' || sortBy === 'DATA_ZWROTU_DO_DOSTAWCY') {
+        aValue = new Date(aValue);
+        bValue = new Date(bValue);
       }
-      groups[cecha].push(drum);
+      
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
     });
+  }, [userDrums, searchTerm, filterStatus, sortBy, sortOrder]);
 
-    // Sortuj grupy alfabetycznie
-    const sortedGroupNames = Object.keys(groups).sort((a, b) => {
-      if (sortOrder === 'asc') {
-        return a.localeCompare(b);
-      } else {
-        return b.localeCompare(a);
-      }
-    });
-
-    // Zwróć grupowane bębny
-    return sortedGroupNames.map(cecha => ({
-      cecha,
-      drums: groups[cecha].sort((a, b) => {
-        const aCode = a.kod_bebna || a.KOD_BEBNA;
-        const bCode = b.kod_bebna || b.KOD_BEBNA;
-        return sortOrder === 'asc' 
-          ? aCode.localeCompare(bCode) 
-          : bCode.localeCompare(aCode);
-      })
-    }));
-  }, [userDrums, searchTerm, filterStatus, sortOrder]);
-
-  // DODANE: Funkcje do rozwijania/zwijania grup
-  const toggleGroup = (cecha) => {
-    setExpandedGroups(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(cecha)) {
-        newSet.delete(cecha);
-      } else {
-        newSet.add(cecha);
-      }
-      return newSet;
-    });
+  const handleSort = (field) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
   };
 
-  const expandAll = () => {
-    const allGroups = new Set(groupedDrums.map(g => g.cecha));
-    setExpandedGroups(allGroups);
-  };
-
-  const collapseAll = () => {
-    setExpandedGroups(new Set());
-  };
-
-  // ZMIENIONE: Statystyki teraz uwzględniają też grupy
   const getStatistics = () => {
-    const total = userDrums.length;
-    const overdue = userDrums.filter(d => d.status === 'overdue').length;
-    const dueSoon = userDrums.filter(d => d.status === 'due-soon').length;
-    const active = userDrums.filter(d => d.status === 'active').length;
-    const totalGroups = groupedDrums.length; // DODANE
+    const total = filteredAndSortedDrums.length;
+    const overdue = filteredAndSortedDrums.filter(d => d.status === 'overdue').length;
+    const dueSoon = filteredAndSortedDrums.filter(d => d.status === 'due-soon').length;
+    const active = filteredAndSortedDrums.filter(d => d.status === 'active').length;
     
-    return { total, overdue, dueSoon, active, totalGroups };
+    return { total, overdue, dueSoon, active };
   };
 
   const stats = getStatistics();
 
-  // DODANE: Status grupy (czerwony jeśli są przeterminowane, żółty jeśli zbliża się termin)
-  const getGroupStatus = (drums) => {
-    const overdue = drums.filter(d => d.status === 'overdue').length;
-    const dueSoon = drums.filter(d => d.status === 'due-soon').length;
-    
-    if (overdue > 0) return { text: 'Przeterminowane', color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' };
-    if (dueSoon > 0) return { text: 'Zbliża się termin', color: 'text-yellow-600', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-200' };
-    return { text: 'Aktywne', color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' };
-  };
-
-  // ZACHOWANE: Twoja oryginalna karta bębna
   const DrumCard = ({ drum, index }) => {
     const kodBebna = drum.kod_bebna || drum.KOD_BEBNA;
     const nazwa = drum.nazwa || drum.NAZWA;
@@ -266,54 +215,6 @@ const DrumsList = ({ user, onNavigate }) => {
     );
   };
 
-  // NOWY: Komponent grupy
-  const DrumGroup = ({ group }) => {
-    const isExpanded = expandedGroups.has(group.cecha);
-    const groupStatus = getGroupStatus(group.drums);
-    
-    return (
-      <div className="mb-6">
-        {/* Header grupy */}
-        <div 
-          className={`${groupStatus.bgColor} border ${groupStatus.borderColor} rounded-xl p-4 cursor-pointer hover:opacity-90 transition-opacity mb-4`}
-          onClick={() => toggleGroup(group.cecha)}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-                <Package className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">{group.cecha}</h3>
-                <p className="text-sm text-gray-600">{group.drums.length} bębn{group.drums.length === 1 ? '' : 'ów'}</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-3">
-              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${groupStatus.color} bg-white`}>
-                {groupStatus.text}
-              </div>
-              {isExpanded ? (
-                <ChevronDown className="w-6 h-6 text-gray-600" />
-              ) : (
-                <ChevronRight className="w-6 h-6 text-gray-600" />
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Lista kart bębnów */}
-        {isExpanded && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {group.drums.map((drum, index) => (
-              <DrumCard key={drum.kod_bebna || drum.KOD_BEBNA || index} drum={drum} index={index} />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen">
@@ -366,7 +267,7 @@ const DrumsList = ({ user, onNavigate }) => {
                 <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
                   Moje bębny
                 </h1>
-                <p className="text-gray-600">Pogrupowane według cechy bębna</p>
+                <p className="text-gray-600">Zarządzaj swoimi bębnami i terminami zwrotów</p>
               </div>
             </div>
             
@@ -380,25 +281,15 @@ const DrumsList = ({ user, onNavigate }) => {
             </button>
           </div>
 
-          {/* Stats - DODANE: Rodzaje */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          {/* Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-blue-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-gray-900">{stats.totalGroups}</div>
-                  <div className="text-sm text-gray-600">Rodzaje</div>
+                  <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+                  <div className="text-sm text-gray-600">Wszystkie bębny</div>
                 </div>
                 <Package className="w-8 h-8 text-blue-600" />
-              </div>
-            </div>
-            
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
-                  <div className="text-sm text-gray-600">Wszystkie</div>
-                </div>
-                <Package className="w-8 h-8 text-gray-600" />
               </div>
             </div>
             
@@ -416,7 +307,7 @@ const DrumsList = ({ user, onNavigate }) => {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-2xl font-bold text-yellow-600">{stats.dueSoon}</div>
-                  <div className="text-sm text-gray-600">Zbliża się</div>
+                  <div className="text-sm text-gray-600">Zbliża się termin</div>
                 </div>
                 <Clock className="w-8 h-8 text-yellow-600" />
               </div>
@@ -426,21 +317,21 @@ const DrumsList = ({ user, onNavigate }) => {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-2xl font-bold text-red-600">{stats.overdue}</div>
-                  <div className="text-sm text-gray-600">Przetermn.</div>
+                  <div className="text-sm text-gray-600">Przeterminowane</div>
                 </div>
                 <AlertCircle className="w-8 h-8 text-red-600" />
               </div>
             </div>
           </div>
 
-          {/* Filters - DODANE: Przyciski rozwiń/zwiń */}
+          {/* Filters */}
           <div className="bg-white/80 backdrop-blur-lg rounded-xl p-6 shadow-lg border border-gray-200">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
-                  placeholder="Szukaj po kodzie, nazwie lub cesze..."
+                  placeholder="Szukaj po kodzie lub nazwie bębna..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -460,28 +351,38 @@ const DrumsList = ({ user, onNavigate }) => {
               
               <div className="flex gap-2">
                 <button
-                  onClick={expandAll}
-                  className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-200"
+                  onClick={() => handleSort('kod_bebna')}
+                  className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 ${
+                    sortBy === 'kod_bebna' 
+                      ? 'bg-blue-600 text-white border-blue-600' 
+                      : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
+                  }`}
                 >
-                  Rozwiń wszystkie
+                  <span>Kod</span>
+                  <ArrowUpDown className="w-4 h-4" />
                 </button>
                 
                 <button
-                  onClick={collapseAll}
-                  className="px-4 py-3 bg-gray-600 text-white rounded-xl hover:bg-gray-700 transition-all duration-200"
+                  onClick={() => handleSort('data_zwrotu_do_dostawcy')}
+                  className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 ${
+                    sortBy === 'data_zwrotu_do_dostawcy' 
+                      ? 'bg-blue-600 text-white border-blue-600' 
+                      : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
+                  }`}
                 >
-                  Zwiń wszystkie
+                  <span>Termin</span>
+                  <ArrowUpDown className="w-4 h-4" />
                 </button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Results - ZMIENIONE: Używamy grup zamiast płaskiej listy */}
-        {groupedDrums.length > 0 ? (
-          <div className="pb-8">
-            {groupedDrums.map((group) => (
-              <DrumGroup key={group.cecha} group={group} />
+        {/* Results */}
+        {filteredAndSortedDrums.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
+            {filteredAndSortedDrums.map((drum, index) => (
+              <DrumCard key={drum.kod_bebna || drum.KOD_BEBNA || index} drum={drum} index={index} />
             ))}
           </div>
         ) : (
