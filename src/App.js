@@ -1,20 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Navbar from './components/Navbar';
-import AdminNavbar from './components/AdminNavbar';
-import LoginForm from './components/LoginForm';
-import SetPassword from './components/SetPassword';
-import Dashboard from './components/Dashboard';
-import DrumsList from './components/DrumsList';
-import ReturnForm from './components/ReturnForm';
-import AdminDashboard from './components/AdminDashboard';
-import AdminClientsList from './components/AdminClientsList';
-import AdminReturnPeriodsManager from './components/AdminReturnPeriodsManager';
-import AdminDrumsList from './components/AdminDrumsList';
-import AdminReturnRequests from './components/AdminReturnRequests';
-import AdminReports from './components/AdminReports';
-import './App.css';
-
-import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import AdminNavbar from './components/AdminNavbar';
@@ -30,6 +14,8 @@ import AdminDrumsList from './components/AdminDrumsList';
 import AdminReturnRequests from './components/AdminReturnRequests';
 import AdminReports from './components/AdminReports';
 import './App.css';
+
+
 
 const App = () => {
   const [currentUser, setCurrentUser] = useState(null);
