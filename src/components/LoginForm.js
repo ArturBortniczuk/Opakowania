@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Building2, UserCheck, LogIn, Mail, ArrowLeft } from 'lucide-react';
-import { authAPI } from '../utils/supabaseApi'; 
+import { authAPI } from '../utils/supabaseApi';
 
-const LoginForm = ({ onLogin, onNavigate }) => {
+const LoginForm = ({ onLogin }) => {
   const [view, setView] = useState('login');
   const [nip, setNip] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  
+
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,7 +34,7 @@ const LoginForm = ({ onLogin, onNavigate }) => {
       setLoading(false);
     }
   };
-  
+
   const handleRequestReset = async (e) => {
     e.preventDefault();
     if (loading || !nip) return;
@@ -73,7 +73,7 @@ const LoginForm = ({ onLogin, onNavigate }) => {
           Wprowadź swoje dane, aby uzyskać dostęp.
         </p>
       </div>
-      
+
       {error && (
         <div className="p-3 mb-4 rounded-lg bg-red-50 border border-red-200 animate-shake">
           <p className="text-sm text-red-600 text-center">{error}</p>
@@ -98,7 +98,7 @@ const LoginForm = ({ onLogin, onNavigate }) => {
         </div>
 
         <div>
-          <label htmlFor="password"className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
             Hasło
           </label>
           <div className="relative">
@@ -121,11 +121,10 @@ const LoginForm = ({ onLogin, onNavigate }) => {
         <button
           type="submit"
           disabled={loading || !nip || !password}
-          className={`w-full py-3 px-4 rounded-xl font-medium flex items-center justify-center space-x-2 transition-all duration-200 ${
-            loginMode === 'admin'
+          className={`w-full py-3 px-4 rounded-xl font-medium flex items-center justify-center space-x-2 transition-all duration-200 ${loginMode === 'admin'
               ? 'bg-purple-600 text-white hover:bg-purple-700 focus:ring-purple-500'
               : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
-          } disabled:opacity-50`}
+            } disabled:opacity-50`}
         >
           {loading ? (
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -138,7 +137,7 @@ const LoginForm = ({ onLogin, onNavigate }) => {
         </button>
       </form>
       <div className="text-center mt-6">
-        <button 
+        <button
           onClick={() => setView('requestReset')}
           className="text-sm text-blue-600 hover:underline"
         >
@@ -149,7 +148,7 @@ const LoginForm = ({ onLogin, onNavigate }) => {
   );
 
   const renderRequestResetView = () => (
-     <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-blue-100 p-8">
+    <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-blue-100 p-8">
       <div className="text-center mb-6">
         <h3 className="text-xl font-semibold text-gray-900 mb-2">
           Ustawianie / Resetowanie hasła
@@ -158,7 +157,7 @@ const LoginForm = ({ onLogin, onNavigate }) => {
           Wpisz NIP swojej firmy, aby otrzymać link do ustawienia hasła na adres e-mail.
         </p>
       </div>
-      
+
       {error && (
         <div className="p-3 mb-4 rounded-lg bg-red-50 border border-red-200 animate-shake">
           <p className="text-sm text-red-600 text-center">{error}</p>
@@ -203,7 +202,7 @@ const LoginForm = ({ onLogin, onNavigate }) => {
         </button>
       </form>
       <div className="text-center mt-6">
-        <button 
+        <button
           onClick={() => setView('login')}
           className="text-sm text-blue-600 hover:underline flex items-center justify-center mx-auto"
         >
@@ -227,15 +226,15 @@ const LoginForm = ({ onLogin, onNavigate }) => {
 
         <div className="bg-white/60 backdrop-blur-lg rounded-2xl p-2 shadow-lg border border-blue-100">
           <div className="flex">
-            <button 
-              onClick={() => handleModeChange('client')} 
+            <button
+              onClick={() => handleModeChange('client')}
               className={`flex-1 py-3 px-4 rounded-xl font-medium text-sm transition-all duration-200 flex items-center justify-center space-x-2 ${loginMode === 'client' ? 'bg-white text-blue-600 shadow-md' : 'text-gray-600'}`}
             >
               <Building2 className="w-4 h-4" />
               <span>Klient</span>
             </button>
-            <button 
-              onClick={() => handleModeChange('admin')} 
+            <button
+              onClick={() => handleModeChange('admin')}
               className={`flex-1 py-3 px-4 rounded-xl font-medium text-sm transition-all duration-200 flex items-center justify-center space-x-2 ${loginMode === 'admin' ? 'bg-white text-purple-600 shadow-md' : 'text-gray-600'}`}
             >
               <UserCheck className="w-4 h-4" />

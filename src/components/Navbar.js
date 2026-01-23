@@ -1,32 +1,25 @@
 // src/components/Navbar.js - Zaktualizowany o zwijanie i przewijanie
 import React from 'react';
-import { 
-  Menu, 
-  X, 
-  Home, 
-  Package, 
-  Truck, 
-  LogOut, 
-  Building2,
-  User,
-  Pin,
-  PinOff
+import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  Menu, X, Home, Package, Truck, LogOut, Building2, User, Pin, PinOff
 } from 'lucide-react';
 
-const Navbar = ({ 
-  user, 
-  currentView, 
-  sidebarOpen, 
-  setSidebarOpen, 
+const Navbar = ({
+  user,
+  sidebarOpen,
+  setSidebarOpen,
   isCollapsed,
   setIsCollapsed,
-  onNavigate, 
-  onLogout 
+  onLogout
 }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'drums', label: 'Moje bębny', icon: Package },
-    { id: 'return', label: 'Zgłoś zwrot', icon: Truck }
+    { path: '/dashboard', label: 'Dashboard', icon: Home },
+    { path: '/drums', label: 'Moje bębny', icon: Package },
+    { path: '/return', label: 'Zgłoś zwrot', icon: Truck }
   ];
 
   const NavItem = ({ item, isActive, onClick }) => {
@@ -38,8 +31,8 @@ const Navbar = ({
         className={`
           relative w-full p-4 rounded-xl transition-all duration-300 group flex items-center
           ${isCollapsed ? 'justify-center' : ''}
-          ${isActive 
-            ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg' 
+          ${isActive
+            ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg'
             : 'text-gray-600 hover:bg-blue-50 hover:text-blue-600'
           }
         `}
@@ -97,7 +90,7 @@ const Navbar = ({
       </header>
 
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
@@ -133,16 +126,19 @@ const Navbar = ({
             </h4>
             {menuItems.map((item) => (
               <NavItem
-                key={item.id}
+                key={item.path}
                 item={item}
-                isActive={currentView === item.id}
-                onClick={() => onNavigate(item.id)}
+                isActive={location.pathname === item.path}
+                onClick={() => {
+                  navigate(item.path);
+                  setSidebarOpen(false);
+                }}
               />
             ))}
           </nav>
 
           <div className="p-4 border-t border-blue-100">
-             <button
+            <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               className="w-full p-4 rounded-xl text-gray-600 hover:bg-gray-100 transition-all duration-200 flex items-center space-x-3 group"
               title={isCollapsed ? "Rozwiń menu" : "Zwiń menu"}

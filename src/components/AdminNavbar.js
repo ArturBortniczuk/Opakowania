@@ -1,36 +1,23 @@
 // src/components/AdminNavbar.js - Zaktualizowany o zwijanie i przewijanie
 import React, { useState, useEffect } from 'react';
-import { 
-  Menu, 
-  X, 
-  Home, 
-  Users, 
-  Package, 
-  Truck, 
-  BarChart3,
-  LogOut, 
-  Building2,
-  UserCheck,
-  ChevronRight,
-  Shield,
-  Settings,
-  Bell,
-  Crown,
-  Pin,
-  PinOff
+import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  Menu, X, Home, Users, Package, Truck, BarChart3, LogOut, Building2,
+  UserCheck, ChevronRight, Shield, Settings, Bell, Crown, Pin, PinOff
 } from 'lucide-react';
 import { statsAPI } from '../utils/supabaseApi';
 
-const AdminNavbar = ({ 
-  user, 
-  currentView, 
-  sidebarOpen, 
+const AdminNavbar = ({
+  user,
+  sidebarOpen,
   setSidebarOpen,
   isCollapsed,
   setIsCollapsed,
-  onNavigate, 
-  onLogout 
+  onLogout
 }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [quickStats, setQuickStats] = useState({
     totalClients: 0,
     totalDrums: 0,
@@ -59,18 +46,18 @@ const AdminNavbar = ({
     };
 
     fetchQuickStats();
-    
+
     const interval = setInterval(fetchQuickStats, 30000);
     return () => clearInterval(interval);
   }, []);
 
   const menuItems = [
-    { id: 'admin-dashboard', label: 'Dashboard', icon: Home, description: 'Panel główny administratora' },
-    { id: 'admin-clients', label: 'Zarządzaj klientami', icon: Users, description: 'Wszyscy klienci w systemie' },
-    { id: 'admin-drums', label: 'Wszystkie bębny', icon: Package, description: 'Monitoruj wszystkie bębny' },
-    { id: 'admin-returns', label: 'Zgłoszenia zwrotów', icon: Truck, description: 'Zarządzaj zwrotami' },
-    { id: 'admin-return-periods', label: 'Terminy zwrotu', icon: Settings, description: 'Ustaw terminy dla klientów' },
-    { id: 'admin-reports', label: 'Raporty i analizy', icon: BarChart3, description: 'Statystyki i raporty' }
+    { path: '/admin', label: 'Dashboard', icon: Home, description: 'Panel główny administratora' },
+    { path: '/admin/clients', label: 'Zarządzaj klientami', icon: Users, description: 'Wszyscy klienci w systemie' },
+    { path: '/admin/drums', label: 'Wszystkie bębny', icon: Package, description: 'Monitoruj wszystkie bębny' },
+    { path: '/admin/returns', label: 'Zgłoszenia zwrotów', icon: Truck, description: 'Zarządzaj zwrotami' },
+    { path: '/admin/return-periods', label: 'Terminy zwrotu', icon: Settings, description: 'Ustaw terminy dla klientów' },
+    { path: '/admin/reports', label: 'Raporty i analizy', icon: BarChart3, description: 'Statystyki i raporty' }
   ];
 
   const getRoleBadge = (role) => {
@@ -97,8 +84,8 @@ const AdminNavbar = ({
         className={`
           relative w-full p-4 rounded-xl transition-all duration-300 group flex items-center
           ${isCollapsed ? 'justify-center' : ''}
-          ${isActive 
-            ? 'bg-gradient-to-r from-purple-600 to-blue-700 text-white shadow-lg' 
+          ${isActive
+            ? 'bg-gradient-to-r from-purple-600 to-blue-700 text-white shadow-lg'
             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
           }
         `}
@@ -162,14 +149,14 @@ const AdminNavbar = ({
           </div>
         </div>
       </header>
-      
+
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
-      
+
       {/* ZMIANA: Dynamiczna szerokość i obsługa zwijania */}
       <aside className={`
         fixed top-0 left-0 z-40 h-screen bg-white/95 backdrop-blur-md 
@@ -195,7 +182,7 @@ const AdminNavbar = ({
               {getRoleBadge(user.role)}
             </div>
           </div>
-          
+
           {/* ZMIANA: Dodano overflow-y-auto dla przewijania */}
           <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
             <h4 className={`text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 ${isCollapsed ? 'text-center' : 'pl-4'}`}>
@@ -203,10 +190,13 @@ const AdminNavbar = ({
             </h4>
             {menuItems.map((item) => (
               <NavItem
-                key={item.id}
+                key={item.path}
                 item={item}
-                isActive={currentView === item.id}
-                onClick={() => onNavigate(item.id)}
+                isActive={location.pathname === item.path}
+                onClick={() => {
+                  navigate(item.path);
+                  setSidebarOpen(false);
+                }}
               />
             ))}
           </nav>

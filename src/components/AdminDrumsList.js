@@ -1,10 +1,10 @@
-// src/components/AdminDrumsList.js - KOMPLETNY KOD Z PAGINACJĄ I IMPORTEM
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { drumsAPI, companiesAPI } from '../utils/supabaseApi';
-import { 
-  Package, 
-  Search, 
-  Filter, 
+import {
+  Package,
+  Search,
+  Filter,
   Calendar,
   Building2,
   AlertCircle,
@@ -25,7 +25,8 @@ import {
   Loader
 } from 'lucide-react';
 
-const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
+const AdminDrumsList = ({ initialFilter = {} }) => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('kod_bebna');
   const [sortOrder, setSortOrder] = useState('asc');
@@ -34,20 +35,20 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
   const [filterDateRange, setFilterDateRange] = useState('all');
   const [selectedDrum, setSelectedDrum] = useState(null);
   const [showDrumDetails, setShowDrumDetails] = useState(false);
-  
+
   // DODANE: Stan paginacji
   const [drumsData, setDrumsData] = useState({
     data: [],
     pagination: {
       page: 1,
-      limit: 100, // 100 na stronę dla adminów
+      limit: 300, // 300 na stronę dla adminów
       total: 0,
       totalPages: 1,
       hasNext: false,
       hasPrev: false
     }
   });
-  
+
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -57,7 +58,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
   const fetchDrums = useCallback(async (options = {}) => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const requestOptions = {
         page: drumsData.pagination.page,
@@ -70,13 +71,13 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
       };
 
       console.log(`🔄 Admin pobiera bębny, strona: ${requestOptions.page}`);
-      
+
       // Admin pobiera WSZYSTKIE bębny (bez filtra NIP)
       const result = await drumsAPI.getDrums(null, requestOptions);
-      
+
       console.log(`✅ Admin pobrał ${result.data.length} bębnów ze strony ${result.pagination.page}/${result.pagination.totalPages}`);
       console.log(`📊 Łącznie w bazie: ${result.pagination.total} bębnów`);
-      
+
       setDrumsData(result);
     } catch (err) {
       console.error('❌ Błąd podczas pobierania bębnów:', err);
@@ -167,7 +168,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.csv,.xlsx,.xls';
-    
+
     input.onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -188,25 +189,25 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
       console.log(`📁 Plik: ${file.name}, rozmiar: ${Math.round(file.size / 1024)}KB`);
 
       setImportLoading(true);
-      
+
       try {
         let bodyData;
         let contentType;
-        
+
         if (fileName.endsWith('.csv')) {
           console.log('📄 Tryb CSV...');
-          
+
           const csvContent = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => resolve(e.target.result);
             reader.onerror = () => reject(new Error('Błąd odczytu CSV'));
             reader.readAsText(file, 'UTF-8');
           });
-          
+
           // SPRAWDŹ LICZBĘ LINII
           const lines = csvContent.split('\n').filter(line => line.trim());
           console.log(`📊 CSV ma ${lines.length} linii`);
-          
+
           if (lines.length > 10000) {
             const proceed = window.confirm(
               `⚠️ UWAGA: Plik ma ${lines.length} linii.\n\n` +
@@ -219,19 +220,19 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
               return;
             }
           }
-          
+
           bodyData = csvContent;
           contentType = 'text/plain; charset=utf-8';
-          
+
         } else {
           console.log('📊 Tryb XLSX...');
-          
+
           if (file.size > 50 * 1024 * 1024) {
             alert('❌ Plik XLSX jest za duży. Maksymalny rozmiar dla Excel: 50MB');
             setImportLoading(false);
             return;
           }
-          
+
           const base64 = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -241,7 +242,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
             reader.onerror = () => reject(new Error('Błąd odczytu XLSX'));
             reader.readAsDataURL(file);
           });
-          
+
           bodyData = JSON.stringify({
             type: 'xlsx',
             data: base64,
@@ -249,7 +250,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
           });
           contentType = 'application/json; charset=utf-8';
         }
-        
+
         const response = await fetch(
           'https://pobafitamzkzcfptuaqj.supabase.co/functions/v1/clever-action',
           {
@@ -271,42 +272,42 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
 
         const result = await response.json();
         console.log('📝 Odpowiedź serwera:', result);
-        
+
         if (result.success) {
           const message = `✅ SUKCES!\n\n${result.message}\n\n` +
-                        `📊 Format: ${fileName.endsWith('.csv') ? 'CSV' : 'XLSX'}\n` +
-                        `🇵🇱 Polskie znaki: ${result.hasPolishChars ? 'OK' : 'Brak'}\n` +
-                        `📦 Importowano: ${result.imported} rekordów\n` +
-                        `🏢 Dodano firm: ${result.companiesAdded || 0}\n` +
-                        `⚠️ Pominięto: ${result.skipped || 0} błędnych`;
-          
+            `📊 Format: ${fileName.endsWith('.csv') ? 'CSV' : 'XLSX'}\n` +
+            `🇵🇱 Polskie znaki: ${result.hasPolishChars ? 'OK' : 'Brak'}\n` +
+            `📦 Importowano: ${result.imported} rekordów\n` +
+            `🏢 Dodano firm: ${result.companiesAdded || 0}\n` +
+            `⚠️ Pominięto: ${result.skipped || 0} błędnych`;
+
           alert(message);
           await handleRefresh();
         } else {
           throw new Error(result.message || 'Nieznany błąd importu');
         }
-        
+
       } catch (error) {
         console.error('❌ Błąd importu:', error);
-        
+
         let userMessage = `❌ Błąd importu: ${error.message}`;
-        
+
         if (error.message.includes('Maximum call stack')) {
           userMessage = `❌ Plik jest za duży lub zawiera błędy formatowania.\n\n` +
-                      `💡 Rozwiązania:\n` +
-                      `• Podziel plik na mniejsze części (max 2000 wierszy)\n` +
-                      `• Sprawdź czy nie ma uszkodzonych znaków w danych\n` +
-                      `• Użyj XLSX zamiast CSV dla lepszej kompatybilności`;
+            `💡 Rozwiązania:\n` +
+            `• Podziel plik na mniejsze części (max 2000 wierszy)\n` +
+            `• Sprawdź czy nie ma uszkodzonych znaków w danych\n` +
+            `• Użyj XLSX zamiast CSV dla lepszej kompatybilności`;
         } else if (error.message.includes('Failed to fetch')) {
           userMessage += '\n\n🔧 Sprawdź połączenie internetowe lub spróbuj ponownie za chwilę.';
         }
-        
+
         alert(userMessage);
       } finally {
         setImportLoading(false);
       }
     };
-    
+
     input.click();
   };
 
@@ -316,7 +317,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
     const overdue = drumsData.data.filter(d => d.status === 'overdue').length;
     const dueSoon = drumsData.data.filter(d => d.status === 'due-soon').length;
     const active = drumsData.data.filter(d => d.status === 'active').length;
-    
+
     return { total, overdue, dueSoon, active };
   };
 
@@ -324,7 +325,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
 
   // ZACHOWANE: DrumCard z twojego kodu
   const DrumCard = ({ drum, index }) => (
-    <div 
+    <div
       className={`bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] h-full flex flex-col ${drum.borderColor || 'border-gray-200'}`}
       style={{ animationDelay: `${index * 50}ms` }}
     >
@@ -350,22 +351,22 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
             {drum.company || drum.pelna_nazwa_kontrahenta}
           </span>
         </div>
-        
+
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-500">NIP</span>
           <span className="text-sm font-medium text-gray-900">{drum.nip}</span>
         </div>
-        
+
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-500">Termin zwrotu</span>
           <span className="text-sm font-medium text-gray-900">
-            {drum.data_zwrotu_do_dostawcy ? 
-              new Date(drum.data_zwrotu_do_dostawcy).toLocaleDateString('pl-PL') : 
+            {drum.data_zwrotu_do_dostawcy ?
+              new Date(drum.data_zwrotu_do_dostawcy).toLocaleDateString('pl-PL') :
               'Brak'
             }
           </span>
         </div>
-        
+
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-500">Dni w posiadaniu</span>
           <span className="text-sm font-medium text-gray-900">{drum.daysInPossession || 0}</span>
@@ -380,18 +381,18 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
           <Eye className="w-4 h-4" />
           <span>Szczegóły</span>
         </button>
-        
+
         <button
-          onClick={() => onNavigate('admin-clients', { clientNip: drum.nip })}
+          onClick={() => navigate('/admin/clients', { state: { clientNip: drum.nip } })}
           className="bg-gray-100 text-gray-700 py-2 px-3 rounded-xl font-medium hover:bg-gray-200 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
         >
           <Building2 className="w-4 h-4" />
           <span>Klient</span>
         </button>
-        
+
         {drum.status === 'overdue' && (
           <button
-            onClick={() => onNavigate('admin-returns')}
+            onClick={() => navigate('/admin/returns')}
             className="bg-red-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-red-700 transition-all duration-200 flex items-center justify-center text-sm"
           >
             <Truck className="w-4 h-4" />
@@ -419,7 +420,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
               </button>
             </div>
           </div>
-          
+
           <div className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -447,7 +448,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                   </div>
                 </div>
               </div>
-              
+
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacje o kliencie</h3>
                 <div className="space-y-3">
@@ -478,14 +479,14 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 </div>
               </div>
             </div>
-            
+
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Timeline</h3>
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Data wydania</span>
                   <span className="font-medium">
-                    {selectedDrum.data_wydania 
+                    {selectedDrum.data_wydania
                       ? new Date(selectedDrum.data_wydania).toLocaleDateString('pl-PL')
                       : 'Brak'
                     }
@@ -494,7 +495,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Data przyjęcia na stan</span>
                   <span className="font-medium">
-                    {selectedDrum.data_przyjecia_na_stan 
+                    {selectedDrum.data_przyjecia_na_stan
                       ? new Date(selectedDrum.data_przyjecia_na_stan).toLocaleDateString('pl-PL')
                       : 'Brak'
                     }
@@ -503,7 +504,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Termin zwrotu</span>
                   <span className="font-medium">
-                    {selectedDrum.data_zwrotu_do_dostawcy 
+                    {selectedDrum.data_zwrotu_do_dostawcy
                       ? new Date(selectedDrum.data_zwrotu_do_dostawcy).toLocaleDateString('pl-PL')
                       : 'Brak'
                     }
@@ -566,7 +567,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            
+
             {/* Numerowanie stron */}
             {[...Array(Math.min(5, drumsData.pagination.totalPages))].map((_, idx) => {
               let pageNum;
@@ -584,11 +585,10 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 <button
                   key={pageNum}
                   onClick={() => goToPage(pageNum)}
-                  className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                    drumsData.pagination.page === pageNum
+                  className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${drumsData.pagination.page === pageNum
                       ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
                       : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   {pageNum}
                 </button>
@@ -656,7 +656,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 Zarządzaj bazą {drumsData.pagination.total} bębnów
               </p>
             </div>
-            
+
             <div className="flex items-center space-x-4">
               {/* PRZYCISK IMPORT CSV/XLSX */}
               <button
@@ -676,7 +676,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                   </>
                 )}
               </button>
-              
+
               <button
                 onClick={handleRefresh}
                 disabled={loading}
@@ -699,7 +699,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-green-100">
               <div className="flex items-center">
                 <CheckCircle className="w-8 h-8 text-green-600" />
@@ -709,7 +709,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-yellow-100">
               <div className="flex items-center">
                 <Clock className="w-8 h-8 text-yellow-600" />
@@ -719,7 +719,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-red-100">
               <div className="flex items-center">
                 <AlertCircle className="w-8 h-8 text-red-600" />
@@ -744,7 +744,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                   className="pl-10 w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
-              
+
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
@@ -755,7 +755,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                 <option value="due-soon">Zbliża się termin</option>
                 <option value="overdue">Przeterminowane</option>
               </select>
-              
+
               <select
                 value={filterClient}
                 onChange={(e) => setFilterClient(e.target.value)}
@@ -768,7 +768,7 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
                   </option>
                 ))}
               </select>
-              
+
               <select
                 value={filterDateRange}
                 onChange={(e) => setFilterDateRange(e.target.value)}
@@ -800,23 +800,28 @@ const AdminDrumsList = ({ onNavigate, initialFilter = {} }) => {
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <Package className="w-12 h-12 text-gray-400" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Nie znaleziono bębnów</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {searchTerm || filterStatus !== 'all' ? 'Nie znaleziono bębnów' : 'Brak bębnów'}
+            </h3>
             <p className="text-gray-600 mb-6">
-              {searchTerm ? 'Spróbuj zmienić kryteria wyszukiwania.' : 'Baza danych jest pusta.'}
+              {searchTerm || filterStatus !== 'all'
+                ? 'Spróbuj zmienić kryteria wyszukiwania lub filtry'
+                : 'Nie znaleziono bębnów przypisanych do Twojego konta'
+              }
             </p>
-            {!searchTerm && (
+            {(searchTerm || filterStatus !== 'all') && (
               <button
-                onClick={handleImportFile}
-                className="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors duration-200 flex items-center mx-auto"
+                onClick={() => {
+                  setSearchTerm('');
+                  setFilterStatus('all');
+                }}
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200"
               >
-                <Upload className="w-4 h-4 mr-2" />
-                Zaimportuj pierwszy plik
+                Wyczyść filtry
               </button>
             )}
           </div>
         )}
-
-        <DrumDetailsModal />
       </div>
     </div>
   );

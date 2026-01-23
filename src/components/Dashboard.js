@@ -1,20 +1,12 @@
-// src/components/Dashboard.js - Zaktualizowany o prawdziwe dane
 import React, { useState, useEffect } from 'react';
-import { 
-  Package, 
-  Truck, 
-  Calendar, 
-  TrendingUp, 
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  ArrowRight,
-  BarChart3,
-  Activity
+import { useNavigate } from 'react-router-dom';
+import {
+  Package, Truck, Calendar, TrendingUp, AlertCircle, CheckCircle, Clock, ArrowRight, BarChart3, Activity
 } from 'lucide-react';
 import { drumsAPI, statsAPI } from '../utils/supabaseApi';
 
-const Dashboard = ({ user, onNavigate }) => {
+const Dashboard = ({ user }) => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalDrums: 0,
     activeDrums: 0,
@@ -29,16 +21,14 @@ const Dashboard = ({ user, onNavigate }) => {
     const fetchDashboardData = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
-        // Pobierz statystyki dla konkretnego klienta
         const dashboardStats = await statsAPI.getDashboardStats(user.nip);
         setStats(dashboardStats);
-        
-        // Pobierz ostatnie bębny dla aktywności
+
         const userDrums = await drumsAPI.getAllDrums(user.nip);
         generateRecentActivity(userDrums);
-        
+
       } catch (err) {
         console.error('Błąd podczas pobierania danych dashboardu:', err);
         setError('Nie udało się pobrać danych. Spróbuj ponownie.');
@@ -55,13 +45,12 @@ const Dashboard = ({ user, onNavigate }) => {
   const generateRecentActivity = (drums) => {
     const now = new Date();
     const activities = [];
-    
-    // Przygotuj aktywność na podstawie rzeczywistych danych
+
     drums.forEach((drum, index) => {
-      if (index < 3) { // Pokaż tylko pierwsze 3 dla przykładu
+      if (index < 3) {
         const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
         const daysDiff = Math.ceil((returnDate - now) / (1000 * 60 * 60 * 24));
-        
+
         if (daysDiff < 0) {
           activities.push({
             id: `overdue-${drum.KOD_BEBNA}`,
@@ -92,8 +81,7 @@ const Dashboard = ({ user, onNavigate }) => {
         }
       }
     });
-    
-    // Jeśli brak danych, dodaj przykładową aktywność
+
     if (activities.length === 0) {
       activities.push({
         id: 'welcome',
@@ -104,13 +92,13 @@ const Dashboard = ({ user, onNavigate }) => {
         color: 'text-blue-600'
       });
     }
-    
+
     setRecentActivity(activities);
   };
 
-  const StatCard = ({ icon: Icon, title, value, subtitle, color, trend, onClick }) => (
-    <div 
-      onClick={onClick}
+  const StatCard = ({ icon: Icon, title, value, subtitle, color, trend, path }) => (
+    <div
+      onClick={() => navigate(path)}
       className={`
         bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 
         hover:shadow-xl transition-all duration-300 transform hover:scale-105 cursor-pointer 
@@ -142,7 +130,7 @@ const Dashboard = ({ user, onNavigate }) => {
     </div>
   );
 
-  const ActionCard = ({ icon: Icon, title, description, buttonText, color, onClick }) => (
+  const ActionCard = ({ icon: Icon, title, description, buttonText, color, path }) => (
     <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300">
       <div className="flex flex-col h-full">
         <div className="flex items-start space-x-4 mb-4">
@@ -154,15 +142,15 @@ const Dashboard = ({ user, onNavigate }) => {
             <p className="text-gray-600 text-sm leading-relaxed">{description}</p>
           </div>
         </div>
-        
+
         <div className="mt-auto">
           <button
-            onClick={onClick}
+            onClick={() => navigate(path)}
             className={`
               w-full py-3 px-4 rounded-xl font-medium transition-all duration-200 
               transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2
-              ${color === 'text-blue-600' 
-                ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 focus:ring-blue-500' 
+              ${color === 'text-blue-600'
+                ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 focus:ring-blue-500'
                 : 'bg-gradient-to-r from-green-600 to-blue-600 text-white hover:from-green-700 hover:to-blue-700 focus:ring-green-500'
               }
             `}
@@ -207,7 +195,7 @@ const Dashboard = ({ user, onNavigate }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center py-12">
             <div className="text-red-600 mb-4">{error}</div>
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200"
             >
@@ -235,14 +223,14 @@ const Dashboard = ({ user, onNavigate }) => {
               <p className="text-gray-600">Witaj ponownie, {user.companyName}</p>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-2 text-sm text-gray-500">
             <Calendar className="w-4 h-4" />
-            <span>Ostatnia aktualizacja: {new Date().toLocaleDateString('pl-PL', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
+            <span>Ostatnia aktualizacja: {new Date().toLocaleDateString('pl-PL', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
             })}</span>
           </div>
         </div>
@@ -256,9 +244,9 @@ const Dashboard = ({ user, onNavigate }) => {
             subtitle="Łączna liczba bębnów"
             color="text-blue-600"
             trend={5}
-            onClick={() => onNavigate('drums')}
+            path="/drums"
           />
-          
+
           <StatCard
             icon={CheckCircle}
             title="Aktywne bębny"
@@ -266,9 +254,9 @@ const Dashboard = ({ user, onNavigate }) => {
             subtitle="Bębny w użyciu"
             color="text-green-600"
             trend={2}
-            onClick={() => onNavigate('drums')}
+            path="/drums"
           />
-          
+
           <StatCard
             icon={AlertCircle}
             title="Oczekujące zwroty"
@@ -276,9 +264,9 @@ const Dashboard = ({ user, onNavigate }) => {
             subtitle="Wymagają zwrotu"
             color="text-red-600"
             trend={-10}
-            onClick={() => onNavigate('return')}
+            path="/return"
           />
-          
+
           <StatCard
             icon={TrendingUp}
             title="Ostatnie 30 dni"
@@ -286,7 +274,7 @@ const Dashboard = ({ user, onNavigate }) => {
             subtitle="Nowe przyjęcia"
             color="text-purple-600"
             trend={15}
-            onClick={() => onNavigate('drums')}
+            path="/drums"
           />
         </div>
 
@@ -299,7 +287,7 @@ const Dashboard = ({ user, onNavigate }) => {
                 <Activity className="w-5 h-5 mr-2 text-blue-600" />
                 Szybkie akcje
               </h2>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <ActionCard
                   icon={Package}
@@ -307,16 +295,16 @@ const Dashboard = ({ user, onNavigate }) => {
                   description="Zobacz wszystkie swoje bębny, sprawdź daty zwrotu i status każdego z nich"
                   buttonText="Zobacz bębny"
                   color="text-blue-600"
-                  onClick={() => onNavigate('drums')}
+                  path="/drums"
                 />
-                
+
                 <ActionCard
                   icon={Truck}
                   title="Zgłoś zwrot"
                   description="Wypełnij formularz zwrotu bębnów do dostawcy i zaplanuj odbiór"
                   buttonText="Zgłoś zwrot"
                   color="text-green-600"
-                  onClick={() => onNavigate('return')}
+                  path="/return"
                 />
               </div>
             </div>
@@ -329,15 +317,15 @@ const Dashboard = ({ user, onNavigate }) => {
                 <Clock className="w-5 h-5 mr-2 text-blue-600" />
                 Ostatnia aktywność
               </h3>
-              
+
               <div className="space-y-2">
                 {recentActivity.map((item) => (
                   <ActivityItem key={item.id} item={item} />
                 ))}
               </div>
-              
-              <button 
-                onClick={() => onNavigate('drums')}
+
+              <button
+                onClick={() => navigate('/drums')}
                 className="w-full mt-4 py-2 px-4 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200 border border-blue-200 rounded-lg hover:bg-blue-50"
               >
                 Zobacz wszystkie bębny
