@@ -2,14 +2,21 @@
 // Opis: Komponent-strona do ustawiania nowego hasła przez użytkownika po kliknięciu linku z e-maila.
 
 import React, { useState, useEffect } from 'react';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Building2, KeyRound, CheckCircle } from 'lucide-react';
 import { authAPI } from '../utils/supabaseApi';
 
-const SetPassword = ({ token, onPasswordSet, onInvalidToken }) => {
+const SetPassword = ({ token: propToken, onPasswordSet, onInvalidToken }) => {
+  const { token: paramToken } = useParams();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const token = propToken || paramToken || searchParams.get('token');
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -18,9 +25,12 @@ const SetPassword = ({ token, onPasswordSet, onInvalidToken }) => {
     if (!token) {
       setError('Brak tokenu w linku. Upewnij się, że link został skopiowany poprawnie.');
       // Opcjonalnie, przekieruj na stronę logowania po chwili
-      setTimeout(() => onInvalidToken(), 5000);
+      setTimeout(() => {
+        if (onInvalidToken) onInvalidToken();
+        else navigate('/');
+      }, 5000);
     }
-  }, [token, onInvalidToken]);
+  }, [token, onInvalidToken, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -98,7 +108,7 @@ const SetPassword = ({ token, onPasswordSet, onInvalidToken }) => {
                 </button>
               </div>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Potwierdź hasło</label>
               <input

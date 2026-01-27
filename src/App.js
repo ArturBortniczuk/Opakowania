@@ -100,6 +100,7 @@ const App = () => {
         <Routes>
           <Route path="/" element={<LoginForm onLogin={handleLogin} />} />
           <Route path="/set-password" element={<SetPassword onPasswordSet={handleLogin} />} />
+          <Route path="/set-password/:token" element={<SetPassword onPasswordSet={handleLogin} />} />
 
           {/* Trasy Klienta */}
           <Route path="/dashboard" element={
