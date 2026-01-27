@@ -1,10 +1,11 @@
 // src/components/AdminClientsList.js - Zaktualizowany o prawdziwe dane
 import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { companiesAPI, drumsAPI, returnsAPI } from '../utils/supabaseApi';
-import { 
-  Users, 
-  Search, 
-  Filter, 
+import {
+  Users,
+  Search,
+  Filter,
   Eye,
   Package,
   Calendar,
@@ -23,7 +24,8 @@ import {
 } from 'lucide-react';
 
 const AdminClientsList = ({ onNavigate }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+  const location = useLocation();
+  const [searchTerm, setSearchTerm] = useState(location.state?.clientNip || '');
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -38,27 +40,27 @@ const AdminClientsList = ({ onNavigate }) => {
     const fetchClientsData = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
         const [companiesData, allDrums, allReturns] = await Promise.all([
           companiesAPI.getCompanies(),
           drumsAPI.getAllDrums(),
           returnsAPI.getReturns()
         ]);
-        
+
         // Wzbogać dane klientów o statystyki
         const enrichedClients = companiesData.map(company => {
           const clientDrums = allDrums.filter(drum => drum.NIP === company.nip);
           const clientReturns = allReturns.filter(ret => ret.user_nip === company.nip);
-          
+
           const now = new Date();
           const overdueDrums = clientDrums.filter(drum => {
             const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
             return returnDate < now;
           });
-          
+
           const pendingRequests = clientReturns.filter(req => req.status === 'Pending');
-          
+
           return {
             ...company,
             drums: clientDrums,
@@ -66,14 +68,14 @@ const AdminClientsList = ({ onNavigate }) => {
             overdueDrums: overdueDrums.length,
             pendingRequests: pendingRequests.length,
             totalRequests: clientReturns.length,
-            riskLevel: overdueDrums.length > 0 ? 'high' : 
-                      pendingRequests.length > 0 ? 'medium' : 'low',
+            riskLevel: overdueDrums.length > 0 ? 'high' :
+              pendingRequests.length > 0 ? 'medium' : 'low',
             lastActivity: company.created_at || new Date().toISOString().split('T')[0]
           };
         });
-        
+
         setClients(enrichedClients);
-        
+
       } catch (err) {
         console.error('Błąd podczas pobierania danych klientów:', err);
         setError('Nie udało się pobrać listy klientów. Spróbuj ponownie.');
@@ -88,26 +90,26 @@ const AdminClientsList = ({ onNavigate }) => {
   const filteredAndSortedClients = useMemo(() => {
     let filtered = clients.filter(client => {
       const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           client.nip.includes(searchTerm) ||
-                           (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase()));
-      
+        client.nip.includes(searchTerm) ||
+        (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase()));
+
       if (filterStatus === 'all') return matchesSearch;
       if (filterStatus === 'high-risk' && client.riskLevel === 'high') return matchesSearch;
       if (filterStatus === 'pending' && client.pendingRequests > 0) return matchesSearch;
       if (filterStatus === 'active' && client.drumsCount > 0) return matchesSearch;
-      
+
       return false;
     });
 
     return filtered.sort((a, b) => {
       let aValue = a[sortBy];
       let bValue = b[sortBy];
-      
+
       if (sortBy === 'lastActivity') {
         aValue = new Date(aValue);
         bValue = new Date(bValue);
       }
-      
+
       if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
       if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
       return 0;
@@ -131,26 +133,26 @@ const AdminClientsList = ({ onNavigate }) => {
   const handleRefresh = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const [companiesData, allDrums, allReturns] = await Promise.all([
         companiesAPI.getCompanies(),
         drumsAPI.getAllDrums(),
         returnsAPI.getReturns()
       ]);
-      
+
       const enrichedClients = companiesData.map(company => {
         const clientDrums = allDrums.filter(drum => drum.NIP === company.nip);
         const clientReturns = allReturns.filter(ret => ret.user_nip === company.nip);
-        
+
         const now = new Date();
         const overdueDrums = clientDrums.filter(drum => {
           const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
           return returnDate < now;
         });
-        
+
         const pendingRequests = clientReturns.filter(req => req.status === 'Pending');
-        
+
         return {
           ...company,
           drums: clientDrums,
@@ -158,14 +160,14 @@ const AdminClientsList = ({ onNavigate }) => {
           overdueDrums: overdueDrums.length,
           pendingRequests: pendingRequests.length,
           totalRequests: clientReturns.length,
-          riskLevel: overdueDrums.length > 0 ? 'high' : 
-                    pendingRequests.length > 0 ? 'medium' : 'low',
+          riskLevel: overdueDrums.length > 0 ? 'high' :
+            pendingRequests.length > 0 ? 'medium' : 'low',
           lastActivity: company.created_at || new Date().toISOString().split('T')[0]
         };
       });
-      
+
       setClients(enrichedClients);
-      
+
     } catch (err) {
       console.error('Błąd podczas odświeżania:', err);
       setError('Nie udało się odświeżyć danych.');
@@ -180,7 +182,7 @@ const AdminClientsList = ({ onNavigate }) => {
       medium: { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', text: 'Średnie ryzyko' },
       low: { color: 'bg-green-100 text-green-800 border-green-200', text: 'Niskie ryzyko' }
     };
-    
+
     const badge = badges[riskLevel];
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium border ${badge.color}`}>
@@ -194,14 +196,14 @@ const AdminClientsList = ({ onNavigate }) => {
     const highRisk = clients.filter(c => c.riskLevel === 'high').length;
     const withPending = clients.filter(c => c.pendingRequests > 0).length;
     const lowRisk = clients.filter(c => c.riskLevel === 'low').length;
-    
+
     return { total, highRisk, withPending, lowRisk };
   };
 
   const stats = getStatistics();
 
   const ClientCard = ({ client, index }) => (
-    <div 
+    <div
       className="bg-white/90 rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]"
       style={{ animationDelay: `${index * 100}ms` }}
     >
@@ -215,7 +217,7 @@ const AdminClientsList = ({ onNavigate }) => {
             <p className="text-sm text-gray-600">NIP: {client.nip}</p>
           </div>
         </div>
-        
+
         <div className="flex items-center space-x-2">
           {getRiskBadge(client.riskLevel)}
           <div className="relative">
@@ -232,13 +234,13 @@ const AdminClientsList = ({ onNavigate }) => {
           <span className="text-gray-600">Bębny:</span>
           <span className="font-medium text-gray-900">{client.drumsCount}</span>
         </div>
-        
+
         <div className="flex items-center space-x-2 text-sm">
           <Clock className="w-4 h-4 text-yellow-600" />
           <span className="text-gray-600">Oczekujące:</span>
           <span className="font-medium text-gray-900">{client.pendingRequests}</span>
         </div>
-        
+
         {client.overdueDrums > 0 && (
           <div className="flex items-center space-x-2 text-sm">
             <AlertCircle className="w-4 h-4 text-red-600" />
@@ -281,7 +283,7 @@ const AdminClientsList = ({ onNavigate }) => {
           <Eye className="w-4 h-4" />
           <span>Szczegóły</span>
         </button>
-        
+
         <button
           onClick={() => onNavigate('admin-drums', { clientNip: client.nip })}
           className="flex-1 bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-xl font-medium hover:bg-gray-50 transition-all duration-200 flex items-center justify-center space-x-2"
@@ -310,7 +312,7 @@ const AdminClientsList = ({ onNavigate }) => {
               </button>
             </div>
           </div>
-          
+
           <div className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -338,7 +340,7 @@ const AdminClientsList = ({ onNavigate }) => {
                   </div>
                 </div>
               </div>
-              
+
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Statystyki</h3>
                 <div className="space-y-3">
@@ -365,7 +367,7 @@ const AdminClientsList = ({ onNavigate }) => {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex space-x-4">
               <button
                 onClick={() => {
@@ -410,7 +412,7 @@ const AdminClientsList = ({ onNavigate }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center py-12">
             <div className="text-red-600 mb-4">{error}</div>
-            <button 
+            <button
               onClick={handleRefresh}
               className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2 mx-auto"
             >
@@ -440,7 +442,7 @@ const AdminClientsList = ({ onNavigate }) => {
                 <p className="text-gray-600">Przeglądaj i zarządzaj wszystkimi klientami w systemie</p>
               </div>
             </div>
-            
+
             <button
               onClick={handleRefresh}
               className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2"
@@ -484,23 +486,21 @@ const AdminClientsList = ({ onNavigate }) => {
               <div className="flex space-x-2">
                 <button
                   onClick={() => handleSort('name')}
-                  className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 ${
-                    sortBy === 'name' 
-                      ? 'bg-blue-600 text-white border-blue-600' 
+                  className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 ${sortBy === 'name'
+                      ? 'bg-blue-600 text-white border-blue-600'
                       : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
-                  }`}
+                    }`}
                 >
                   <span>Nazwa</span>
                   <ArrowUpDown className="w-4 h-4" />
                 </button>
-                
+
                 <button
                   onClick={() => handleSort('lastActivity')}
-                  className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 ${
-                    sortBy === 'lastActivity' 
-                      ? 'bg-blue-600 text-white border-blue-600' 
+                  className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 ${sortBy === 'lastActivity'
+                      ? 'bg-blue-600 text-white border-blue-600'
                       : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
-                  }`}
+                    }`}
                 >
                   <span>Aktywność</span>
                   <ArrowUpDown className="w-4 h-4" />

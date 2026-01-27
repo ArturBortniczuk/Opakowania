@@ -136,21 +136,23 @@ const App = () => {
               />
             </ProtectedRoute>
           } />
-          <ProtectedRoute adminOnly>
-            <AdminClientsList
-              user={currentUser}
-              onNavigate={(page, state) => {
-                const routes = {
-                  'admin-clients': '/admin/clients',
-                  'admin-drums': '/admin/drums',
-                  'admin-returns': '/admin/returns',
-                  'admin-return-periods': '/admin/return-periods',
-                  'admin-reports': '/admin/reports'
-                };
-                if (routes[page]) navigate(routes[page], { state });
-              }}
-            />
-          </ProtectedRoute>
+          <Route path="/admin/clients" element={
+            <ProtectedRoute adminOnly>
+              <AdminClientsList
+                user={currentUser}
+                onNavigate={(page, state) => {
+                  const routes = {
+                    'admin-clients': '/admin/clients',
+                    'admin-drums': '/admin/drums',
+                    'admin-returns': '/admin/returns',
+                    'admin-return-periods': '/admin/return-periods',
+                    'admin-reports': '/admin/reports'
+                  };
+                  if (routes[page]) navigate(routes[page], { state });
+                }}
+              />
+            </ProtectedRoute>
+          } />
           <Route path="/admin/drums" element={
             <ProtectedRoute adminOnly>
               <AdminDrumsList user={currentUser} />

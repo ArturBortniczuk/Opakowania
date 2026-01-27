@@ -824,6 +824,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
             )}
           </div>
         )}
+        <DrumDetailsModal />
       </div>
     </div>
   );
