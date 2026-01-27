@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, Building2, UserCheck, LogIn, Mail, ArrowLeft } from 'lucide-react';
 import { authAPI } from '../utils/supabaseApi';
 
 const LoginForm = ({ onLogin }) => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [view, setView] = useState('login');
   const [nip, setNip] = useState('');
   const [password, setPassword] = useState('');
@@ -12,6 +15,13 @@ const LoginForm = ({ onLogin }) => {
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [loginMode, setLoginMode] = useState('client');
+
+  useEffect(() => {
+    const token = searchParams.get('token');
+    if (token) {
+      navigate(`/set-password/${token}`);
+    }
+  }, [searchParams, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -122,8 +132,8 @@ const LoginForm = ({ onLogin }) => {
           type="submit"
           disabled={loading || !nip || !password}
           className={`w-full py-3 px-4 rounded-xl font-medium flex items-center justify-center space-x-2 transition-all duration-200 ${loginMode === 'admin'
-              ? 'bg-purple-600 text-white hover:bg-purple-700 focus:ring-purple-500'
-              : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
+            ? 'bg-purple-600 text-white hover:bg-purple-700 focus:ring-purple-500'
+            : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
             } disabled:opacity-50`}
         >
           {loading ? (
