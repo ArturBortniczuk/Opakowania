@@ -360,8 +360,8 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-500">Termin zwrotu</span>
           <span className="text-sm font-medium text-gray-900">
-            {drum.data_zwrotu_do_dostawcy ?
-              new Date(drum.data_zwrotu_do_dostawcy).toLocaleDateString('pl-PL') :
+            {drum.DATA_ZWROTU_DO_DOSTAWCY ?
+              new Date(drum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL') :
               'Brak'
             }
           </span>
@@ -369,7 +369,9 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
 
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-500">Dni w posiadaniu</span>
-          <span className="text-sm font-medium text-gray-900">{drum.daysInPossession || 0}</span>
+          <span className="text-sm font-medium text-gray-900">
+            {drum.daysInPossession || (drum.DATA_WYDANIA ? Math.floor((new Date() - new Date(drum.DATA_WYDANIA)) / (1000 * 60 * 60 * 24)) : 0)}
+          </span>
         </div>
       </div>
 
@@ -586,8 +588,8 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                   key={pageNum}
                   onClick={() => goToPage(pageNum)}
                   className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${drumsData.pagination.page === pageNum
-                      ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                      : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                    ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                    : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
                     }`}
                 >
                   {pageNum}
