@@ -3,8 +3,16 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+// Helper to safely get env variables
+const getEnv = (key) => {
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env[key];
+  }
+  return ''; // Fallback or handle import.meta.env if needed
+};
+
+const supabaseUrl = getEnv('REACT_APP_SUPABASE_URL');
+const supabaseAnonKey = getEnv('REACT_APP_SUPABASE_ANON_KEY');
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Błąd krytyczny: Brak zmiennych środowiskowych Supabase. Sprawdź konfigurację w Vercel.');
@@ -31,9 +39,9 @@ export const supabaseHelpers = {
     // Resetujemy czas do północy, aby uniknąć problemów ze strefami czasowymi
     now.setHours(0, 0, 0, 0);
     returnDateTime.setHours(0, 0, 0, 0);
-    
+
     const daysDiff = Math.ceil((returnDateTime - now) / (1000 * 60 * 60 * 24));
-    
+
     if (daysDiff < 0) {
       return {
         status: 'overdue',
