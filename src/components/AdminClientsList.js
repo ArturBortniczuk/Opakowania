@@ -299,8 +299,14 @@ const AdminClientsList = ({ onNavigate }) => {
     if (!showClientDetails || !selectedClient) return null;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        onClick={() => setShowClientDetails(false)}
+      >
+        <div
+          className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900">Szczegóły klienta</h2>
@@ -487,8 +493,8 @@ const AdminClientsList = ({ onNavigate }) => {
                 <button
                   onClick={() => handleSort('name')}
                   className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 ${sortBy === 'name'
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
                     }`}
                 >
                   <span>Nazwa</span>
@@ -498,8 +504,8 @@ const AdminClientsList = ({ onNavigate }) => {
                 <button
                   onClick={() => handleSort('lastActivity')}
                   className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 ${sortBy === 'lastActivity'
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
                     }`}
                 >
                   <span>Aktywność</span>

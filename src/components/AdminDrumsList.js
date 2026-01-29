@@ -28,6 +28,7 @@ import {
 const AdminDrumsList = ({ initialFilter = {} }) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [localSearchTerm, setLocalSearchTerm] = useState(''); // DODANE: Lokalny stan dla inputa
   const [sortBy, setSortBy] = useState('cecha');
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterStatus, setFilterStatus] = useState((initialFilter && initialFilter.clientNip) ? 'client' : 'all');
@@ -98,6 +99,15 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
   };
 
   // Pobierz dane przy pierwszym ładowaniu i zmianie parametrów
+  // DODANE: Debounce dla wyszukiwania
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchTerm(localSearchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [localSearchTerm]);
+
   useEffect(() => {
     fetchDrums({ page: 1 }); // Resetuj do pierwszej strony przy zmianie filtrów
   }, [sortBy, sortOrder, searchTerm, filterStatus, filterClient]);
@@ -411,8 +421,14 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     if (!showDrumDetails || !selectedDrum) return null;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        onClick={() => setShowDrumDetails(false)} // DODANE: Zamykanie po kliknięciu w tło
+      >
+        <div
+          className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()} // DODANE: Zapobieganie zamykaniu po kliknięciu w treść
+        >
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900">Szczegóły bębna {selectedDrum.cecha || selectedDrum.kod_bebna}</h2>
@@ -619,12 +635,21 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     </div>
   );
 
-  if (loading) {
+  // loading check removed from here to prevent unmounting
+
+  if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600">Ładowanie bębnów...</p>
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Błąd ładowania</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700"
+          >
+            Spróbuj ponownie
+          </button>
         </div>
       </div>
     );
@@ -743,8 +768,8 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                 <input
                   type="text"
                   placeholder="Szukaj bębnów..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={localSearchTerm}
+                  onChange={(e) => setLocalSearchTerm(e.target.value)}
                   className="pl-10 w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
