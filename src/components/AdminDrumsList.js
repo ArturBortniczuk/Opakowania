@@ -431,16 +431,16 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacje o bębnie</h3>
                 <div className="space-y-3">
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Cecha</label>
-                    <p className="text-gray-900 font-medium">{selectedDrum.cecha || 'Brak'}</p>
+                    <label className="text-sm font-medium text-gray-500">Kod bębna</label>
+                    <p className="text-gray-900">{selectedDrum.kod_bebna}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Nazwa</label>
                     <p className="text-gray-900">{selectedDrum.nazwa}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Kod bębna</label>
-                    <p className="text-gray-900">{selectedDrum.kod_bebna}</p>
+                    <label className="text-sm font-medium text-gray-500">Cecha</label>
+                    <p className="text-gray-900 font-medium">{selectedDrum.cecha || 'Brak'}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Dostawca</label>
@@ -520,9 +520,9 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
+          </div >
+        </div >
+      </div >
     );
   };
 
