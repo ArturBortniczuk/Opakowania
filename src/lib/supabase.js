@@ -3,19 +3,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Helper to safely get env variables
-const getEnv = (key) => {
-  if (typeof process !== 'undefined' && process.env) {
-    return process.env[key];
-  }
-  return ''; // Fallback or handle import.meta.env if needed
-};
-
-const supabaseUrl = getEnv('REACT_APP_SUPABASE_URL');
-const supabaseAnonKey = getEnv('REACT_APP_SUPABASE_ANON_KEY');
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Błąd krytyczny: Brak zmiennych środowiskowych Supabase. Sprawdź konfigurację w Vercel.');
+  throw new Error('Błąd krytyczny: Brak zmiennych środowiskowych Supabase. Sprawdź plik .env.local lub konfigurację Vercel.');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);

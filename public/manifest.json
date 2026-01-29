@@ -9,19 +9,14 @@
       "type": "image/x-icon"
     },
     {
-      "src": "icon-192.png",
+      "src": "logo192.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "icon-512.png",
+      "src": "logo512.png",
       "type": "image/png",
       "sizes": "512x512"
-    },
-    {
-      "src": "apple-touch-icon.png",
-      "type": "image/png",
-      "sizes": "180x180"
     }
   ],
   "start_url": ".",
@@ -32,46 +27,10 @@
   "scope": "/",
   "lang": "pl",
   "dir": "ltr",
-  "categories": ["business", "productivity", "utilities"],
-  "screenshots": [
-    {
-      "src": "screenshot-wide.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide"
-    },
-    {
-      "src": "screenshot-narrow.png", 
-      "sizes": "720x1280",
-      "type": "image/png",
-      "form_factor": "narrow"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "Moje bębny",
-      "short_name": "Bębny",
-      "description": "Zobacz swoje bębny",
-      "url": "/?view=drums",
-      "icons": [
-        {
-          "src": "icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "Zgłoś zwrot",
-      "short_name": "Zwrot",
-      "description": "Zgłoś zwrot bębnów",
-      "url": "/?view=return",
-      "icons": [
-        {
-          "src": "icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
-    }
+  "categories": [
+    "business",
+    "productivity",
+    "utilities"
   ],
   "prefer_related_applications": false,
   "edge_side_panel": {
