@@ -655,23 +655,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     );
   }
 
-  return (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Błąd ładowania</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700"
-          >
-            Spróbuj ponownie
-          </button>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
