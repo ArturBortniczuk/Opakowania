@@ -335,8 +335,10 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
             <Package className="w-6 h-6 text-white" />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="font-bold text-gray-900 truncate text-lg">{drum.cecha}</h3>
-            <p className="text-gray-600 text-sm truncate">{drum.kod_bebna} • {drum.nazwa}</p>
+            <h3 className="font-bold text-gray-900 truncate text-lg">{drum.cecha || drum.kod_bebna}</h3>
+            <p className="text-gray-600 text-sm truncate">
+              {drum.cecha ? `${drum.kod_bebna} • ${drum.nazwa}` : drum.nazwa}
+            </p>
           </div>
         </div>
         <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.color || 'bg-gray-100 text-gray-600'}`}>
@@ -413,7 +415,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">Szczegóły bębna {selectedDrum.cecha}</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Szczegóły bębna {selectedDrum.cecha || selectedDrum.kod_bebna}</h2>
               <button
                 onClick={() => setShowDrumDetails(false)}
                 className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
@@ -430,7 +432,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                 <div className="space-y-3">
                   <div>
                     <label className="text-sm font-medium text-gray-500">Cecha</label>
-                    <p className="text-gray-900 font-medium">{selectedDrum.cecha}</p>
+                    <p className="text-gray-900 font-medium">{selectedDrum.cecha || 'Brak'}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Nazwa</label>
