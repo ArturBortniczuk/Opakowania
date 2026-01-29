@@ -205,6 +205,7 @@ export const drumsAPI = {
           nr_dokumentupz: drum.nr_dokumentupz,
           data_przyjecia_na_stan: drum.data_przyjecia_na_stan,
           kontrahent: drum.kontrahent,
+          db_status: drum.status,
           status: drum.status,
           data_wydania: drum.data_wydania,
 
