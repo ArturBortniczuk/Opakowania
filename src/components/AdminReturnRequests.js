@@ -1,10 +1,10 @@
-// src/components/AdminReturnRequests.js - Zaktualizowany o rzeczywiste dane
+// src/components/AdminReturnRequests.js - Zaktualizowany o obsługę CECHY i USZKODZEŃ
 import React, { useState, useMemo, useEffect } from 'react';
 import { returnsAPI, companiesAPI } from '../utils/supabaseApi';
-import { 
-  Truck, 
-  Search, 
-  Filter, 
+import {
+  Truck,
+  Search,
+  Filter,
   Eye,
   CheckCircle,
   XCircle,
@@ -20,7 +20,8 @@ import {
   MoreVertical,
   Edit,
   Download,
-  RefreshCw
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 
 const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
@@ -36,21 +37,33 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Helper do bezpiecznego wyciągania identyfikatora bębna (cecha lub stary kod)
+  const getDrumLabel = (drum) => {
+    if (typeof drum === 'object' && drum !== null) {
+      return drum.cecha || drum.kod_bebna || 'Nieznany';
+    }
+    return drum; // Stary format (string)
+  };
+
+  const isDrumDamaged = (drum) => {
+    return typeof drum === 'object' && drum !== null && drum.isDamaged;
+  };
+
   // Pobierz zgłoszenia zwrotów i firmy
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
         const [requestsData, companiesData] = await Promise.all([
           returnsAPI.getReturns(),
           companiesAPI.getCompanies()
         ]);
-        
+
         setRequests(requestsData);
         setCompanies(companiesData);
-        
+
       } catch (err) {
         console.error('Błąd podczas pobierania danych:', err);
         setError('Nie udało się pobrać danych. Spróbuj ponownie.');
@@ -67,17 +80,17 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
       const now = new Date();
       const collectionDate = new Date(request.collection_date);
       const createdDate = new Date(request.created_at);
-      
+
       const daysUntilCollection = Math.ceil((collectionDate - now) / (1000 * 60 * 60 * 24));
       const daysOld = Math.ceil((now - createdDate) / (1000 * 60 * 60 * 24));
-      
+
       let urgencyLevel = 'normal';
       if (request.priority === 'High' || daysUntilCollection < 0) {
         urgencyLevel = 'high';
       } else if (daysUntilCollection <= 3) {
         urgencyLevel = 'medium';
       }
-      
+
       return {
         ...request,
         daysUntilCollection,
@@ -90,25 +103,30 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
 
   const filteredAndSortedRequests = useMemo(() => {
     let filtered = enrichedRequests.filter(request => {
+      // Rozszerzone wyszukiwanie o strukturę obiektową bębnów
+      const drumsMatch = Array.isArray(request.selected_drums) && request.selected_drums.some(drum => {
+        const label = getDrumLabel(drum);
+        return label.toLowerCase().includes(searchTerm.toLowerCase());
+      });
+
       const matchesSearch = request.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           request.user_nip.includes(searchTerm) ||
-                           request.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           request.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           (Array.isArray(request.selected_drums) && 
-                            request.selected_drums.some(drum => drum.toLowerCase().includes(searchTerm.toLowerCase())));
-      
+        request.user_nip.includes(searchTerm) ||
+        request.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        request.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        drumsMatch;
+
       if (!matchesSearch) return false;
-      
+
       if (filterStatus !== 'all' && request.status !== filterStatus) return false;
       if (filterPriority !== 'all' && request.priority !== filterPriority) return false;
-      
+
       return true;
     });
 
     return filtered.sort((a, b) => {
       let aValue = a[sortBy];
       let bValue = b[sortBy];
-      
+
       if (sortBy === 'created_at' || sortBy === 'collection_date') {
         aValue = new Date(aValue);
         bValue = new Date(bValue);
@@ -116,7 +134,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
         aValue = Number(aValue);
         bValue = Number(bValue);
       }
-      
+
       if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
       if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
       return 0;
@@ -140,12 +158,12 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
   const handleStatusChange = async (requestId, newStatus) => {
     try {
       await returnsAPI.updateReturnStatus(requestId, newStatus);
-      
+
       // Zaktualizuj lokalny stan
-      setRequests(prev => prev.map(req => 
+      setRequests(prev => prev.map(req =>
         req.id === requestId ? { ...req, status: newStatus, updated_at: new Date().toISOString() } : req
       ));
-      
+
       alert(`✅ Status zgłoszenia #${requestId} został zmieniony na: ${newStatus}`);
     } catch (error) {
       console.error('Błąd podczas zmiany statusu:', error);
@@ -156,16 +174,16 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
   const handleRefresh = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const [requestsData, companiesData] = await Promise.all([
         returnsAPI.getReturns(),
         companiesAPI.getCompanies()
       ]);
-      
+
       setRequests(requestsData);
       setCompanies(companiesData);
-      
+
     } catch (err) {
       console.error('Błąd podczas odświeżania:', err);
       setError('Nie udało się odświeżyć danych.');
@@ -181,10 +199,10 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
       Completed: { color: 'bg-green-100 text-green-800 border-green-200', text: 'Zakończony', icon: CheckCircle },
       Rejected: { color: 'bg-red-100 text-red-800 border-red-200', text: 'Odrzucony', icon: XCircle }
     };
-    
+
     const badge = badges[status] || badges.Pending;
     const Icon = badge.icon;
-    
+
     return (
       <span className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium border ${badge.color}`}>
         <Icon className="w-3 h-3" />
@@ -199,7 +217,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
       Normal: { color: 'bg-gray-100 text-gray-800 border-gray-200', text: 'Normalny' },
       Low: { color: 'bg-blue-100 text-blue-800 border-blue-200', text: 'Niski' }
     };
-    
+
     const badge = badges[priority] || badges.Normal;
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium border ${badge.color}`}>
@@ -222,145 +240,159 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
     const approved = enrichedRequests.filter(r => r.status === 'Approved').length;
     const completed = enrichedRequests.filter(r => r.status === 'Completed').length;
     const urgent = enrichedRequests.filter(r => r.urgencyLevel === 'high').length;
-    
+
     return { total, pending, approved, completed, urgent };
   };
 
   const stats = getStatistics();
 
-  const RequestCard = ({ request, index }) => (
-    <div 
-      className={`bg-white/90 rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${getUrgencyColor(request.urgencyLevel)}`}
-      style={{ animationDelay: `${index * 50}ms` }}
-    >
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
-            <Truck className="w-6 h-6 text-white" />
+  const RequestCard = ({ request, index }) => {
+    const damagedCount = Array.isArray(request.selected_drums)
+      ? request.selected_drums.filter(d => isDrumDamaged(d)).length
+      : 0;
+
+    return (
+      <div
+        className={`bg-white/90 rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${getUrgencyColor(request.urgencyLevel)}`}
+        style={{ animationDelay: `${index * 50}ms` }}
+      >
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
+              <Truck className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Zgłoszenie #{request.id}</h3>
+              <p className="text-sm text-gray-600">{request.company_name}</p>
+              <p className="text-xs text-gray-500">NIP: {request.user_nip}</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-lg font-bold text-gray-900">Zgłoszenie #{request.id}</h3>
-            <p className="text-sm text-gray-600">{request.company_name}</p>
-            <p className="text-xs text-gray-500">NIP: {request.user_nip}</p>
+
+          <div className="flex flex-col items-end space-y-2">
+            {getStatusBadge(request.status)}
+            {getPriorityBadge(request.priority)}
+            {request.urgencyLevel === 'high' && (
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+            )}
           </div>
         </div>
-        
-        <div className="flex flex-col items-end space-y-2">
-          {getStatusBadge(request.status)}
-          {getPriorityBadge(request.priority)}
-          {request.urgencyLevel === 'high' && (
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+
+        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+          <div className="flex items-center space-x-2">
+            <Calendar className="w-4 h-4 text-blue-600" />
+            <div>
+              <span className="text-gray-600">Odbiór:</span>
+              <div className="font-medium text-gray-900">
+                {new Date(request.collection_date).toLocaleDateString('pl-PL')}
+              </div>
+              {request.daysUntilCollection < 0 && (
+                <div className="text-xs text-red-600">Przeterminowany</div>
+              )}
+              {request.daysUntilCollection >= 0 && request.daysUntilCollection <= 7 && (
+                <div className="text-xs text-yellow-600">Za {request.daysUntilCollection} dni</div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Package className="w-4 h-4 text-green-600" />
+            <div>
+              <span className="text-gray-600">Bębny:</span>
+              <div className="font-medium text-gray-900">
+                {request.drumsCount} szt.
+                {damagedCount > 0 && (
+                  <span className="text-red-500 ml-1 text-xs">({damagedCount} uszk.)</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-2 mb-4 text-sm">
+          <div className="flex items-center space-x-2 text-gray-600">
+            <MapPin className="w-4 h-4" />
+            <span className="truncate">{request.street}, {request.postal_code} {request.city}</span>
+          </div>
+          <div className="flex items-center space-x-2 text-gray-600">
+            <Mail className="w-4 h-4" />
+            <span>{request.email}</span>
+          </div>
+          <div className="flex items-center space-x-2 text-gray-600">
+            <Clock className="w-4 h-4" />
+            <span>Godziny: {request.loading_hours}</span>
+          </div>
+          {request.available_equipment && (
+            <div className="flex items-center space-x-2 text-gray-600">
+              <Truck className="w-4 h-4" />
+              <span>Sprzęt: {request.available_equipment}</span>
+            </div>
           )}
         </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-        <div className="flex items-center space-x-2">
-          <Calendar className="w-4 h-4 text-blue-600" />
-          <div>
-            <span className="text-gray-600">Odbiór:</span>
-            <div className="font-medium text-gray-900">
-              {new Date(request.collection_date).toLocaleDateString('pl-PL')}
-            </div>
-            {request.daysUntilCollection < 0 && (
-              <div className="text-xs text-red-600">Przeterminowany</div>
+        {/* Podgląd bębnów na karcie - pierwsze 5 */}
+        <div className="space-y-2">
+          <div className="text-xs text-gray-500 mb-1">Wybrane bębny:</div>
+          <div className="flex flex-wrap gap-1">
+            {Array.isArray(request.selected_drums) && request.selected_drums.slice(0, 5).map((drum, idx) => {
+              const label = getDrumLabel(drum);
+              const damaged = isDrumDamaged(drum);
+              return (
+                <span key={idx} className={`px-2 py-1 rounded text-xs font-medium flex items-center space-x-1 ${damaged ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                  }`}>
+                  <span>{label}</span>
+                  {damaged && <AlertCircle className="w-3 h-3" />}
+                </span>
+              );
+            })}
+            {request.drumsCount > 5 && (
+              <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-medium">
+                +{request.drumsCount - 5} więcej
+              </span>
             )}
-            {request.daysUntilCollection >= 0 && request.daysUntilCollection <= 7 && (
-              <div className="text-xs text-yellow-600">Za {request.daysUntilCollection} dni</div>
-            )}
           </div>
         </div>
-        
-        <div className="flex items-center space-x-2">
-          <Package className="w-4 h-4 text-green-600" />
-          <div>
-            <span className="text-gray-600">Bębny:</span>
-            <div className="font-medium text-gray-900">{request.drumsCount} szt.</div>
-          </div>
-        </div>
-      </div>
 
-      <div className="space-y-2 mb-4 text-sm">
-        <div className="flex items-center space-x-2 text-gray-600">
-          <MapPin className="w-4 h-4" />
-          <span className="truncate">{request.street}, {request.postal_code} {request.city}</span>
-        </div>
-        <div className="flex items-center space-x-2 text-gray-600">
-          <Mail className="w-4 h-4" />
-          <span>{request.email}</span>
-        </div>
-        <div className="flex items-center space-x-2 text-gray-600">
-          <Clock className="w-4 h-4" />
-          <span>Godziny: {request.loading_hours}</span>
-        </div>
-        {request.available_equipment && (
-          <div className="flex items-center space-x-2 text-gray-600">
-            <Truck className="w-4 h-4" />
-            <span>Sprzęt: {request.available_equipment}</span>
-          </div>
-        )}
-        <div className="text-gray-600">
-          <span>Zgłoszono: {new Date(request.created_at).toLocaleDateString('pl-PL')} ({request.daysOld} dni temu)</span>
-        </div>
-      </div>
+        <div className="flex space-x-2 mt-4">
+          <button
+            onClick={() => handleViewRequest(request)}
+            className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2 px-3 rounded-xl font-medium hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
+          >
+            <Eye className="w-4 h-4" />
+            <span>Szczegóły</span>
+          </button>
 
-      {request.notes && (
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-700">{request.notes}</p>
-        </div>
-      )}
+          {request.status === 'Pending' && (
+            <>
+              <button
+                onClick={() => handleStatusChange(request.id, 'Approved')}
+                className="flex-1 bg-green-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-green-700 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span>Zatwierdź</span>
+              </button>
 
-      <div className="space-y-2">
-        <div className="text-xs text-gray-500 mb-2">Wybrane bębny:</div>
-        <div className="flex flex-wrap gap-1">
-          {Array.isArray(request.selected_drums) && request.selected_drums.map((drum, idx) => (
-            <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
-              {drum}
-            </span>
-          ))}
-        </div>
-      </div>
+              <button
+                onClick={() => handleStatusChange(request.id, 'Rejected')}
+                className="bg-red-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-red-700 transition-all duration-200 flex items-center justify-center text-sm"
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            </>
+          )}
 
-      <div className="flex space-x-2 mt-4">
-        <button
-          onClick={() => handleViewRequest(request)}
-          className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2 px-3 rounded-xl font-medium hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
-        >
-          <Eye className="w-4 h-4" />
-          <span>Szczegóły</span>
-        </button>
-        
-        {request.status === 'Pending' && (
-          <>
+          {request.status === 'Approved' && (
             <button
-              onClick={() => handleStatusChange(request.id, 'Approved')}
+              onClick={() => handleStatusChange(request.id, 'Completed')}
               className="flex-1 bg-green-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-green-700 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
             >
               <CheckCircle className="w-4 h-4" />
-              <span>Zatwierdź</span>
+              <span>Zakończ</span>
             </button>
-            
-            <button
-              onClick={() => handleStatusChange(request.id, 'Rejected')}
-              className="bg-red-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-red-700 transition-all duration-200 flex items-center justify-center text-sm"
-            >
-              <XCircle className="w-4 h-4" />
-            </button>
-          </>
-        )}
-        
-        {request.status === 'Approved' && (
-          <button
-            onClick={() => handleStatusChange(request.id, 'Completed')}
-            className="flex-1 bg-green-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-green-700 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
-          >
-            <CheckCircle className="w-4 h-4" />
-            <span>Zakończ</span>
-          </button>
-        )}
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const RequestDetailsModal = () => {
     if (!showRequestDetails || !selectedRequest) return null;
@@ -385,7 +417,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
               </button>
             </div>
           </div>
-          
+
           <div className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -405,7 +437,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                   </div>
                 </div>
               </div>
-              
+
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Adres odbioru</h3>
                 <div className="space-y-3">
@@ -426,7 +458,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                 </div>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Szczegóły odbioru</h3>
@@ -445,7 +477,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                   </div>
                 </div>
               </div>
-              
+
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Status zgłoszenia</h3>
                 <div className="space-y-3">
@@ -460,35 +492,52 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                   <div>
                     <label className="text-sm font-medium text-gray-500">Data zgłoszenia</label>
                     <p className="text-gray-900">
-                      {new Date(selectedRequest.created_at).toLocaleDateString('pl-PL')} 
+                      {new Date(selectedRequest.created_at).toLocaleDateString('pl-PL')}
                       <span className="text-gray-500 ml-2">({selectedRequest.daysOld} dni temu)</span>
                     </p>
                   </div>
                 </div>
               </div>
             </div>
-            
+
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Wybrane bębny ({selectedRequest.drumsCount} szt.)</h3>
-              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                {Array.isArray(selectedRequest.selected_drums) && selectedRequest.selected_drums.map((drum, idx) => (
-                  <span key={idx} className="px-3 py-2 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium text-center">
-                    {drum}
-                  </span>
-                ))}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {Array.isArray(selectedRequest.selected_drums) && selectedRequest.selected_drums.map((drum, idx) => {
+                  const label = getDrumLabel(drum);
+                  const damaged = isDrumDamaged(drum);
+                  const description = damaged ? drum.description : '';
+
+                  return (
+                    <div key={idx} className={`p-3 rounded-lg border ${damaged ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'
+                      }`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`font-semibold ${damaged ? 'text-red-700' : 'text-blue-700'}`}>
+                          {label}
+                        </span>
+                        {damaged && <AlertTriangle className="w-4 h-4 text-red-500" title="Uszkodzony" />}
+                      </div>
+                      {damaged && description && (
+                        <div className="text-xs text-red-600 mt-2 p-1 bg-white rounded border border-red-100">
+                          <span className="font-medium">Opis: </span>{description}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            
+
             {selectedRequest.notes && (
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Uwagi</h3>
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Uwagi do odbioru</h3>
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <p className="text-gray-700">{selectedRequest.notes}</p>
                 </div>
               </div>
             )}
-            
-            <div className="flex flex-col sm:flex-row gap-4">
+
+            <div className="flex flex-col sm:flex-row gap-4 mt-8">
               {selectedRequest.status === 'Pending' && (
                 <>
                   <button
@@ -501,7 +550,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                     <CheckCircle className="w-5 h-5" />
                     <span>Zatwierdź zgłoszenie</span>
                   </button>
-                  
+
                   <button
                     onClick={() => {
                       handleStatusChange(selectedRequest.id, 'Rejected');
@@ -514,7 +563,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                   </button>
                 </>
               )}
-              
+
               {selectedRequest.status === 'Approved' && (
                 <button
                   onClick={() => {
@@ -527,7 +576,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                   <span>Oznacz jako zakończone</span>
                 </button>
               )}
-              
+
               <button
                 onClick={() => {
                   setShowRequestDetails(false);
@@ -563,7 +612,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center py-12">
             <div className="text-red-600 mb-4">{error}</div>
-            <button 
+            <button
               onClick={handleRefresh}
               className="px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors duration-200 flex items-center space-x-2 mx-auto"
             >
@@ -593,13 +642,13 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                 <p className="text-gray-600">Zarządzaj wszystkimi zgłoszeniami zwrotu bębnów</p>
               </div>
             </div>
-            
+
             <div className="flex space-x-2">
               <button className="px-4 py-2 bg-white border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors duration-200 flex items-center space-x-2">
                 <Download className="w-4 h-4" />
                 <span>Export</span>
               </button>
-              <button 
+              <button
                 onClick={handleRefresh}
                 className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors duration-200 flex items-center space-x-2"
               >
@@ -653,23 +702,21 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
               <div className="flex space-x-2">
                 <button
                   onClick={() => handleSort('created_at')}
-                  className={`flex-1 px-3 py-3 rounded-xl border transition-all duration-200 flex items-center justify-center space-x-1 text-sm ${
-                    sortBy === 'created_at' 
-                      ? 'bg-blue-600 text-white border-blue-600' 
+                  className={`flex-1 px-3 py-3 rounded-xl border transition-all duration-200 flex items-center justify-center space-x-1 text-sm ${sortBy === 'created_at'
+                      ? 'bg-blue-600 text-white border-blue-600'
                       : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
-                  }`}
+                    }`}
                 >
                   <span>Data</span>
                   <ArrowUpDown className="w-3 h-3" />
                 </button>
-                
+
                 <button
                   onClick={() => handleSort('collection_date')}
-                  className={`flex-1 px-3 py-3 rounded-xl border transition-all duration-200 flex items-center justify-center space-x-1 text-sm ${
-                    sortBy === 'collection_date' 
-                      ? 'bg-blue-600 text-white border-blue-600' 
+                  className={`flex-1 px-3 py-3 rounded-xl border transition-all duration-200 flex items-center justify-center space-x-1 text-sm ${sortBy === 'collection_date'
+                      ? 'bg-blue-600 text-white border-blue-600'
                       : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
-                  }`}
+                    }`}
                 >
                   <span>Odbiór</span>
                   <ArrowUpDown className="w-3 h-3" />

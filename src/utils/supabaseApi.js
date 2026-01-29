@@ -23,7 +23,7 @@ export const authAPI = {
       const errorMessage = error.context?.data?.error || error.message || 'Wystąpił nieznany błąd logowania.';
       throw new Error(errorMessage);
     }
-    
+
     if (data.error) {
       throw new Error(data.error);
     }
@@ -33,12 +33,12 @@ export const authAPI = {
 
     // Pobierz nazwę firmy dla klienta lub nazwę dla admina/supervisora
     if (loginMode === 'admin' || user.role === 'supervisor') {
-        companyName = user.name || 'Administrator';
+      companyName = user.name || 'Administrator';
     } else {
-        const { data: companyData } = await supabase.from('companies').select('name').eq('nip', nip).single();
-        if (companyData) {
-            companyName = companyData.name;
-        }
+      const { data: companyData } = await supabase.from('companies').select('name').eq('nip', nip).single();
+      if (companyData) {
+        companyName = companyData.name;
+      }
     }
 
     // Stwórz spójny obiekt użytkownika do przechowywania w aplikacji
@@ -52,7 +52,7 @@ export const authAPI = {
       is_first_login: user.is_first_login,
       companyName: companyName,
     };
-    
+
     localStorage.setItem('currentUser', JSON.stringify(finalUser));
     return { user: finalUser };
   },
@@ -71,7 +71,7 @@ export const authAPI = {
       const errorMessage = error.context?.data?.error || error.message || 'Wystąpił błąd.';
       throw new Error(errorMessage);
     }
-    
+
     return data;
   },
 
@@ -85,7 +85,7 @@ export const authAPI = {
     if (!password || password.length < 6) {
       throw new Error('Hasło musi mieć co najmniej 6 znaków.');
     }
-    
+
     const { data, error } = await supabase.functions.invoke('set-new-password', {
       body: { token, password },
     });
@@ -98,7 +98,7 @@ export const authAPI = {
     if (data.error) {
       throw new Error(data.error);
     }
-    
+
     // Po udanym ustawieniu hasła, od razu logujemy użytkownika
     return this.signIn(data.user.nip, password, 'client');
   },
@@ -126,7 +126,7 @@ export const drumsAPI = {
       const {
         page = 1,
         limit = 100,
-        sortBy = 'kod_bebna',
+        sortBy = 'cecha', // ZMIANA: Domyślne sortowanie po 'cecha'
         sortOrder = 'asc',
         search = '',
         status = 'all'
@@ -144,24 +144,27 @@ export const drumsAPI = {
         query = query.eq('nip', nip);
       }
 
-      // Filtrowanie po wyszukiwaniu
-      if (search) {
-        query = query.or(`kod_bebna.ilike.%${search}%,nazwa.ilike.%${search}%,pelna_nazwa_kontrahenta.ilike.%${search}%`);
+      // Filtrowanie po statusie (domyślnie ukrywamy 'Lost')
+      if (status !== 'all') {
+        query = query.eq('status', status);
+      } else {
+        // Domyślnie NIE pokazuj zagubionych, chyba że explicitly o to poproszono
+        query = query.neq('status', 'Lost');
       }
 
-      // Filtrowanie po statusie (jeśli potrzebne w przyszłości)
-      if (status !== 'all') {
-        // Można dodać logikę statusu
-        // query = query.eq('status', status);
+      // Filtrowanie po wyszukiwaniu - PRIORYTET DLA CECHY
+      if (search) {
+        // Dodano cecha.ilike.%${search}% jako pierwsze
+        query = query.or(`cecha.ilike.%${search}%,kod_bebna.ilike.%${search}%,nazwa.ilike.%${search}%,pelna_nazwa_kontrahenta.ilike.%${search}%`);
       }
 
       // Sortowanie
-      const dbSortBy = sortBy === 'KOD_BEBNA' ? 'kod_bebna' : 
-                       sortBy === 'NAZWA' ? 'nazwa' :
-                       sortBy === 'DATA_ZWROTU_DO_DOSTAWCY' ? 'data_zwrotu_do_dostawcy' :
-                       sortBy === 'pelna_nazwa_kontrahenta' ? 'pelna_nazwa_kontrahenta' :
-                       sortBy;
-      
+      let dbSortBy = sortBy;
+      if (sortBy === 'KOD_BEBNA') dbSortBy = 'kod_bebna';
+      else if (sortBy === 'NAZWA') dbSortBy = 'nazwa';
+      else if (sortBy === 'CECHA') dbSortBy = 'cecha';
+      else if (sortBy === 'DATA_ZWROTU_DO_DOSTAWCY') dbSortBy = 'data_zwrotu_do_dostawcy';
+
       query = query.order(dbSortBy, { ascending: sortOrder === 'asc' });
 
       // Paginacja - KLUCZOWE!
@@ -169,14 +172,14 @@ export const drumsAPI = {
       query = query.range(offset, offset + limit - 1);
 
       const { data, error, count } = await query;
-      
+
       if (error) throw error;
 
       console.log(`✅ Pobrano ${data?.length || 0} rekordów z ${count || 0} łącznie`);
 
       // Mapowanie danych do spójnego formatu używanego w komponentach
       const mappedData = data.map(drum => {
-        const status = supabaseHelpers.getDrumStatus(drum.data_zwrotu_do_dostawcy);
+        const statusObj = supabaseHelpers.getDrumStatus(drum.data_zwrotu_do_dostawcy);
         const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
         const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
 
@@ -196,7 +199,7 @@ export const drumsAPI = {
           kontrahent: drum.kontrahent,
           status: drum.status,
           data_wydania: drum.data_wydania,
-          
+
           // DODATKOWO: Zachowaj kompatybilność z WIELKIMI LITERAMI (stary kod)
           KOD_BEBNA: drum.kod_bebna,
           NAZWA: drum.nazwa,
@@ -211,13 +214,13 @@ export const drumsAPI = {
           KONTRAHENT: drum.kontrahent,
           STATUS: drum.status,
           DATA_WYDANIA: drum.data_wydania,
-          
+
           company: drum.companies?.name || drum.pelna_nazwa_kontrahenta,
           companyPhone: drum.companies?.phone,
           companyEmail: drum.companies?.email,
           companyAddress: drum.companies?.address,
           daysInPossession: daysInPossession > 0 ? daysInPossession : 0,
-          ...status
+          ...statusObj
         };
       });
 
@@ -247,6 +250,36 @@ export const drumsAPI = {
   },
 
   /**
+   * Zgłasza zagubienie bębna.
+   * @param {string} cecha - Unikalna cecha bębna.
+   * @param {string} nip - NIP klienta (dla bezpieczeństwa).
+   * @param {string} description - Opis okoliczności zagubienia.
+   * @returns {Promise<object>} Zaktualizowany rekord.
+   */
+  async reportLost(cecha, nip, description) {
+    try {
+      console.log(`⚠️ Zgłaszanie zagubienia bębna: ${cecha} dla NIP: ${nip}`);
+      const { data, error } = await supabase
+        .from('drums')
+        .update({
+          status: 'Lost',
+          uwagi: description, // Zakładamy pole 'uwagi' lub podobne, jeśli nie ma to stworzymy w migracji lub użyjemy innego
+          updated_at: new Date().toISOString()
+        })
+        .eq('cecha', cecha)
+        .eq('nip', nip) // Dodatkowe zabezpieczenie
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('❌ Błąd zgłaszania zagubienia:', error);
+      throw error;
+    }
+  },
+
+  /**
    * WSTECZNA KOMPATYBILNOŚĆ: Pobiera WSZYSTKIE bębny bez paginacji (dla starych komponentów)
    * @param {string|null} nip - NIP klienta do filtrowania.
    * @returns {Promise<Array>} Lista wszystkich bębnów.
@@ -254,7 +287,7 @@ export const drumsAPI = {
   async getAllDrums(nip = null) {
     try {
       console.log('🔄 getAllDrums - pobieranie WSZYSTKICH bębnów...');
-      
+
       let query = supabase
         .from('drums')
         .select(`*, companies (name, email, phone, address)`);
@@ -265,7 +298,7 @@ export const drumsAPI = {
 
       // USUWAMY LIMIT - pobieramy wszystko
       const { data, error } = await query.order('kod_bebna');
-      
+
       if (error) throw error;
 
       console.log(`✅ getAllDrums pobrał ${data.length} bębnów z bazy`);
@@ -291,7 +324,7 @@ export const drumsAPI = {
           kontrahent: drum.kontrahent,
           status: drum.status,
           data_wydania: drum.data_wydania,
-          
+
           // Kompatybilność z WIELKIMI LITERAMI
           KOD_BEBNA: drum.kod_bebna,
           NAZWA: drum.nazwa,
@@ -306,7 +339,7 @@ export const drumsAPI = {
           KONTRAHENT: drum.kontrahent,
           STATUS: drum.status,
           DATA_WYDANIA: drum.data_wydania,
-          
+
           company: drum.companies?.name || drum.pelna_nazwa_kontrahenta,
           companyPhone: drum.companies?.phone,
           companyEmail: drum.companies?.email,
@@ -453,9 +486,9 @@ export const returnsAPI = {
       if (nip) {
         query = query.eq('user_nip', nip);
       }
-      
+
       const { data, error } = await query.order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       return data.map(req => ({ ...req, company_name: req.companies?.name || req.company_name }));
     } catch (error) {
@@ -569,14 +602,14 @@ export const statsAPI = {
 
       console.log(`🔄 Pobieranie statystyk dla NIP: ${nip || 'ADMIN'}`);
 
-      if (nip) { 
+      if (nip) {
         // Statystyki dla klienta - NAPRAWIONE: head: true oznacza że pobieramy TYLKO COUNT
         console.log(`👤 Liczenie bębnów dla klienta ${nip}...`);
-        
+
         const [
-          { count: totalDrums }, 
-          { count: activeDrums }, 
-          { count: pendingReturns }, 
+          { count: totalDrums },
+          { count: activeDrums },
+          { count: pendingReturns },
           { count: recentReturns }
         ] = await Promise.all([
           supabase.from('drums').select('*', { count: 'exact', head: true }).eq('nip', nip),
@@ -586,23 +619,23 @@ export const statsAPI = {
         ]);
 
         console.log(`✅ Statystyki klienta ${nip}: ${totalDrums} bębnów, ${activeDrums} aktywnych`);
-        return { 
-          totalDrums: totalDrums || 0, 
-          activeDrums: activeDrums || 0, 
-          pendingReturns: pendingReturns || 0, 
-          recentReturns: recentReturns || 0 
+        return {
+          totalDrums: totalDrums || 0,
+          activeDrums: activeDrums || 0,
+          pendingReturns: pendingReturns || 0,
+          recentReturns: recentReturns || 0
         };
       }
 
       // Statystyki dla admina - NAPRAWIONE: head: true oznacza że pobieramy TYLKO COUNT
       console.log(`👨‍💼 Liczenie statystyk dla administratora...`);
-      
+
       const [
-        { count: totalClients }, 
-        { count: totalDrums }, 
-        { count: pendingReturns }, 
-        { count: overdueReturns }, 
-        { count: activeRequests }, 
+        { count: totalClients },
+        { count: totalDrums },
+        { count: pendingReturns },
+        { count: overdueReturns },
+        { count: activeRequests },
         { count: completedRequests }
       ] = await Promise.all([
         supabase.from('companies').select('*', { count: 'exact', head: true }),
@@ -614,14 +647,14 @@ export const statsAPI = {
       ]);
 
       console.log(`✅ Statystyki admina: ${totalDrums} bębnów, ${totalClients} klientów, ${pendingReturns} zwrotów`);
-      
-      return { 
-        totalClients: totalClients || 0, 
-        totalDrums: totalDrums || 0, 
-        pendingReturns: pendingReturns || 0, 
-        overdueReturns: overdueReturns || 0, 
-        activeRequests: activeRequests || 0, 
-        completedRequests: completedRequests || 0 
+
+      return {
+        totalClients: totalClients || 0,
+        totalDrums: totalDrums || 0,
+        pendingReturns: pendingReturns || 0,
+        overdueReturns: overdueReturns || 0,
+        activeRequests: activeRequests || 0,
+        completedRequests: completedRequests || 0
       };
 
     } catch (error) {
@@ -637,7 +670,7 @@ export const statsAPI = {
   async getDetailedDrumStats() {
     try {
       console.log('🔄 Pobieranie szczegółowych statystyk bębnów...');
-      
+
       const now = new Date().toISOString();
       const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 

@@ -1,25 +1,37 @@
-// src/components/ReturnForm.js - NAPRAWIONA WERSJA
+// src/components/ReturnForm.js - WERSJA Z OBSŁUGĄ CECHY I USZKODZEŃ
 import React, { useState, useEffect } from 'react';
-import { 
-  Calendar, 
-  MapPin, 
-  Mail, 
-  Clock, 
-  Truck, 
+import {
+  Calendar,
+  MapPin,
+  Mail,
+  Clock,
+  Truck,
   MessageSquare,
   Building2,
   CheckCircle,
   AlertCircle,
   Send,
   Package,
-  User
+  User,
+  AlertTriangle,
+  Trash2
 } from 'lucide-react';
 import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
 
 const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   const [currentStep, setCurrentStep] = useState(1);
+
+  // Oblicz minimalną datę (dzisiaj + 7 dni)
+  const getMinDate = () => {
+    const date = new Date();
+    date.setDate(date.getDate() + 7);
+    return date.toISOString().split('T')[0];
+  };
+
+  const minDate = getMinDate();
+
   const [formData, setFormData] = useState({
-    collectionDate: new Date().toISOString().split('T')[0],
+    collectionDate: minDate,
     companyName: user.companyName || user.name,
     street: '',
     postalCode: '',
@@ -28,41 +40,47 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
     loadingHours: '',
     availableEquipment: '',
     notes: '',
-    selectedDrums: selectedDrum ? [selectedDrum.kod_bebna || selectedDrum.KOD_BEBNA] : [],
+    // ZMIANA: selectedDrums to teraz tablica obiektów { cecha, isDamaged, description }
+    selectedDrums: selectedDrum ? [{
+      cecha: selectedDrum.cecha || selectedDrum.CECHA || selectedDrum.kod_bebna,
+      isDamaged: false,
+      description: ''
+    }] : [],
     confirmType: false,
     confirmEmpty: false
   });
   const [loading, setLoading] = useState(false);
   const [userDrums, setUserDrums] = useState([]);
   const [drumsLoading, setDrumsLoading] = useState(true);
+  const [dateWarning, setDateWarning] = useState(false);
 
-  // Pobierz bębny użytkownika - NAPRAWIONE!
+  // Pobierz bębny użytkownika
   useEffect(() => {
     const fetchUserDrums = async () => {
       setDrumsLoading(true);
       try {
         console.log('🔄 ReturnForm: Pobieranie bębnów dla', user.nip);
-        
-        // NAPRAWIONE: Dodaj opcje i obsłuż oba formaty odpowiedzi
+
         const options = {
           page: 1,
           limit: 1000,
-          sortBy: 'kod_bebna',
+          sortBy: 'cecha', // ZMIANA: Sortowanie po 'cecha'
           sortOrder: 'asc'
         };
-        
+
         const result = await drumsAPI.getDrums(user.nip, options);
         console.log('✅ ReturnForm: Otrzymano dane:', result);
-        
-        // WAŻNE: Obsłuż oba formaty - obiekt z paginacją lub bezpośrednio tablica
+
         const drums = result.data || result;
-        
+
         if (!Array.isArray(drums)) {
           console.error('❌ ReturnForm: Dane nie są tablicą!', drums);
           setUserDrums([]);
         } else {
-          console.log(`✅ ReturnForm: Załadowano ${drums.length} bębnów`);
-          setUserDrums(drums);
+          // Filtrujemy, żeby nie pokazywać zagubionych (chociaż API domyślnie to robi)
+          const availableDrums = drums.filter(d => d.status !== 'Lost');
+          console.log(`✅ ReturnForm: Załadowano ${availableDrums.length} bębnów`);
+          setUserDrums(availableDrums);
         }
       } catch (err) {
         console.error('❌ Błąd podczas pobierania bębnów:', err);
@@ -79,6 +97,22 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
       setUserDrums([]);
     }
   }, [user?.nip]);
+
+  // Obsługa zmiany daty z ostrzeżeniem
+  const handleDateChange = (e) => {
+    const newDate = e.target.value;
+    const selectedDate = new Date(newDate);
+    const minAllowedDate = new Date(minDate);
+
+    // Sprawdź czy data jest wcześniejsza niż minimalna (7 dni)
+    if (selectedDate < minAllowedDate) {
+      setDateWarning(true);
+    } else {
+      setDateWarning(false);
+    }
+
+    setFormData(prev => ({ ...prev, collectionDate: newDate }));
+  };
 
   const steps = [
     { id: 1, title: 'Dane podstawowe', icon: Building2 },
@@ -117,7 +151,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
 
   const handleSubmit = async () => {
     if (!validateStep(5)) return;
-    
+
     setLoading(true);
     try {
       // Przygotuj dane do wysłania
@@ -132,12 +166,12 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
         loading_hours: formData.loadingHours,
         available_equipment: formData.availableEquipment,
         notes: formData.notes,
-        selected_drums: formData.selectedDrums
+        selected_drums: formData.selectedDrums // Teraz to tablica obiektów
       };
 
       // Wyślij zgłoszenie
       await returnsAPI.createReturn(returnData);
-      
+
       setLoading(false);
       onSubmit();
     } catch (err) {
@@ -147,12 +181,57 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
     }
   };
 
-  const handleDrumToggle = (drumCode) => {
+  // Zgłaszanie zagubienia
+  const handleReportLost = async (cecha, e) => {
+    e.stopPropagation(); // Nie przełączaj zaznaczenia wyboru
+    if (window.confirm(`Czy na pewno chcesz zgłosić zagubienie bębna ${cecha}? Zostanie on usunięty z listy twoich bębnów.`)) {
+      try {
+        await drumsAPI.reportLost(cecha, user.nip, 'Zgłoszone przez klienta w formularzu zwrotu');
+        // Usuń z lokalnego stanu
+        setUserDrums(prev => prev.filter(d => d.cecha !== cecha && d.kod_bebna !== cecha));
+        // Usuń z zaznaczonych jeśli był
+        setFormData(prev => ({
+          ...prev,
+          selectedDrums: prev.selectedDrums.filter(d => d.cecha !== cecha)
+        }));
+        alert('Zgłoszono zagubienie.');
+      } catch (err) {
+        console.error(err);
+        alert('Błąd zgłaszania zagubienia.');
+      }
+    }
+  };
+
+  // Logika toggle dla nowy struktury danych
+  const handleDrumToggle = (drumCecha) => {
+    setFormData(prev => {
+      const isSelected = prev.selectedDrums.some(d => d.cecha === drumCecha);
+
+      if (isSelected) {
+        // Usuń
+        return {
+          ...prev,
+          selectedDrums: prev.selectedDrums.filter(d => d.cecha !== drumCecha)
+        };
+      } else {
+        // Dodaj (domyślnie nieuszkodzony)
+        return {
+          ...prev,
+          selectedDrums: [...prev.selectedDrums, { cecha: drumCecha, isDamaged: false, description: '' }]
+        };
+      }
+    });
+  };
+
+  // Aktualizacja stanu uszkodzenia dla wybranego bębna
+  const handleDamageChange = (drumCecha, field, value) => {
     setFormData(prev => ({
       ...prev,
-      selectedDrums: prev.selectedDrums.includes(drumCode)
-        ? prev.selectedDrums.filter(code => code !== drumCode)
-        : [...prev.selectedDrums, drumCode]
+      selectedDrums: prev.selectedDrums.map(item =>
+        item.cecha === drumCecha
+          ? { ...item, [field]: value }
+          : item
+      )
     }));
   };
 
@@ -161,23 +240,20 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
       {steps.map((step, index) => (
         <React.Fragment key={step.id}>
           <div className="flex flex-col items-center">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
-              currentStep >= step.id 
-                ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg' 
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${currentStep >= step.id
+                ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-lg'
                 : 'bg-gray-200 text-gray-500'
-            }`}>
+              }`}>
               <step.icon className="w-6 h-6" />
             </div>
-            <span className={`text-sm mt-2 font-medium ${
-              currentStep >= step.id ? 'text-blue-600' : 'text-gray-500'
-            }`}>
+            <span className={`text-sm mt-2 font-medium ${currentStep >= step.id ? 'text-blue-600' : 'text-gray-500'
+              }`}>
               {step.title}
             </span>
           </div>
           {index < steps.length - 1 && (
-            <div className={`w-16 h-1 mx-2 rounded transition-all duration-300 ${
-              currentStep > step.id ? 'bg-blue-600' : 'bg-gray-200'
-            }`} />
+            <div className={`w-16 h-1 mx-2 rounded transition-all duration-300 ${currentStep > step.id ? 'bg-blue-600' : 'bg-gray-200'
+              }`} />
           )}
         </React.Fragment>
       ))}
@@ -194,20 +270,35 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
               <h2 className="text-2xl font-bold text-gray-900">Podstawowe informacje</h2>
               <p className="text-gray-600">Określ datę i firmę dla odbioru</p>
             </div>
-            
+
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Calendar className="inline w-4 h-4 mr-2" />
                   Data odbioru *
                 </label>
-                <input
-                  type="date"
-                  value={formData.collectionDate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, collectionDate: e.target.value }))}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
-                />
+                <div className="space-y-2">
+                  <input
+                    type="date"
+                    value={formData.collectionDate}
+                    onChange={handleDateChange}
+                    // Info: nie blokujemy "na sztywno" w HTML5 min, ale walidujemy
+                    // min={minDate} 
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white ${dateWarning ? 'border-yellow-400 bg-yellow-50' : 'border-gray-300'
+                      }`}
+                  />
+                  {dateWarning && (
+                    <div className="flex items-start space-x-2 text-yellow-700 text-sm bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                      <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                      <span>
+                        Wybrana data jest krótsza niż zalecane 7 dni. Może to wpłynąć na terminowość odbioru.
+                      </span>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    Zalecany termin odbioru to minimum 7 dni od daty zgłoszenia.
+                  </p>
+                </div>
               </div>
 
               <div>
@@ -235,7 +326,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
               <h2 className="text-2xl font-bold text-gray-900">Adres odbioru</h2>
               <p className="text-gray-600">Podaj dokładny adres skąd mają być odebrane bębny</p>
             </div>
-            
+
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -290,7 +381,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
               <h2 className="text-2xl font-bold text-gray-900">Szczegóły odbioru</h2>
               <p className="text-gray-600">Dodaj informacje o kontakcie i logistyce</p>
             </div>
-            
+
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -345,8 +436,11 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                   value={formData.notes}
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
-                  placeholder="Dodatkowe informacje dla kuriera..."
+                  placeholder={dateWarning ? "WPISZ TUTAJ INFORMACJĘ O TURBO PILNOŚCI!..." : "Dodatkowe informacje dla kuriera..."}
                 />
+                {dateWarning && (
+                  <p className="text-xs text-red-500 mt-1 font-medium">Ze względu na krótki termin, prosimy o wyraźne zaznaczenie pilności w uwagach.</p>
+                )}
               </div>
             </div>
           </div>
@@ -360,7 +454,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
               <h2 className="text-2xl font-bold text-gray-900">Wybór bębnów</h2>
               <p className="text-gray-600">Zaznacz bębny które chcesz zwrócić</p>
             </div>
-            
+
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
               <div className="flex items-center space-x-2">
                 <AlertCircle className="w-5 h-5 text-blue-600" />
@@ -369,7 +463,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                 </span>
               </div>
             </div>
-            
+
             {drumsLoading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -381,35 +475,84 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                 <p className="text-gray-600">Brak dostępnych bębnów do zwrotu</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto">
                 {userDrums.map((drum, index) => {
-                  const drumCode = drum.kod_bebna || drum.KOD_BEBNA;
-                  const drumName = drum.nazwa || drum.NAZWA;
-                  const returnDate = drum.data_zwrotu_do_dostawcy || drum.DATA_ZWROTU_DO_DOSTAWCY;
-                  
+                  const drumCecha = drum.cecha; // UŻYWAMY CECHY JAKO ID
+                  const drumName = drum.nazwa;
+                  const returnDate = drum.data_zwrotu_do_dostawcy;
+
+                  // Sprawdź czy wybrany
+                  const selectedItem = formData.selectedDrums.find(d => d.cecha === drumCecha);
+                  const isSelected = !!selectedItem;
+
                   return (
                     <div
-                      key={drumCode || index}
-                      className={`border-2 rounded-xl p-4 transition-all duration-200 cursor-pointer ${
-                        formData.selectedDrums.includes(drumCode)
+                      key={drumCecha || index}
+                      className={`border-2 rounded-xl p-4 transition-all duration-200 ${isSelected
                           ? 'border-blue-600 bg-blue-50'
                           : 'border-gray-200 hover:border-blue-300 bg-white'
-                      }`}
-                      onClick={() => handleDrumToggle(drumCode)}
+                        }`}
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold text-gray-900">{drumCode}</span>
+                      {/* Nagłówek Karty */}
+                      <div
+                        className="flex items-center justify-between mb-2 cursor-pointer"
+                        onClick={() => handleDrumToggle(drumCecha)}
+                      >
+                        <span className="font-semibold text-gray-900">{drumCecha}</span>
                         <input
                           type="checkbox"
-                          checked={formData.selectedDrums.includes(drumCode)}
-                          onChange={() => {}}
+                          checked={isSelected}
+                          onChange={() => { }} // Obsłużone przez onClick diva
                           className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                         />
                       </div>
+
                       <p className="text-sm text-gray-600 mb-2">{drumName}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500 mb-3">
                         Termin: {returnDate ? new Date(returnDate).toLocaleDateString('pl-PL') : 'Brak'}
                       </p>
+
+                      {/* Sekcja przycisków akcji */}
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        {isSelected ? (
+                          // Sekcja Uszkodzeń (tylko gdy wybrany)
+                          <div className="space-y-3">
+                            <label className="flex items-center space-x-2 cursor-pointer text-sm text-gray-700 font-medium">
+                              <input
+                                type="checkbox"
+                                checked={selectedItem.isDamaged}
+                                onChange={(e) => handleDamageChange(drumCecha, 'isDamaged', e.target.checked)}
+                                className="text-red-500 focus:ring-red-500 rounded border-gray-300"
+                              />
+                              <span>Czy bęben jest uszkodzony?</span>
+                            </label>
+
+                            {selectedItem.isDamaged && (
+                              <div className="animate-fadeIn">
+                                <textarea
+                                  placeholder="Opisz uszkodzenie..."
+                                  value={selectedItem.description}
+                                  onChange={(e) => handleDamageChange(drumCecha, 'description', e.target.value)}
+                                  className="w-full text-sm p-2 border border-red-200 bg-red-50 rounded-lg focus:outline-none focus:border-red-400"
+                                  rows={2}
+                                />
+                                <p className="text-xs text-red-600 mt-1 italic">
+                                  ⚠ W przypadku uszkodzenia zastrzegamy sobie prawo do wystawienia faktury o wartości bębna.
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          // Sekcja Zgubienia (tylko gdy NIE wybrany)
+                          <button
+                            onClick={(e) => handleReportLost(drumCecha, e)}
+                            className="w-full flex items-center justify-center space-x-1.5 py-1.5 px-3 bg-white border border-gray-300 hover:bg-red-50 hover:border-red-300 text-gray-600 hover:text-red-600 rounded-lg text-sm transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span>Zgłoś zagubienie</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -426,7 +569,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
               <h2 className="text-2xl font-bold text-gray-900">Potwierdzenie</h2>
               <p className="text-gray-600">Sprawdź dane i potwierdź zgłoszenie</p>
             </div>
-            
+
             <div className="bg-gray-50 rounded-xl p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -454,8 +597,10 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                   <p className="font-medium text-gray-900">{formData.selectedDrums.length}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Godziny załadunku</p>
-                  <p className="font-medium text-gray-900">{formData.loadingHours}</p>
+                  <p className="text-sm text-gray-500">Uszkodzone</p>
+                  <p className="font-medium text-red-600">
+                    {formData.selectedDrums.filter(d => d.isDamaged).length} szt.
+                  </p>
                 </div>
               </div>
             </div>
@@ -531,11 +676,10 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                 <button
                   onClick={handleNext}
                   disabled={!validateStep(currentStep)}
-                  className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 flex items-center space-x-2 ${
-                    validateStep(currentStep)
+                  className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 flex items-center space-x-2 ${validateStep(currentStep)
                       ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-lg'
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  }`}
+                    }`}
                 >
                   <span>Dalej</span>
                   <ArrowRight className="w-4 h-4" />
@@ -544,11 +688,10 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                 <button
                   onClick={handleSubmit}
                   disabled={!validateStep(5) || loading}
-                  className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 flex items-center space-x-2 ${
-                    validateStep(5) && !loading
+                  className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 flex items-center space-x-2 ${validateStep(5) && !loading
                       ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 shadow-lg'
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  }`}
+                    }`}
                 >
                   {loading ? (
                     <>
