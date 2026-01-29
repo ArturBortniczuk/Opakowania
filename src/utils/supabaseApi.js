@@ -137,7 +137,7 @@ export const drumsAPI = {
       // Podstawowe zapytanie
       let query = supabase
         .from('drums')
-        .select(`*, companies (name, email, phone, address)`, { count: 'exact' });
+        .select(`*, companies (name, email, phone, address, custom_return_periods(return_period_days))`, { count: 'exact' });
 
       // Filtrowanie po NIP
       if (nip) {
@@ -183,6 +183,12 @@ export const drumsAPI = {
         const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
         const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
 
+        const returnPeriodDays = drum.companies?.custom_return_periods?.[0]?.return_period_days || 85;
+        const clientReturnDeadline = new Date(issueDate);
+        if (!isNaN(clientReturnDeadline.getTime())) {
+          clientReturnDeadline.setDate(clientReturnDeadline.getDate() + returnPeriodDays);
+        }
+
         return {
           ...drum,
           // Zachowaj oryginalne nazwy kolumn z bazy
@@ -199,6 +205,10 @@ export const drumsAPI = {
           kontrahent: drum.kontrahent,
           status: drum.status,
           data_wydania: drum.data_wydania,
+
+          // Obliczone pola
+          returnPeriodDays,
+          clientReturnDeadline: !isNaN(clientReturnDeadline.getTime()) ? clientReturnDeadline.toISOString() : null,
 
           // DODATKOWO: Zachowaj kompatybilność z WIELKIMI LITERAMI (stary kod)
           KOD_BEBNA: drum.kod_bebna,

@@ -17,11 +17,11 @@ export const supabaseHelpers = {
   getDrumStatus(returnDate) {
     if (!returnDate) {
       return {
-        status: 'unknown',
-        color: 'text-gray-600',
-        bgColor: 'bg-gray-100',
-        borderColor: 'border-gray-200',
-        text: 'Brak daty',
+        status: 'own',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-100',
+        borderColor: 'border-indigo-200',
+        text: 'Własny',
         daysDiff: null
       };
     }

@@ -370,10 +370,20 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         </div>
 
         <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Termin zwrotu</span>
+          <span className="text-sm text-gray-500">Zwrot do dostawcy</span>
           <span className="text-sm font-medium text-gray-900">
             {drum.DATA_ZWROTU_DO_DOSTAWCY ?
               new Date(drum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL') :
+              <span className="text-indigo-600 font-semibold">Własny</span>
+            }
+          </span>
+        </div>
+
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-500">Zwrot od klienta</span>
+          <span className="text-sm font-medium text-gray-900">
+            {drum.clientReturnDeadline ?
+              new Date(drum.clientReturnDeadline).toLocaleDateString('pl-PL') :
               'Brak'
             }
           </span>
@@ -522,10 +532,19 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Termin zwrotu</span>
+                  <span className="text-gray-600">Zwrot do dostawcy</span>
                   <span className="font-medium">
                     {selectedDrum.data_zwrotu_do_dostawcy
                       ? new Date(selectedDrum.data_zwrotu_do_dostawcy).toLocaleDateString('pl-PL')
+                      : <span className="text-indigo-600">Własny</span>
+                    }
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Zwrot od klienta</span>
+                  <span className="font-medium">
+                    {selectedDrum.clientReturnDeadline
+                      ? new Date(selectedDrum.clientReturnDeadline).toLocaleDateString('pl-PL')
                       : 'Brak'
                     }
                   </span>
