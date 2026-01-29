@@ -142,6 +142,8 @@ export const drumsAPI = {
       // Filtrowanie po NIP
       if (nip) {
         query = query.eq('nip', nip);
+        // Ukryj bębny, które zostały już zwrócone (status kontrahenta: 'Nie wydany')
+        query = query.neq('kontrahent', 'Nie wydany');
       }
 
       // Filtrowanie po statusie (domyślnie ukrywamy 'Lost')
