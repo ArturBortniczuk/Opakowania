@@ -393,33 +393,17 @@ export const companiesAPI = {
 
       if (error) throw error;
 
-      // Pobierz dodatkowe statystyki dla każdej firmy
-      const enrichedData = await Promise.all(
-        data.map(async (company) => {
-          // Policz bębny
-          const { count: drumsCount } = await supabase
-            .from('drums')
-            .select('*', { count: 'exact', head: true })
-            .eq('nip', company.nip);
+      if (error) throw error;
 
-          // Policz zgłoszenia
-          const { count: requestsCount } = await supabase
-            .from('return_requests')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_nip', company.nip);
+      // Mapowanie danych (bez zbędnych zapytań do bazy)
+      const mappedData = data.map(company => ({
+        ...company,
+        returnPeriodDays: company.custom_return_periods?.[0]?.return_period_days || 85,
+        status: 'Aktywny', // Domyślny status
+        lastActivity: company.created_at || new Date().toISOString().split('T')[0]
+      }));
 
-          return {
-            ...company,
-            drumsCount: drumsCount || 0,
-            totalRequests: requestsCount || 0,
-            returnPeriodDays: company.custom_return_periods?.[0]?.return_period_days || 85,
-            status: 'Aktywny', // Domyślny status
-            lastActivity: company.created_at || new Date().toISOString().split('T')[0]
-          };
-        })
-      );
-
-      return enrichedData;
+      return mappedData;
     } catch (error) {
       console.error('Błąd API firm:', error);
       throw error;
