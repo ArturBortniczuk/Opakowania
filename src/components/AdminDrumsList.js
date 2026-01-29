@@ -491,8 +491,8 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                     <p className="text-gray-900">{selectedDrum.nip}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Kontrahent</label>
-                    <p className="text-gray-900">{selectedDrum.kontrahent}</p>
+                    <label className="text-sm font-medium text-gray-500">Status</label>
+                    <p className="text-gray-900">{selectedDrum.db_status}</p>
                   </div>
                   {selectedDrum.companyEmail && (
                     <div>
