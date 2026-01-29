@@ -267,7 +267,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
             method: 'POST',
             headers: {
               'Content-Type': contentType,
-              'Authorization': `Bearer ${process?.env?.REACT_APP_SUPABASE_ANON_KEY || ''}`
+              'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY || ''}`
             },
             body: bodyData,
             timeout: 300000
@@ -655,7 +655,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     );
   }
 
-  if (error) {
+  return (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
