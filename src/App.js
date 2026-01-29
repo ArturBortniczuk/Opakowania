@@ -21,6 +21,7 @@ const App = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false); // DODANE: Stan inicjalizacji
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -40,6 +41,7 @@ const App = () => {
         localStorage.removeItem('currentUser');
       }
     }
+    setIsInitialized(true); // DODANE: Oznaczamy, że sprawdziliśmy localStorage
   }, []);
 
   const handleLogin = (user) => {
@@ -69,6 +71,15 @@ const App = () => {
   };
 
   const shouldShowNavbar = currentUser && location.pathname !== '/' && location.pathname !== '/set-password';
+
+  // DODANE: Loading screen podczas inicjalizacji
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
