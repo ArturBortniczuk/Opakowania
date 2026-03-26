@@ -159,14 +159,11 @@ const DrumsList = ({ user }) => {
           )}
 
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Miejsce dostawy</span>
+            <span className="text-sm text-gray-500">Lokalizacja</span>
             <div className="text-sm font-medium text-gray-900 text-right max-w-xs truncate">
-              {drum.nazwa_punktu_dostawy || drum.adres_dostawy ? (
-                <>
-                  {drum.nazwa_punktu_dostawy && <div className="truncate" title={drum.nazwa_punktu_dostawy}>{drum.nazwa_punktu_dostawy}</div>}
-                  {drum.adres_dostawy && <div className="truncate text-xs text-gray-500" title={drum.adres_dostawy}>{drum.adres_dostawy}</div>}
-                </>
-              ) : 'Brak danych'}
+              {drum.adres_dostawy ? (
+                <div className="truncate" title={drum.adres_dostawy}>{drum.adres_dostawy}</div>
+              ) : 'Brak informacji o adresie'}
             </div>
           </div>
 

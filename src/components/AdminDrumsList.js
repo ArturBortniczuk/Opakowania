@@ -477,14 +477,9 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                     <p className="text-gray-900">{selectedDrum.nr_dokumentupz}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Miejsce dostawy</label>
+                    <label className="text-sm font-medium text-gray-500">Lokalizacja</label>
                     <p className="text-gray-900">
-                      {selectedDrum.nazwa_punktu_dostawy || selectedDrum.adres_dostawy ? (
-                        <>
-                          {selectedDrum.nazwa_punktu_dostawy && <span>{selectedDrum.nazwa_punktu_dostawy}</span>}
-                          {selectedDrum.adres_dostawy && <span className="block text-sm text-gray-600">{selectedDrum.adres_dostawy}</span>}
-                        </>
-                      ) : 'Brak danych'}
+                      {selectedDrum.adres_dostawy || 'Brak informacji o adresie'}
                     </p>
                   </div>
                   <div>
