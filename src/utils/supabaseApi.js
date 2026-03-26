@@ -197,11 +197,18 @@ export const drumsAPI = {
 
       // Mapowanie danych do spójnego formatu używanego w komponentach
       const mappedData = data.map(drum => {
-        const statusObj = supabaseHelpers.getDrumStatus(drum.data_zwrotu_do_dostawcy);
+        let finalReturnDate = drum.data_zwrotu_do_dostawcy;
+        if (!finalReturnDate && drum.data_wydania) {
+          const d = new Date(drum.data_wydania);
+          d.setDate(d.getDate() + 120);
+          finalReturnDate = d.toISOString().split('T')[0];
+        }
+        
+        const returnPeriodDays = drum.companies?.custom_return_periods?.[0]?.return_period_days || 180;
+        const statusObj = supabaseHelpers.getDrumStatus(finalReturnDate);
         const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
         const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
 
-        const returnPeriodDays = drum.companies?.custom_return_periods?.[0]?.return_period_days || 85;
         const clientReturnDeadline = new Date(issueDate);
         if (!isNaN(clientReturnDeadline.getTime())) {
           clientReturnDeadline.setDate(clientReturnDeadline.getDate() + returnPeriodDays);
@@ -209,11 +216,11 @@ export const drumsAPI = {
 
         return {
           ...drum,
+          data_zwrotu_do_dostawcy: finalReturnDate, // Nadpisujemy dla bębnów własnych
           // Zachowaj oryginalne nazwy kolumn z bazy
           kod_bebna: drum.kod_bebna,
           nazwa: drum.nazwa,
           cecha: drum.cecha,
-          data_zwrotu_do_dostawcy: drum.data_zwrotu_do_dostawcy,
           kon_dostawca: drum.kon_dostawca,
           pelna_nazwa_kontrahenta: drum.companies?.name || drum.pelna_nazwa_kontrahenta,
           nip: drum.nip,
@@ -222,7 +229,7 @@ export const drumsAPI = {
           data_przyjecia_na_stan: drum.data_przyjecia_na_stan,
           kontrahent: drum.kontrahent,
           db_status: drum.status,
-          status: drum.status,
+          status: statusObj.status, // Używamy statusu obliczonego na podstawie finalReturnDate
           data_wydania: drum.data_wydania,
           adres_dostawy: drum.adres_dostawy,
           nazwa_punktu_dostawy: drum.nazwa_punktu_dostawy,
@@ -236,7 +243,7 @@ export const drumsAPI = {
           KOD_BEBNA: drum.kod_bebna,
           NAZWA: drum.nazwa,
           CECHA: drum.cecha,
-          DATA_ZWROTU_DO_DOSTAWCY: drum.data_zwrotu_do_dostawcy,
+          DATA_ZWROTU_DO_DOSTAWCY: finalReturnDate, // Nadpisujemy
           KON_DOSTAWCA: drum.kon_dostawca,
           PELNA_NAZWA_KONTRAHENTA: drum.companies?.name || drum.pelna_nazwa_kontrahenta,
           NIP: drum.nip,
@@ -244,7 +251,7 @@ export const drumsAPI = {
           NR_DOKUMENTUPZ: drum.nr_dokumentupz,
           'Data przyjęcia na stan': drum.data_przyjecia_na_stan,
           KONTRAHENT: drum.kontrahent,
-          STATUS: drum.status,
+          STATUS: statusObj.status, // Używamy statusu obliczonego na podstawie finalReturnDate
           DATA_WYDANIA: drum.data_wydania,
           ADRES_DOSTAWY: drum.adres_dostawy,
           NAZWA_PUNKTU_DOSTAWY: drum.nazwa_punktu_dostawy,
@@ -325,7 +332,7 @@ export const drumsAPI = {
 
       let query = supabase
         .from('drums')
-        .select(`*, companies (name, email, phone, address)`);
+        .select(`*, companies (name, email, phone, address, custom_return_periods(return_period_days))`);
 
       if (nip) {
         query = query.eq('nip', nip);
@@ -340,34 +347,40 @@ export const drumsAPI = {
 
       // Mapowanie danych (identyczne jak w getDrums)
       return data.map(drum => {
-        const status = supabaseHelpers.getDrumStatus(drum.data_zwrotu_do_dostawcy);
+        // Obliczenie wirtualnej daty zwrotu dla bębnów 'Własnych' (120 dni od wydania)
+        let finalReturnDate = drum.data_zwrotu_do_dostawcy;
+        if (!finalReturnDate && drum.data_wydania) {
+          const d = new Date(drum.data_wydania);
+          d.setDate(d.getDate() + 120);
+          finalReturnDate = d.toISOString().split('T')[0];
+        }
+
+        // Zabezpieczone pobieranie dni z relacji
+        const returnPeriodDays = drum.companies?.custom_return_periods?.[0]?.return_period_days || 180;
+        
+        // Obliczamy STATUS TERMINOWY
+        const statusObj = supabaseHelpers.getDrumStatus(finalReturnDate);
         const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
         const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
 
+        const clientReturnDeadline = new Date(issueDate);
+        if (!isNaN(clientReturnDeadline.getTime())) {
+          clientReturnDeadline.setDate(clientReturnDeadline.getDate() + returnPeriodDays);
+        }
+
         return {
           ...drum,
-          kod_bebna: drum.kod_bebna,
-          nazwa: drum.nazwa,
-          cecha: drum.cecha,
-          data_zwrotu_do_dostawcy: drum.data_zwrotu_do_dostawcy,
-          kon_dostawca: drum.kon_dostawca,
-          pelna_nazwa_kontrahenta: drum.companies?.name || drum.pelna_nazwa_kontrahenta,
-          nip: drum.nip,
-          typ_dok: drum.typ_dok,
-          nr_dokumentupz: drum.nr_dokumentupz,
-          data_przyjecia_na_stan: drum.data_przyjecia_na_stan,
-          kontrahent: drum.kontrahent,
-          status: drum.status,
-          data_wydania: drum.data_wydania,
-          adres_dostawy: drum.adres_dostawy,
-          nazwa_punktu_dostawy: drum.nazwa_punktu_dostawy,
-          numer_faktury: drum.numer_faktury,
-
+          data_zwrotu_do_dostawcy: finalReturnDate, // Nadpisujemy
+          
+          // Ujednolicony dostęp do formatu dającego "active", "due-soon", "overdue"
+          db_status: drum.status,
+          status: statusObj.status,
+          
           // Kompatybilność z WIELKIMI LITERAMI
           KOD_BEBNA: drum.kod_bebna,
           NAZWA: drum.nazwa,
           CECHA: drum.cecha,
-          DATA_ZWROTU_DO_DOSTAWCY: drum.data_zwrotu_do_dostawcy,
+          DATA_ZWROTU_DO_DOSTAWCY: finalReturnDate, // Nadpisujemy
           KON_DOSTAWCA: drum.kon_dostawca,
           PELNA_NAZWA_KONTRAHENTA: drum.companies?.name || drum.pelna_nazwa_kontrahenta,
           NIP: drum.nip,
@@ -375,7 +388,7 @@ export const drumsAPI = {
           NR_DOKUMENTUPZ: drum.nr_dokumentupz,
           'Data przyjęcia na stan': drum.data_przyjecia_na_stan,
           KONTRAHENT: drum.kontrahent,
-          STATUS: drum.status,
+          STATUS: statusObj.status, // Używamy statusu obliczonego na podstawie finalReturnDate
           DATA_WYDANIA: drum.data_wydania,
           ADRES_DOSTAWY: drum.adres_dostawy,
           NAZWA_PUNKTU_DOSTAWY: drum.nazwa_punktu_dostawy,
@@ -386,7 +399,7 @@ export const drumsAPI = {
           companyEmail: drum.companies?.email,
           companyAddress: drum.companies?.address,
           daysInPossession: daysInPossession > 0 ? daysInPossession : 0,
-          ...status
+          ...statusObj
         };
       });
     } catch (error) {
