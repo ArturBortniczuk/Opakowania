@@ -476,6 +476,21 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                     <label className="text-sm font-medium text-gray-500">Dokument</label>
                     <p className="text-gray-900">{selectedDrum.nr_dokumentupz}</p>
                   </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Miejsce dostawy</label>
+                    <p className="text-gray-900">
+                      {selectedDrum.nazwa_punktu_dostawy || selectedDrum.adres_dostawy ? (
+                        <>
+                          {selectedDrum.nazwa_punktu_dostawy && <span>{selectedDrum.nazwa_punktu_dostawy}</span>}
+                          {selectedDrum.adres_dostawy && <span className="block text-sm text-gray-600">{selectedDrum.adres_dostawy}</span>}
+                        </>
+                      ) : 'Brak danych'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Numer faktury</label>
+                    <p className="text-gray-900">{selectedDrum.numer_faktury || 'Brak danych'}</p>
+                  </div>
                 </div>
               </div>
 
@@ -770,7 +785,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Szukaj bębnów..."
+                  placeholder="Szukaj po kodzie, nazwie, adresie dostawy lub numerze faktury..."
                   value={localSearchTerm}
                   onChange={(e) => setLocalSearchTerm(e.target.value)}
                   className="pl-10 w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"

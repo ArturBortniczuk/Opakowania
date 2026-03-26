@@ -157,7 +157,7 @@ export const drumsAPI = {
       // Filtrowanie po wyszukiwaniu - PRIORYTET DLA CECHY
       if (search) {
         // Dodano cecha.ilike.%${search}% jako pierwsze
-        query = query.or(`cecha.ilike.%${search}%,kod_bebna.ilike.%${search}%,nazwa.ilike.%${search}%,pelna_nazwa_kontrahenta.ilike.%${search}%`);
+        query = query.or(`cecha.ilike.%${search}%,kod_bebna.ilike.%${search}%,nazwa.ilike.%${search}%,pelna_nazwa_kontrahenta.ilike.%${search}%,adres_dostawy.ilike.%${search}%,nazwa_punktu_dostawy.ilike.%${search}%,numer_faktury.ilike.%${search}%`);
       }
 
       // Sortowanie
@@ -208,6 +208,9 @@ export const drumsAPI = {
           db_status: drum.status,
           status: drum.status,
           data_wydania: drum.data_wydania,
+          adres_dostawy: drum.adres_dostawy,
+          nazwa_punktu_dostawy: drum.nazwa_punktu_dostawy,
+          numer_faktury: drum.numer_faktury,
 
           // Obliczone pola
           returnPeriodDays,
@@ -227,6 +230,9 @@ export const drumsAPI = {
           KONTRAHENT: drum.kontrahent,
           STATUS: drum.status,
           DATA_WYDANIA: drum.data_wydania,
+          ADRES_DOSTAWY: drum.adres_dostawy,
+          NAZWA_PUNKTU_DOSTAWY: drum.nazwa_punktu_dostawy,
+          NUMER_FAKTURY: drum.numer_faktury,
 
           company: drum.companies?.name || drum.pelna_nazwa_kontrahenta,
           companyPhone: drum.companies?.phone,
@@ -337,6 +343,9 @@ export const drumsAPI = {
           kontrahent: drum.kontrahent,
           status: drum.status,
           data_wydania: drum.data_wydania,
+          adres_dostawy: drum.adres_dostawy,
+          nazwa_punktu_dostawy: drum.nazwa_punktu_dostawy,
+          numer_faktury: drum.numer_faktury,
 
           // Kompatybilność z WIELKIMI LITERAMI
           KOD_BEBNA: drum.kod_bebna,
@@ -352,6 +361,9 @@ export const drumsAPI = {
           KONTRAHENT: drum.kontrahent,
           STATUS: drum.status,
           DATA_WYDANIA: drum.data_wydania,
+          ADRES_DOSTAWY: drum.adres_dostawy,
+          NAZWA_PUNKTU_DOSTAWY: drum.nazwa_punktu_dostawy,
+          NUMER_FAKTURY: drum.numer_faktury,
 
           company: drum.companies?.name || drum.pelna_nazwa_kontrahenta,
           companyPhone: drum.companies?.phone,

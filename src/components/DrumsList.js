@@ -157,6 +157,23 @@ const DrumsList = ({ user }) => {
               <span className="text-sm font-medium text-gray-900">{drum.daysInPossession}</span>
             </div>
           )}
+
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">Miejsce dostawy</span>
+            <div className="text-sm font-medium text-gray-900 text-right max-w-xs truncate">
+              {drum.nazwa_punktu_dostawy || drum.adres_dostawy ? (
+                <>
+                  {drum.nazwa_punktu_dostawy && <div className="truncate" title={drum.nazwa_punktu_dostawy}>{drum.nazwa_punktu_dostawy}</div>}
+                  {drum.adres_dostawy && <div className="truncate text-xs text-gray-500" title={drum.adres_dostawy}>{drum.adres_dostawy}</div>}
+                </>
+              ) : 'Brak danych'}
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center mt-1">
+            <span className="text-sm text-gray-500">Numer faktury</span>
+            <span className="text-sm font-medium text-gray-900" title={drum.numer_faktury}>{drum.numer_faktury || 'Brak danych'}</span>
+          </div>
         </div>
 
         <div className="mt-4 pt-4 border-t border-gray-200">
@@ -233,7 +250,7 @@ const DrumsList = ({ user }) => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
-                  placeholder="Szukaj po kodzie lub nazwie bębna..."
+                  placeholder="Szukaj po kodzie, nazwie, adresie lub nr faktury..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
