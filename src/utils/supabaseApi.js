@@ -156,8 +156,8 @@ export const drumsAPI = {
 
       // Filtrowanie po wyszukiwaniu - PRIORYTET DLA CECHY
       if (search) {
-        // Zabezpieczenie przed spacjami i znakami specjalnymi w wyszukiwaniu
-        const safeSearch = `"%${search.replace(/"/g, '""')}%"`;
+        // PostgREST `ilike` z `or`: bezpieczniej przekazać surowy search, Supabase zepnie go przez URL encoding 
+        const safeSearch = `%${search}%`;
         query = query.or(`cecha.ilike.${safeSearch},kod_bebna.ilike.${safeSearch},nazwa.ilike.${safeSearch},pelna_nazwa_kontrahenta.ilike.${safeSearch},adres_dostawy.ilike.${safeSearch},nazwa_punktu_dostawy.ilike.${safeSearch},numer_faktury.ilike.${safeSearch}`);
       }
 
