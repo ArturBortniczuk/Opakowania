@@ -830,7 +830,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-8 items-stretch">
               {drumsData.data.map((drum, index) => (
-                <DrumCard key={drum.kod_bebna || index} drum={drum} index={index} />
+                <DrumCard key={drum.id || drum.cecha || index} drum={drum} index={index} />
               ))}
             </div>
 

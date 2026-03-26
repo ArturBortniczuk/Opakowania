@@ -286,7 +286,7 @@ const DrumsList = ({ user }) => {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
               {drums.map((drum, index) => (
-                <DrumCard key={drum.kod_bebna || drum.KOD_BEBNA || index} drum={drum} index={index} />
+                <DrumCard key={drum.id || drum.cecha || index} drum={drum} index={index} />
               ))}
             </div>
 
