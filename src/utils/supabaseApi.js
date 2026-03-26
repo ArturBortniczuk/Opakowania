@@ -146,12 +146,27 @@ export const drumsAPI = {
         query = query.neq('kontrahent', 'Nie wydany');
       }
 
-      // Filtrowanie po statusie (domyślnie ukrywamy 'Lost')
+      // Filtrowanie po wyliczonym statusie (active, due-soon, overdue) zależnym od daty
+      query = query.neq('status', 'Lost'); // Domyślnie NIE pokazuj zagubionych na głównej liście
+
       if (status !== 'all') {
-        query = query.eq('status', status);
-      } else {
-        // Domyślnie NIE pokazuj zagubionych, chyba że explicitly o to poproszono
-        query = query.neq('status', 'Lost');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        // Supabase toleruje daty jako stringi 'YYYY-MM-DD'
+        const todayStr = today.toISOString().split('T')[0];
+
+        const nextWeek = new Date(today);
+        nextWeek.setDate(today.getDate() + 7);
+        const nextWeekStr = nextWeek.toISOString().split('T')[0];
+
+        if (status === 'overdue') {
+          query = query.lt('data_zwrotu_do_dostawcy', todayStr);
+        } else if (status === 'due-soon') {
+          query = query.gte('data_zwrotu_do_dostawcy', todayStr).lte('data_zwrotu_do_dostawcy', nextWeekStr);
+        } else if (status === 'active') {
+          // Aktywne = data zwrotu jest > za tydzień LUB jest to bęben własny (brak daty zwrotu)
+          query = query.or(`data_zwrotu_do_dostawcy.gt.${nextWeekStr},data_zwrotu_do_dostawcy.is.null`);
+        }
       }
 
       // Filtrowanie po wyszukiwaniu - PRIORYTET DLA CECHY
