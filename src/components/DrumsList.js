@@ -135,16 +135,6 @@ const DrumsList = ({ user }) => {
 
         <div className="space-y-3">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Firma</span>
-            <span className="text-sm font-medium text-gray-900 truncate">{company}</span>
-          </div>
-
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">NIP</span>
-            <span className="text-sm font-medium text-gray-900">{nip}</span>
-          </div>
-
-          <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Termin zwrotu</span>
             <span className="text-sm font-medium text-gray-900">
               {returnDate ? new Date(returnDate).toLocaleDateString('pl-PL') : 'Brak danych'}
