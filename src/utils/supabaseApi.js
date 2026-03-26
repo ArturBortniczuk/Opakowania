@@ -156,8 +156,9 @@ export const drumsAPI = {
 
       // Filtrowanie po wyszukiwaniu - PRIORYTET DLA CECHY
       if (search) {
-        // Dodano cecha.ilike.%${search}% jako pierwsze
-        query = query.or(`cecha.ilike.%${search}%,kod_bebna.ilike.%${search}%,nazwa.ilike.%${search}%,pelna_nazwa_kontrahenta.ilike.%${search}%,adres_dostawy.ilike.%${search}%,nazwa_punktu_dostawy.ilike.%${search}%,numer_faktury.ilike.%${search}%`);
+        // Zabezpieczenie przed spacjami i znakami specjalnymi w wyszukiwaniu
+        const safeSearch = `"%${search.replace(/"/g, '""')}%"`;
+        query = query.or(`cecha.ilike.${safeSearch},kod_bebna.ilike.${safeSearch},nazwa.ilike.${safeSearch},pelna_nazwa_kontrahenta.ilike.${safeSearch},adres_dostawy.ilike.${safeSearch},nazwa_punktu_dostawy.ilike.${safeSearch},numer_faktury.ilike.${safeSearch}`);
       }
 
       // Sortowanie

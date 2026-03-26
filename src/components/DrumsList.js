@@ -124,8 +124,8 @@ const DrumsList = ({ user }) => {
               <Package className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h3 className="font-bold text-gray-900 text-lg">{kodBebna}</h3>
-              <p className="text-gray-600 text-sm">{nazwa}</p>
+              <h3 className="font-bold text-gray-900 text-lg">{drum.cecha || kodBebna}</h3>
+              <p className="text-gray-600 text-sm">{drum.cecha ? `${kodBebna} • ${nazwa}` : nazwa}</p>
             </div>
           </div>
           <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.color || 'bg-gray-100 text-gray-600'}`}>
