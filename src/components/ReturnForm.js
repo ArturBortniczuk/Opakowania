@@ -732,7 +732,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
           {/* Navigation Buttons */}
           <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
             <button
-              onClick={() => currentStep === 1 ? onNavigate('dashboard') : handlePrev()}
+              onClick={() => currentStep === 1 ? (onNavigate ? onNavigate('dashboard') : navigate('/dashboard')) : handlePrev()}
               className="px-6 py-3 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition-all duration-200 font-medium"
             >
               {currentStep === 1 ? 'Anuluj' : 'Wstecz'}
