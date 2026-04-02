@@ -2,7 +2,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  Menu, X, Home, Package, Truck, LogOut, Building2, User, Pin, PinOff
+  Menu, X, Home, Package, Truck, LogOut, Building2, User, Pin, PinOff, FileText
 } from 'lucide-react';
 
 const Navbar = ({
@@ -19,6 +19,7 @@ const Navbar = ({
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard', icon: Home },
     { path: '/drums', label: 'Moje bębny', icon: Package },
+    { path: '/my-returns', label: 'Moje zgłoszenia', icon: FileText },
     { path: '/return', label: 'Zgłoś zwrot', icon: Truck }
   ];
 

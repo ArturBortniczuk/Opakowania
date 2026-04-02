@@ -7,6 +7,7 @@ import SetPassword from './components/SetPassword';
 import Dashboard from './components/Dashboard';
 import DrumsList from './components/DrumsList';
 import ReturnForm from './components/ReturnForm';
+import ClientReturnRequests from './components/ClientReturnRequests';
 import AdminDashboard from './components/AdminDashboard';
 import AdminClientsList from './components/AdminClientsList';
 import AdminReturnPeriodsManager from './components/AdminReturnPeriodsManager';
@@ -127,6 +128,11 @@ const App = () => {
           <Route path="/return" element={
             <ProtectedRoute>
               <ReturnForm user={currentUser} />
+            </ProtectedRoute>
+          } />
+          <Route path="/my-returns" element={
+            <ProtectedRoute>
+              <ClientReturnRequests user={currentUser} />
             </ProtectedRoute>
           } />
 
