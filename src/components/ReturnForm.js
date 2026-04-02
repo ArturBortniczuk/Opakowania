@@ -14,7 +14,9 @@ import {
   Package,
   User,
   AlertTriangle,
-  Trash2
+  Trash2,
+  Phone,
+  Search
 } from 'lucide-react';
 import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
 
@@ -28,10 +30,18 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
     return date.toISOString().split('T')[0];
   };
 
+  const getEndDate = (startDateStr) => {
+    const date = new Date(startDateStr);
+    date.setDate(date.getDate() + 7);
+    return date.toISOString().split('T')[0];
+  };
+
   const minDate = getMinDate();
 
   const [formData, setFormData] = useState({
-    collectionDate: minDate,
+    collectionDateStart: minDate,
+    collectionDateEnd: getEndDate(minDate),
+    phoneNumber: '',
     companyName: user.companyName || user.name,
     street: '',
     postalCode: '',
@@ -53,6 +63,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   const [userDrums, setUserDrums] = useState([]);
   const [drumsLoading, setDrumsLoading] = useState(true);
   const [dateWarning, setDateWarning] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Pobierz bębny użytkownika
   useEffect(() => {
@@ -99,7 +110,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   }, [user?.nip]);
 
   // Obsługa zmiany daty z ostrzeżeniem
-  const handleDateChange = (e) => {
+  const handleStartDateChange = (e) => {
     const newDate = e.target.value;
     const selectedDate = new Date(newDate);
     const minAllowedDate = new Date(minDate);
@@ -111,7 +122,20 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
       setDateWarning(false);
     }
 
-    setFormData(prev => ({ ...prev, collectionDate: newDate }));
+    const newEndDateStr = getEndDate(newDate);
+    const currentEndDate = new Date(formData.collectionDateEnd);
+    const minEndDate = new Date(newEndDateStr);
+    
+    if (currentEndDate < minEndDate) {
+      setFormData(prev => ({ ...prev, collectionDateStart: newDate, collectionDateEnd: newEndDateStr }));
+    } else {
+      setFormData(prev => ({ ...prev, collectionDateStart: newDate }));
+    }
+  };
+
+  const handleEndDateChange = (e) => {
+    const newDate = e.target.value;
+    setFormData(prev => ({ ...prev, collectionDateEnd: newDate }));
   };
 
   const steps = [
@@ -125,11 +149,11 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   const validateStep = (step) => {
     switch (step) {
       case 1:
-        return formData.collectionDate && formData.companyName;
+        return formData.collectionDateStart && formData.collectionDateEnd && formData.companyName;
       case 2:
         return formData.street.trim() && formData.postalCode.trim() && formData.city.trim();
       case 3:
-        return formData.email.trim() && formData.loadingHours.trim();
+        return formData.email.trim() && formData.phoneNumber.trim() && formData.loadingHours.trim();
       case 4:
         return formData.selectedDrums.length > 0;
       case 5:
@@ -155,17 +179,19 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
     setLoading(true);
     try {
       // Przygotuj dane do wysłania
+      const notesWithPhoneAndDates = `Sugerowany termin zwrotu: od ${formData.collectionDateStart} do ${formData.collectionDateEnd}\nTelefon kontaktowy: ${formData.phoneNumber}\n\n${formData.notes || ''}`;
+
       const returnData = {
         user_nip: user.nip,
         company_name: formData.companyName,
-        collection_date: formData.collectionDate,
+        collection_date: formData.collectionDateStart, // Używamy daty początkowej dla sortowania w bazie
         street: formData.street,
         postal_code: formData.postalCode,
         city: formData.city,
         email: formData.email,
         loading_hours: formData.loadingHours,
         available_equipment: formData.availableEquipment,
-        notes: formData.notes,
+        notes: notesWithPhoneAndDates,
         selected_drums: formData.selectedDrums // Teraz to tablica obiektów
       };
 
@@ -275,28 +301,35 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Calendar className="inline w-4 h-4 mr-2" />
-                  Data odbioru *
+                  Sugerowany termin zwrotu (Od - Do) *
                 </label>
                 <div className="space-y-2">
-                  <input
-                    type="date"
-                    value={formData.collectionDate}
-                    onChange={handleDateChange}
-                    // Info: nie blokujemy "na sztywno" w HTML5 min, ale walidujemy
-                    // min={minDate} 
-                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white ${dateWarning ? 'border-yellow-400 bg-yellow-50' : 'border-gray-300'
-                      }`}
-                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input
+                      type="date"
+                      value={formData.collectionDateStart}
+                      onChange={handleStartDateChange}
+                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white ${dateWarning ? 'border-yellow-400 bg-yellow-50' : 'border-gray-300'
+                        }`}
+                    />
+                    <input
+                      type="date"
+                      value={formData.collectionDateEnd}
+                      onChange={handleEndDateChange}
+                      min={getEndDate(formData.collectionDateStart)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                    />
+                  </div>
                   {dateWarning && (
                     <div className="flex items-start space-x-2 text-yellow-700 text-sm bg-yellow-50 p-3 rounded-lg border border-yellow-200">
                       <AlertTriangle className="w-5 h-5 flex-shrink-0" />
                       <span>
-                        Wybrana data jest krótsza niż zalecane 7 dni. Może to wpłynąć na terminowość odbioru.
+                        Wybrana data początkowa jest krótsza niż zalecane 7 dni od dzisiaj. Może to wpłynąć na terminowość odbioru.
                       </span>
                     </div>
                   )}
                   <p className="text-xs text-gray-500">
-                    Zalecany termin odbioru to minimum 7 dni od daty zgłoszenia.
+                    Zalecany przedział to minimum 7 dni od daty początkowej.
                   </p>
                 </div>
               </div>
@@ -383,7 +416,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
             </div>
 
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <Mail className="inline w-4 h-4 mr-2" />
@@ -395,6 +428,20 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                     onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
                     placeholder="kontakt@firma.pl"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Phone className="inline w-4 h-4 mr-2" />
+                    Telefon kontaktowy *
+                  </label>
+                  <input
+                    type="tel"
+                    value={formData.phoneNumber}
+                    onChange={(e) => setFormData(prev => ({ ...prev, phoneNumber: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                    placeholder="np. +48 123 456 789"
                   />
                 </div>
 
@@ -475,8 +522,23 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                 <p className="text-gray-600">Brak dostępnych bębnów do zwrotu</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto">
-                {userDrums.map((drum, index) => {
+              <>
+                <div className="mb-4 relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Wyszukaj bęben (po cesze, nazwie, kodzie)..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto">
+                  {userDrums.filter(d => 
+                    d.cecha?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                    d.nazwa?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    d.kod_bebna?.toLowerCase().includes(searchQuery.toLowerCase())
+                  ).map((drum, index) => {
                   const drumCecha = drum.cecha; // UŻYWAMY CECHY JAKO ID
                   const drumName = drum.nazwa;
                   const returnDate = drum.data_zwrotu_do_dostawcy;
@@ -557,6 +619,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                   );
                 })}
               </div>
+              </>
             )}
           </div>
         );
@@ -573,10 +636,14 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
             <div className="bg-gray-50 rounded-xl p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-500">Data odbioru</p>
+                  <p className="text-sm text-gray-500">Sugerowany okres</p>
                   <p className="font-medium text-gray-900">
-                    {new Date(formData.collectionDate).toLocaleDateString('pl-PL')}
+                    {new Date(formData.collectionDateStart).toLocaleDateString('pl-PL')} - {new Date(formData.collectionDateEnd).toLocaleDateString('pl-PL')}
                   </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Telefon</p>
+                  <p className="font-medium text-gray-900">{formData.phoneNumber}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Firma</p>
