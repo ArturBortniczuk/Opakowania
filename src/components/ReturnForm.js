@@ -18,9 +18,11 @@ import {
   Phone,
   Search
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
 
 const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
 
   // Oblicz minimalną datę (dzisiaj + 7 dni)
@@ -199,7 +201,11 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
       await returnsAPI.createReturn(returnData);
 
       setLoading(false);
-      onSubmit();
+      if (onSubmit) {
+        onSubmit();
+      } else {
+        navigate('/my-returns');
+      }
     } catch (err) {
       console.error('Błąd podczas wysyłania zgłoszenia:', err);
       setLoading(false);
