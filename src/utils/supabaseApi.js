@@ -223,7 +223,7 @@ export const drumsAPI = {
         const returnPeriodDays = drum.companies?.custom_return_periods?.[0]?.return_period_days || 120;
         const statusObj = supabaseHelpers.getDrumStatus(finalReturnDate);
         const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
-        const daysInPossession = returnPeriodDays;
+        const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
 
         const clientReturnDeadline = new Date(issueDate);
         if (!isNaN(clientReturnDeadline.getTime())) {
@@ -378,7 +378,7 @@ export const drumsAPI = {
         // Obliczamy STATUS TERMINOWY
         const statusObj = supabaseHelpers.getDrumStatus(finalReturnDate);
         const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
-        const daysInPossession = returnPeriodDays;
+        const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
 
         const clientReturnDeadline = new Date(issueDate);
         if (!isNaN(clientReturnDeadline.getTime())) {

@@ -571,7 +571,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Dni na zwrot (posiadanie)</span>
+                  <span className="text-gray-600">Dni w posiadaniu</span>
                   <span className="font-medium">{selectedDrum.daysInPossession} dni</span>
                 </div>
               </div>

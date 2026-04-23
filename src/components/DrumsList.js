@@ -109,7 +109,7 @@ const DrumsList = ({ user }) => {
   const DrumCard = ({ drum, index }) => {
     const kodBebna = drum.kod_bebna || drum.KOD_BEBNA;
     const nazwa = drum.nazwa || drum.NAZWA;
-    const returnDate = drum.data_zwrotu_do_dostawcy || drum.DATA_ZWROTU_DO_DOSTAWCY;
+    const returnDate = drum.clientReturnDeadline || drum.data_zwrotu_do_dostawcy;
     const company = drum.company || drum.pelna_nazwa_kontrahenta;
     const nip = drum.nip || drum.NIP;
 

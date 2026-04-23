@@ -26,7 +26,7 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
   const [editingPeriod, setEditingPeriod] = useState('');
   const [showAddNew, setShowAddNew] = useState(false);
   const [newClientNip, setNewClientNip] = useState('');
-  const [newPeriod, setNewPeriod] = useState('85');
+  const [newPeriod, setNewPeriod] = useState('120');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -76,7 +76,7 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
         ...client,
         currentReturnPeriod: currentPeriod,
         hasCustomPeriod,
-        isDefault: currentPeriod === 85
+        isDefault: currentPeriod === 120
       };
     });
   }, [companies, returnPeriods]);
@@ -160,7 +160,7 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
       
       setShowAddNew(false);
       setNewClientNip('');
-      setNewPeriod('85');
+      setNewPeriod('120');
       
     } catch (error) {
       console.error('Błąd podczas dodawania:', error);
@@ -170,27 +170,6 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
     }
   };
 
-  const resetToDefault = async (clientNip) => {
-    if (!window.confirm('Czy na pewno chcesz przywrócić domyślny termin 85 dni?')) return;
-    
-    setSaving(true);
-    setError(null);
-    
-    try {
-      // Usuń niestandardowy termin (przywróć domyślny)
-      await returnPeriodsAPI.updateReturnPeriod(clientNip, 85);
-      
-      // Odśwież dane
-      const updatedPeriods = await returnPeriodsAPI.getReturnPeriods();
-      setReturnPeriods(updatedPeriods);
-      
-    } catch (error) {
-      console.error('Błąd podczas resetowania:', error);
-      setError('Wystąpił błąd. Spróbuj ponownie.');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const refreshData = async () => {
     setLoading(true);
@@ -218,13 +197,13 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
       return (
         <span className="inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
           <Clock className="w-3 h-3" />
-          <span className="hidden sm:inline">Domyślny (85 dni)</span>
-          <span className="sm:hidden">85 dni</span>
+          <span className="hidden sm:inline">Domyślny (120 dni)</span>
+          <span className="sm:hidden">120 dni</span>
         </span>
       );
     }
     
-    const isExtended = client.currentReturnPeriod > 85;
+    const isExtended = client.currentReturnPeriod > 120;
     return (
       <span className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium border ${
         isExtended 
@@ -321,18 +300,7 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
         </div>
       </div>
 
-      {!client.isDefault && (
-        <div className="mt-auto pt-4 border-t border-gray-100">
-          <button
-            onClick={() => resetToDefault(client.nip)}
-            disabled={saving}
-            className="w-full px-3 py-2 text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2 disabled:opacity-50"
-          >
-            <RotateCcw className="w-3 h-3" />
-            <span>Przywróć domyślny (85 dni)</span>
-          </button>
-        </div>
-      )}
+
     </div>
   );
 
@@ -389,7 +357,7 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
               <div className="text-sm text-blue-800">
                 <p className="font-medium mb-1">Informacje o terminach zwrotu:</p>
                 <ul className="space-y-1">
-                  <li>• Domyślny termin zwrotu to <strong>85 dni</strong> od daty wydania bębna</li>
+                  <li>• Domyślny termin zwrotu to <strong>120 dni</strong> od daty wydania bębna</li>
                   <li>• Możesz ustawić niestandardowe terminy dla konkretnych klientów</li>
                   <li>• Terminy można ustawiać w zakresie od 1 do 365 dni</li>
                   <li>• Zmiany wchodzą w życie natychmiast dla nowych bębnów</li>
@@ -472,7 +440,7 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
                   onClick={() => {
                     setShowAddNew(false);
                     setNewClientNip('');
-                    setNewPeriod('85');
+                    setNewPeriod('120');
                     setError(null);
                   }}
                   disabled={saving}
