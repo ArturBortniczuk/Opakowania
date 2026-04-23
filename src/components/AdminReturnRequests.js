@@ -1,5 +1,5 @@
-// src/components/AdminReturnRequests.js - Zaktualizowany o obsługę CECHY i USZKODZEŃ
 import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { returnsAPI, companiesAPI } from '../utils/supabaseApi';
 import {
   Truck,
@@ -25,10 +25,15 @@ import {
 } from 'lucide-react';
 
 const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+  const location = useLocation();
+  const routerState = location.state || {};
+  
+  const initialSearch = routerState.searchTerm || routerState.clientNip || '';
+  
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
-  const [filterStatus, setFilterStatus] = useState((initialFilter && initialFilter.status) || 'all');
+  const [filterStatus, setFilterStatus] = useState(routerState.filterStatus || (initialFilter && initialFilter.status) || 'all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showRequestDetails, setShowRequestDetails] = useState(false);
@@ -74,6 +79,18 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
 
     fetchData();
   }, []);
+
+  // DODANE: Auto-otwieranie modala zgłoszenia
+  useEffect(() => {
+    if (location.state?.openModal && location.state?.searchTerm && !loading && !showRequestDetails && requests.length > 0) {
+      const targetId = parseInt(location.state.searchTerm, 10);
+      const targetRequest = requests.find(r => r.id === targetId || r.company_name === location.state.searchTerm);
+      if (targetRequest) {
+        setSelectedRequest(targetRequest);
+        setShowRequestDetails(true);
+      }
+    }
+  }, [requests, location.state, loading, showRequestDetails]);
 
   const enrichedRequests = useMemo(() => {
     return requests.map(request => {

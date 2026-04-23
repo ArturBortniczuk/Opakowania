@@ -141,7 +141,7 @@ const App = () => {
             <ProtectedRoute adminOnly>
               <AdminDashboard
                 user={currentUser}
-                onNavigate={(page) => {
+                onNavigate={(page, state) => {
                   const routes = {
                     'admin-clients': '/admin/clients',
                     'admin-drums': '/admin/drums',
@@ -149,7 +149,7 @@ const App = () => {
                     'admin-return-periods': '/admin/return-periods',
                     'admin-reports': '/admin/reports'
                   };
-                  if (routes[page]) navigate(routes[page]);
+                  if (routes[page]) navigate(routes[page], { state });
                 }}
               />
             </ProtectedRoute>

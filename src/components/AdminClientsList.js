@@ -87,6 +87,17 @@ const AdminClientsList = ({ onNavigate }) => {
     fetchClientsData();
   }, []);
 
+  // DODANE: Auto-otwieranie modala klienta
+  useEffect(() => {
+    if (location.state?.openModal && location.state?.clientNip && !loading && !showClientDetails && clients.length > 0) {
+      const targetClient = clients.find(c => c.nip === location.state.clientNip);
+      if (targetClient) {
+        setSelectedClient(targetClient);
+        setShowClientDetails(true);
+      }
+    }
+  }, [clients, location.state, loading, showClientDetails]);
+
   const filteredAndSortedClients = useMemo(() => {
     let filtered = clients.filter(client => {
       const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

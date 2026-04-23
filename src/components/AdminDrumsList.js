@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { drumsAPI, companiesAPI } from '../utils/supabaseApi';
 import {
   Package,
@@ -27,12 +27,22 @@ import {
 
 const AdminDrumsList = ({ initialFilter = {} }) => {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [localSearchTerm, setLocalSearchTerm] = useState(''); // DODANE: Lokalny stan dla inputa
+  const location = useLocation();
+
+  const routerState = location.state || {};
+  const initialSearch = routerState.searchTerm || initialFilter.searchTerm || '';
+
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const [localSearchTerm, setLocalSearchTerm] = useState(initialSearch); // DODANE: Lokalny stan dla inputa
   const [sortBy, setSortBy] = useState('cecha');
   const [sortOrder, setSortOrder] = useState('asc');
-  const [filterStatus, setFilterStatus] = useState((initialFilter && initialFilter.clientNip) ? 'client' : 'all');
-  const [filterClient, setFilterClient] = useState((initialFilter && initialFilter.clientNip) || '');
+  
+  const initialClient = routerState.clientNip || (initialFilter && initialFilter.clientNip) || '';
+  const initialStatus = routerState.filterStatus || ((initialFilter && initialFilter.clientNip) ? 'client' : 'all');
+  
+  const [filterStatus, setFilterStatus] = useState(initialStatus);
+  const [filterClient, setFilterClient] = useState(initialClient);
+
   const [filterDateRange, setFilterDateRange] = useState('all');
   const [selectedDrum, setSelectedDrum] = useState(null);
   const [showDrumDetails, setShowDrumDetails] = useState(false);
@@ -128,6 +138,21 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
       }
     }
   }, [initialFilter]);
+
+  // DODANE: Auto-otwieranie modala
+  useEffect(() => {
+    const routerState = location.state || {};
+    if (routerState.openModal && routerState.searchTerm && !loading && !showDrumDetails && drumsData.data.length > 0) {
+      const targetDrum = drumsData.data.find(d => 
+        d.kod_bebna === routerState.searchTerm || 
+        d.cecha === routerState.searchTerm
+      );
+      if (targetDrum) {
+        setSelectedDrum(targetDrum);
+        setShowDrumDetails(true);
+      }
+    }
+  }, [drumsData.data, location.state, loading, showDrumDetails]);
 
   // DODANE: Funkcje nawigacji po stronach
   const goToPage = (page) => {

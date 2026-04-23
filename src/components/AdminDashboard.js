@@ -86,7 +86,8 @@ const AdminDashboard = ({ onNavigate }) => {
         time: getTimeAgo(ret.created_at),
         icon: Truck,
         color: 'text-blue-600',
-        priority: ret.priority === 'High' ? 'high' : 'normal'
+        priority: ret.priority === 'High' ? 'high' : 'normal',
+        action: () => onNavigate('admin-returns', { searchTerm: ret.company_name })
       });
     });
 
@@ -104,7 +105,8 @@ const AdminDashboard = ({ onNavigate }) => {
         time: getTimeAgo(drum.data_zwrotu_do_dostawcy),
         icon: AlertTriangle,
         color: 'text-red-600',
-        priority: 'high'
+        priority: 'high',
+        action: () => onNavigate('admin-drums', { searchTerm: drum.kod_bebna, openModal: true })
       });
     });
 
@@ -119,7 +121,8 @@ const AdminDashboard = ({ onNavigate }) => {
         time: getTimeAgo(latest.updated_at || latest.created_at),
         icon: CheckCircle,
         color: 'text-green-600',
-        priority: 'normal'
+        priority: 'normal',
+        action: () => onNavigate('admin-returns', { searchTerm: latest.company_name })
       });
     }
 
@@ -152,7 +155,8 @@ const AdminDashboard = ({ onNavigate }) => {
           title: `Przekroczony termin: ${drum.kod_bebna}`,
           subtitle: drum.PELNA_NAZWA_KONTRAHENTA || 'Nieznana firma',
           priority: 'high',
-          action: () => onNavigate('admin-drums')
+          action: () => onNavigate('admin-drums', { searchTerm: drum.kod_bebna, openModal: true }),
+          clientAction: drum.nip ? () => onNavigate('admin-clients', { clientNip: drum.nip, openModal: true }) : null
         });
       }
     });
@@ -165,7 +169,8 @@ const AdminDashboard = ({ onNavigate }) => {
           title: `Pilne zgłoszenie #${request.id}`,
           subtitle: request.company_name,
           priority: 'high',
-          action: () => onNavigate('admin-returns')
+          action: () => onNavigate('admin-returns', { searchTerm: request.id.toString(), openModal: true }),
+          clientAction: request.user_nip ? () => onNavigate('admin-clients', { clientNip: request.user_nip, openModal: true }) : null
         });
       }
     });
@@ -220,9 +225,11 @@ const AdminDashboard = ({ onNavigate }) => {
   const ActivityItem = ({ activity }) => {
     const Icon = activity.icon;
     return (
-      <div className={`flex items-start space-x-3 p-3 rounded-lg transition-colors duration-200 ${
+      <div 
+        onClick={activity.action}
+        className={`flex items-start space-x-3 p-3 rounded-lg transition-colors duration-200 ${
         activity.priority === 'high' ? 'hover:bg-red-50' : 'hover:bg-blue-50'
-      }`}>
+      } ${activity.action ? 'cursor-pointer' : ''}`}>
         <div className={`p-2 rounded-lg ${
           activity.priority === 'high' ? 'bg-red-100' : 'bg-gray-100'
         }`}>
@@ -492,10 +499,13 @@ const AdminDashboard = ({ onNavigate }) => {
                 
                 <div className="space-y-3">
                   {urgentItems.map((item, index) => (
-                    <div key={index} className="p-3 bg-red-50 rounded-lg border border-red-200 cursor-pointer hover:bg-red-100 transition-colors duration-200"
-                         onClick={item.action}>
-                      <h4 className="text-sm font-medium text-red-900">{item.title}</h4>
-                      <p className="text-xs text-red-600">{item.subtitle}</p>
+                    <div key={index} className="p-3 bg-red-50 rounded-lg border border-red-200 hover:bg-red-100 transition-colors duration-200">
+                      <div className="cursor-pointer" onClick={item.action}>
+                        <h4 className="text-sm font-medium text-red-900">{item.title}</h4>
+                      </div>
+                      <div className={`mt-1 ${item.clientAction ? 'cursor-pointer hover:underline text-red-700' : 'text-red-600'}`} onClick={item.clientAction || undefined}>
+                        <p className="text-xs">{item.subtitle}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
