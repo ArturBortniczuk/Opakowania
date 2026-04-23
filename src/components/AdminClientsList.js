@@ -1,6 +1,6 @@
 // src/components/AdminClientsList.js - Zaktualizowany o prawdziwe dane
 import React, { useState, useMemo, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { companiesAPI, drumsAPI, returnsAPI } from '../utils/supabaseApi';
 import {
   Users,
@@ -24,8 +24,11 @@ import {
 } from 'lucide-react';
 
 const AdminClientsList = ({ onNavigate }) => {
-  const location = useLocation();
-  const [searchTerm, setSearchTerm] = useState(location.state?.clientNip || '');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlClientNip = searchParams.get('clientNip');
+  const urlOpenModal = searchParams.get('openModal') === 'true';
+
+  const [searchTerm, setSearchTerm] = useState(urlClientNip || '');
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -89,14 +92,23 @@ const AdminClientsList = ({ onNavigate }) => {
 
   // DODANE: Auto-otwieranie modala klienta
   useEffect(() => {
-    if (location.state?.openModal && location.state?.clientNip && !loading && !showClientDetails && clients.length > 0) {
-      const targetClient = clients.find(c => c.nip === location.state.clientNip);
+    if (urlOpenModal && urlClientNip && !loading && !showClientDetails && clients.length > 0) {
+      const targetClient = clients.find(c => c.nip === urlClientNip);
       if (targetClient) {
         setSelectedClient(targetClient);
         setShowClientDetails(true);
       }
     }
-  }, [clients, location.state, loading, showClientDetails]);
+  }, [clients, urlOpenModal, urlClientNip, loading, showClientDetails]);
+
+  const handleCloseModal = () => {
+    setShowClientDetails(false);
+    if (urlOpenModal) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('openModal');
+      setSearchParams(newParams);
+    }
+  };
 
   const filteredAndSortedClients = useMemo(() => {
     let filtered = clients.filter(client => {
@@ -312,7 +324,7 @@ const AdminClientsList = ({ onNavigate }) => {
     return (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-        onClick={() => setShowClientDetails(false)}
+        onClick={handleCloseModal}
       >
         <div
           className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
@@ -322,7 +334,7 @@ const AdminClientsList = ({ onNavigate }) => {
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900">Szczegóły klienta</h2>
               <button
-                onClick={() => setShowClientDetails(false)}
+                onClick={handleCloseModal}
                 className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
               >
                 ✕
@@ -388,7 +400,7 @@ const AdminClientsList = ({ onNavigate }) => {
             <div className="flex space-x-4">
               <button
                 onClick={() => {
-                  setShowClientDetails(false);
+                  handleCloseModal();
                   onNavigate('admin-drums', { clientNip: selectedClient.nip });
                 }}
                 className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200"
@@ -397,7 +409,7 @@ const AdminClientsList = ({ onNavigate }) => {
               </button>
               <button
                 onClick={() => {
-                  setShowClientDetails(false);
+                  handleCloseModal();
                   onNavigate('admin-returns', { clientNip: selectedClient.nip });
                 }}
                 className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-xl font-medium hover:bg-gray-700 transition-colors duration-200"

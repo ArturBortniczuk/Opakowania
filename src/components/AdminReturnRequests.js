@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { returnsAPI, companiesAPI } from '../utils/supabaseApi';
 import {
   Truck,
@@ -25,15 +25,18 @@ import {
 } from 'lucide-react';
 
 const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
-  const location = useLocation();
-  const routerState = location.state || {};
-  
-  const initialSearch = routerState.searchTerm || routerState.clientNip || '';
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlSearchTerm = searchParams.get('searchTerm');
+  const urlClientNip = searchParams.get('clientNip');
+  const urlOpenModal = searchParams.get('openModal') === 'true';
+  const urlFilterStatus = searchParams.get('filterStatus');
+
+  const initialSearch = urlSearchTerm || urlClientNip || '';
   
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
-  const [filterStatus, setFilterStatus] = useState(routerState.filterStatus || (initialFilter && initialFilter.status) || 'all');
+  const [filterStatus, setFilterStatus] = useState(urlFilterStatus || (initialFilter && initialFilter.status) || 'all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showRequestDetails, setShowRequestDetails] = useState(false);
@@ -82,15 +85,24 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
 
   // DODANE: Auto-otwieranie modala zgłoszenia
   useEffect(() => {
-    if (location.state?.openModal && location.state?.searchTerm && !loading && !showRequestDetails && requests.length > 0) {
-      const targetId = parseInt(location.state.searchTerm, 10);
-      const targetRequest = requests.find(r => r.id === targetId || r.company_name === location.state.searchTerm);
+    if (urlOpenModal && urlSearchTerm && !loading && !showRequestDetails && requests.length > 0) {
+      const targetId = parseInt(urlSearchTerm, 10);
+      const targetRequest = requests.find(r => r.id === targetId || r.company_name === urlSearchTerm);
       if (targetRequest) {
         setSelectedRequest(targetRequest);
         setShowRequestDetails(true);
       }
     }
-  }, [requests, location.state, loading, showRequestDetails]);
+  }, [requests, urlOpenModal, urlSearchTerm, loading, showRequestDetails]);
+
+  const handleCloseModal = () => {
+    setShowRequestDetails(false);
+    if (urlOpenModal) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('openModal');
+      setSearchParams(newParams);
+    }
+  };
 
   const enrichedRequests = useMemo(() => {
     return requests.map(request => {
@@ -417,7 +429,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
     return (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-        onClick={() => setShowRequestDetails(false)}
+        onClick={handleCloseModal}
       >
         <div
           className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
@@ -433,7 +445,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                 </div>
               </div>
               <button
-                onClick={() => setShowRequestDetails(false)}
+                onClick={handleCloseModal}
                 className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
               >
                 ✕
@@ -566,7 +578,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                   <button
                     onClick={() => {
                       handleStatusChange(selectedRequest.id, 'Approved');
-                      setShowRequestDetails(false);
+                      handleCloseModal();
                     }}
                     className="flex-1 bg-green-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-green-700 transition-colors duration-200 flex items-center justify-center space-x-2"
                   >
@@ -577,7 +589,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                   <button
                     onClick={() => {
                       handleStatusChange(selectedRequest.id, 'Rejected');
-                      setShowRequestDetails(false);
+                      handleCloseModal();
                     }}
                     className="flex-1 bg-red-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-red-700 transition-colors duration-200 flex items-center justify-center space-x-2"
                   >
@@ -591,7 +603,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                 <button
                   onClick={() => {
                     handleStatusChange(selectedRequest.id, 'Completed');
-                    setShowRequestDetails(false);
+                    handleCloseModal();
                   }}
                   className="flex-1 bg-green-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-green-700 transition-colors duration-200 flex items-center justify-center space-x-2"
                 >
@@ -602,7 +614,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
 
               <button
                 onClick={() => {
-                  setShowRequestDetails(false);
+                  handleCloseModal();
                   onNavigate('admin-clients');
                 }}
                 className="flex-1 bg-gray-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-gray-700 transition-colors duration-200 flex items-center justify-center space-x-2"

@@ -149,7 +149,17 @@ const App = () => {
                     'admin-return-periods': '/admin/return-periods',
                     'admin-reports': '/admin/reports'
                   };
-                  if (routes[page]) navigate(routes[page], { state });
+                  if (routes[page]) {
+                    if (state && Object.keys(state).length > 0) {
+                      const params = new URLSearchParams();
+                      Object.entries(state).forEach(([k, v]) => {
+                        if(v !== undefined && v !== null) params.append(k, v);
+                      });
+                      navigate(`${routes[page]}?${params.toString()}`);
+                    } else {
+                      navigate(routes[page]);
+                    }
+                  }
                 }}
               />
             </ProtectedRoute>
@@ -166,7 +176,17 @@ const App = () => {
                     'admin-return-periods': '/admin/return-periods',
                     'admin-reports': '/admin/reports'
                   };
-                  if (routes[page]) navigate(routes[page], { state });
+                  if (routes[page]) {
+                    if (state && Object.keys(state).length > 0) {
+                      const params = new URLSearchParams();
+                      Object.entries(state).forEach(([k, v]) => {
+                        if(v !== undefined && v !== null) params.append(k, v);
+                      });
+                      navigate(`${routes[page]}?${params.toString()}`);
+                    } else {
+                      navigate(routes[page]);
+                    }
+                  }
                 }}
               />
             </ProtectedRoute>

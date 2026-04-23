@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { drumsAPI, companiesAPI } from '../utils/supabaseApi';
 import {
   Package,
@@ -27,18 +27,22 @@ import {
 
 const AdminDrumsList = ({ initialFilter = {} }) => {
   const navigate = useNavigate();
-  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const routerState = location.state || {};
-  const initialSearch = routerState.searchTerm || initialFilter.searchTerm || '';
+  const urlSearchTerm = searchParams.get('searchTerm');
+  const urlOpenModal = searchParams.get('openModal') === 'true';
+  const urlClientNip = searchParams.get('clientNip');
+  const urlFilterStatus = searchParams.get('filterStatus');
+
+  const initialSearch = urlSearchTerm || initialFilter.searchTerm || '';
 
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [localSearchTerm, setLocalSearchTerm] = useState(initialSearch); // DODANE: Lokalny stan dla inputa
   const [sortBy, setSortBy] = useState('cecha');
   const [sortOrder, setSortOrder] = useState('asc');
   
-  const initialClient = routerState.clientNip || (initialFilter && initialFilter.clientNip) || '';
-  const initialStatus = routerState.filterStatus || ((initialFilter && initialFilter.clientNip) ? 'client' : 'all');
+  const initialClient = urlClientNip || (initialFilter && initialFilter.clientNip) || '';
+  const initialStatus = urlFilterStatus || ((initialFilter && initialFilter.clientNip) || urlClientNip ? 'client' : 'all');
   
   const [filterStatus, setFilterStatus] = useState(initialStatus);
   const [filterClient, setFilterClient] = useState(initialClient);
@@ -141,18 +145,26 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
 
   // DODANE: Auto-otwieranie modala
   useEffect(() => {
-    const routerState = location.state || {};
-    if (routerState.openModal && routerState.searchTerm && !loading && !showDrumDetails && drumsData.data.length > 0) {
+    if (urlOpenModal && urlSearchTerm && !loading && !showDrumDetails && drumsData.data.length > 0) {
       const targetDrum = drumsData.data.find(d => 
-        d.kod_bebna === routerState.searchTerm || 
-        d.cecha === routerState.searchTerm
+        d.kod_bebna === urlSearchTerm || 
+        d.cecha === urlSearchTerm
       );
       if (targetDrum) {
         setSelectedDrum(targetDrum);
         setShowDrumDetails(true);
       }
     }
-  }, [drumsData.data, location.state, loading, showDrumDetails]);
+  }, [drumsData.data, urlOpenModal, urlSearchTerm, loading, showDrumDetails]);
+
+  const handleCloseModal = () => {
+    setShowDrumDetails(false);
+    if (urlOpenModal) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('openModal');
+      setSearchParams(newParams);
+    }
+  };
 
   // DODANE: Funkcje nawigacji po stronach
   const goToPage = (page) => {
@@ -432,7 +444,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         </button>
 
         <button
-          onClick={() => navigate('/admin/clients', { state: { clientNip: drum.nip } })}
+          onClick={() => navigate(`/admin/clients?clientNip=${drum.nip}`)}
           className="bg-gray-100 text-gray-700 py-2 px-3 rounded-xl font-medium hover:bg-gray-200 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
         >
           <Building2 className="w-4 h-4" />
@@ -458,7 +470,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     return (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-        onClick={() => setShowDrumDetails(false)} // DODANE: Zamykanie po kliknięciu w tło
+        onClick={handleCloseModal} // DODANE: Zamykanie po kliknięciu w tło
       >
         <div
           className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
@@ -468,7 +480,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900">Szczegóły bębna {selectedDrum.cecha || selectedDrum.kod_bebna}</h2>
               <button
-                onClick={() => setShowDrumDetails(false)}
+                onClick={handleCloseModal}
                 className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
               >
                 ✕
