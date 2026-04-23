@@ -126,13 +126,14 @@ export const drumsAPI = {
       const {
         page = 1,
         limit = 100,
-        sortBy = 'cecha', // ZMIANA: Domyślne sortowanie po 'cecha'
+        sortBy = 'cecha',
         sortOrder = 'asc',
         search = '',
-        status = 'all'
+        status = 'all',
+        dateRange = 'all'
       } = options;
 
-      console.log(`🔄 getDrums wywołane z: nip=${nip}, page=${page}, limit=${limit}, search="${search}"`);
+      console.log(`🔄 getDrums wywołane z: nip=${nip}, page=${page}, search="${search}", status=${status}, date=${dateRange}`);
 
       // Podstawowe zapytanie
       let query = supabase
@@ -146,24 +147,39 @@ export const drumsAPI = {
         query = query.neq('kontrahent', 'Nie wydany');
       }
 
-      // Filtrowanie po wyliczonym statusie (active, due-soon, overdue) zależnym od daty
-      query = query.neq('status', 'Lost'); // Domyślnie NIE pokazuj zagubionych na głównej liście
+      // 1. Filtrowanie po Statusie Bębna (status = dbStatus)
+      if (status === 'zagubione') {
+        query = query.eq('status', 'Lost');
+      } else {
+        query = query.neq('status', 'Lost'); // Domyślnie NIE pokazuj zagubionych na głównej liście
 
-      if (status !== 'all') {
+        if (status === 'magazyn') {
+          // Bębny na magazynie (Nie wydane)
+          query = query.or('kontrahent.eq.Nie wydany,kontrahent.ilike.%magazyn%');
+        } else if (status === 'wydane') {
+          // Wydane u klientów (Z pominięciem własnych/nie wydanych)
+          query = query.neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%');
+        }
+      }
+
+      // 2. Filtrowanie po Terminie (dateRange)
+      if (dateRange !== 'all') {
+        // Tylko dla bębnów 'wydanych' ma sens filtr terminu w głównej mierze
+        query = query.neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%');
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        // Supabase toleruje daty jako stringi 'YYYY-MM-DD'
         const todayStr = today.toISOString().split('T')[0];
 
         const nextWeek = new Date(today);
         nextWeek.setDate(today.getDate() + 7);
         const nextWeekStr = nextWeek.toISOString().split('T')[0];
 
-        if (status === 'overdue') {
+        if (dateRange === 'overdue') {
           query = query.lt('data_zwrotu_do_dostawcy', todayStr);
-        } else if (status === 'due-soon') {
+        } else if (dateRange === 'due-soon') {
           query = query.gte('data_zwrotu_do_dostawcy', todayStr).lte('data_zwrotu_do_dostawcy', nextWeekStr);
-        } else if (status === 'active') {
+        } else if (dateRange === 'active') {
           // Aktywne = data zwrotu jest > za tydzień LUB jest to bęben własny (brak daty zwrotu)
           query = query.or(`data_zwrotu_do_dostawcy.gt.${nextWeekStr},data_zwrotu_do_dostawcy.is.null`);
         }
@@ -282,6 +298,7 @@ export const drumsAPI = {
           sortOrder,
           search,
           status,
+          dateRange,
           nip
         }
       };

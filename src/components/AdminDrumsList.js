@@ -41,11 +41,9 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
   const [sortBy, setSortBy] = useState('cecha');
   const [sortOrder, setSortOrder] = useState('asc');
   
-  const initialClient = urlClientNip || (initialFilter && initialFilter.clientNip) || '';
-  const initialStatus = urlFilterStatus || ((initialFilter && initialFilter.clientNip) || urlClientNip ? 'client' : 'all');
-  
+  const initialStatus = urlFilterStatus || 'all';
   const [filterStatus, setFilterStatus] = useState(initialStatus);
-  const [filterClient, setFilterClient] = useState(initialClient);
+  const [filterDateRange, setFilterDateRange] = useState('all');
 
   const [filterDateRange, setFilterDateRange] = useState('all');
   const [selectedDrum, setSelectedDrum] = useState(null);
@@ -64,7 +62,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     }
   });
 
-  const [companies, setCompanies] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
@@ -82,6 +80,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         sortOrder,
         search: searchTerm,
         status: filterStatus,
+        dateRange: filterDateRange,
         ...options
       };
 
@@ -100,19 +99,9 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     } finally {
       setLoading(false);
     }
-  }, [sortBy, sortOrder, searchTerm, filterStatus, filterClient]);
+  }, [sortBy, sortOrder, searchTerm, filterStatus, filterDateRange]);
 
-  // Pobierz firmy
-  const fetchCompanies = async () => {
-    try {
-      const companiesData = await companiesAPI.getCompanies();
-      setCompanies(companiesData);
-    } catch (err) {
-      console.error('Błąd podczas pobierania firm:', err);
-    }
-  };
 
-  // Pobierz dane przy pierwszym ładowaniu i zmianie parametrów
   // DODANE: Debounce dla wyszukiwania
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -124,22 +113,10 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
 
   useEffect(() => {
     fetchDrums({ page: 1 }); // Resetuj do pierwszej strony przy zmianie filtrów
-  }, [sortBy, sortOrder, searchTerm, filterStatus, filterClient]);
-
-  // Pobierz firmy na starcie
+  }, [sortBy, sortOrder, searchTerm, filterStatus, filterDateRange]);
   useEffect(() => {
-    fetchCompanies();
-  }, []);
-
-  // Obsługa początkowego filtra
-  useEffect(() => {
-    if (initialFilter) {
-      if (initialFilter.nip) {
-        setFilterClient(initialFilter.nip);
-      }
-      if (initialFilter.status) {
-        setFilterStatus(initialFilter.status);
-      }
+    if (initialFilter && initialFilter.status) {
+      setFilterStatus(initialFilter.status);
     }
   }, [initialFilter]);
 
@@ -829,23 +806,10 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                 onChange={(e) => setFilterStatus(e.target.value)}
                 className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="all">Wszystkie statusy</option>
-                <option value="active">Aktywne</option>
-                <option value="due-soon">Zbliża się termin</option>
-                <option value="overdue">Przeterminowane</option>
-              </select>
-
-              <select
-                value={filterClient}
-                onChange={(e) => setFilterClient(e.target.value)}
-                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Wszyscy klienci</option>
-                {companies.map(company => (
-                  <option key={company.nip} value={company.nip}>
-                    {company.name}
-                  </option>
-                ))}
+                <option value="all">Wszystkie stany magazynowe</option>
+                <option value="wydane">Wydane u klientów</option>
+                <option value="magazyn">Na magazynie</option>
+                <option value="zagubione">Zagubione / Inne</option>
               </select>
 
               <select
@@ -854,8 +818,8 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                 className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">Wszystkie terminy</option>
-                <option value="this-week">Ten tydzień</option>
-                <option value="this-month">Ten miesiąc</option>
+                <option value="active">Bez przekroczeń (Aktywne)</option>
+                <option value="due-soon">Zbliża się termin</option>
                 <option value="overdue">Przeterminowane</option>
               </select>
             </div>

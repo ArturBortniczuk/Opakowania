@@ -338,7 +338,7 @@ const AdminDashboard = ({ onNavigate }) => {
             color="text-yellow-600"
             trend={-1}
             percentage={5}
-            onClick={() => onNavigate('admin-returns')}
+            onClick={() => onNavigate('admin-returns', { filterStatus: 'Pending' })}
           />
           
           <StatCard
@@ -349,7 +349,7 @@ const AdminDashboard = ({ onNavigate }) => {
             color="text-red-600"
             trend={-1}
             percentage={15}
-            onClick={() => onNavigate('admin-drums')}
+            onClick={() => onNavigate('admin-drums', { filterDateRange: 'overdue' })}
           />
           
           <StatCard
@@ -360,7 +360,7 @@ const AdminDashboard = ({ onNavigate }) => {
             color="text-purple-600"
             trend={1}
             percentage={20}
-            onClick={() => onNavigate('admin-returns')}
+            onClick={() => onNavigate('admin-returns', { filterStatus: 'Approved' })}
           />
           
           <StatCard
@@ -371,7 +371,7 @@ const AdminDashboard = ({ onNavigate }) => {
             color="text-teal-600"
             trend={1}
             percentage={25}
-            onClick={() => onNavigate('admin-returns')}
+            onClick={() => onNavigate('admin-returns', { filterStatus: 'Completed' })}
           />
         </div>
 
