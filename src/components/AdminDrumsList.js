@@ -178,7 +178,6 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
 
   const handleRefresh = async () => {
     await fetchDrums();
-    await fetchCompanies();
   };
 
   // ZACHOWANE: Funkcja importu z twojego kodu
