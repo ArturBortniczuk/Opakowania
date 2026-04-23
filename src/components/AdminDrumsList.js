@@ -576,9 +576,10 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                   <span className="font-medium">{selectedDrum.daysInPossession} dni</span>
                 </div>
               </div>
-          </div >
-        </div >
-      </div >
+            </div>
+          </div>
+        </div>
+      </div>
     );
   };
 
