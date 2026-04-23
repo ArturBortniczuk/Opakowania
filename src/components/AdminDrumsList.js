@@ -44,8 +44,6 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
   const initialStatus = urlFilterStatus || 'all';
   const [filterStatus, setFilterStatus] = useState(initialStatus);
   const [filterDateRange, setFilterDateRange] = useState('all');
-
-  const [filterDateRange, setFilterDateRange] = useState('all');
   const [selectedDrum, setSelectedDrum] = useState(null);
   const [showDrumDetails, setShowDrumDetails] = useState(false);
 
