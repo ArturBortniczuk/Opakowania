@@ -64,7 +64,7 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
   // Funkcja pomocnicza do pobierania terminu zwrotu dla klienta
   const getReturnPeriodForClient = (nip) => {
     const customPeriod = returnPeriods.find(period => period.nip === nip);
-    return customPeriod ? customPeriod.return_period_days : 85;
+    return customPeriod ? customPeriod.return_period_days : 120;
   };
 
   const enrichedClients = useMemo(() => {

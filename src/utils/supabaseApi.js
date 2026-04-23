@@ -220,10 +220,10 @@ export const drumsAPI = {
           finalReturnDate = d.toISOString().split('T')[0];
         }
         
-        const returnPeriodDays = drum.companies?.custom_return_periods?.[0]?.return_period_days || 180;
+        const returnPeriodDays = drum.companies?.custom_return_periods?.[0]?.return_period_days || 120;
         const statusObj = supabaseHelpers.getDrumStatus(finalReturnDate);
         const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
-        const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
+        const daysInPossession = returnPeriodDays;
 
         const clientReturnDeadline = new Date(issueDate);
         if (!isNaN(clientReturnDeadline.getTime())) {
@@ -373,12 +373,12 @@ export const drumsAPI = {
         }
 
         // Zabezpieczone pobieranie dni z relacji
-        const returnPeriodDays = drum.companies?.custom_return_periods?.[0]?.return_period_days || 180;
+        const returnPeriodDays = drum.companies?.custom_return_periods?.[0]?.return_period_days || 120;
         
         // Obliczamy STATUS TERMINOWY
         const statusObj = supabaseHelpers.getDrumStatus(finalReturnDate);
         const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
-        const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
+        const daysInPossession = returnPeriodDays;
 
         const clientReturnDeadline = new Date(issueDate);
         if (!isNaN(clientReturnDeadline.getTime())) {
@@ -469,7 +469,7 @@ export const companiesAPI = {
       // Mapowanie danych (bez zbędnych zapytań do bazy)
       const mappedData = data.map(company => ({
         ...company,
-        returnPeriodDays: company.custom_return_periods?.[0]?.return_period_days || 85,
+        returnPeriodDays: company.custom_return_periods?.[0]?.return_period_days || 120,
         status: 'Aktywny', // Domyślny status
         lastActivity: company.created_at || new Date().toISOString().split('T')[0]
       }));
@@ -779,10 +779,10 @@ export const getReturnPeriodForClient = async (nip) => {
       .single();
 
     if (error && error.code !== 'PGRST116') throw error; // Ignoruj błąd "Not Found"
-    return data?.return_period_days || 85; // Domyślny termin 85 dni
+    return data?.return_period_days || 120; // Domyślny termin 120 dni
   } catch (error) {
     console.error('Błąd pobierania terminu zwrotu:', error);
-    return 85; // Zwróć domyślny w razie błędu
+    return 120; // Zwróć domyślny w razie błędu
   }
 };
 

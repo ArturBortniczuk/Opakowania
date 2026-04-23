@@ -406,7 +406,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-500">Dni w posiadaniu</span>
           <span className="text-sm font-medium text-gray-900">
-            {drum.daysInPossession || (drum.DATA_WYDANIA ? Math.floor((new Date() - new Date(drum.DATA_WYDANIA)) / (1000 * 60 * 60 * 24)) : 0)}
+            {drum.daysInPossession}
           </span>
         </div>
       </div>
@@ -574,11 +574,10 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Dni w posiadaniu</span>
-                  <span className="font-medium">{selectedDrum.daysInPossession || 0} dni</span>
+                  <span className="text-gray-600">Dni na zwrot (posiadanie)</span>
+                  <span className="font-medium">{selectedDrum.daysInPossession} dni</span>
                 </div>
               </div>
-            </div>
           </div >
         </div >
       </div >
