@@ -1,0 +1,40 @@
+# Projekt "Opakowania" - Główne zasady i technologie (Eltron Drums System)
+
+Zawsze przed rozpoczęciem jakichkolwiek działań w projekcie, przeczytaj poniższe zasady, aby zachować spójność z obecnym systemem, technologiami i logiką biznesową.
+
+## 1. Technologia (Stack)
+- **Framework Frontendu**: React 18 (CRA - Create React App).
+- **Język**: JavaScript (ES6+) – używamy plików `.js` i `.jsx`. Brak TypeScriptu.
+- **Routing**: React Router v7 (`react-router-dom`).
+- **Stylizacja**: Tailwind CSS (wraz z wtyczkami `forms`, `typography`, `aspect-ratio`).
+- **Ikony**: `lucide-react`.
+- **Baza danych i Backend**: Supabase (autoryzacja, baza danych PostgreSQL, Storage).
+- **Hosting / Deployment**: Vercel.
+
+## 2. Architektura i Organizacja Kodu
+- Główny kod znajduje się w katalogu `src/`.
+- **Komponenty (`src/components/`)**: Piszemy komponenty funkcyjne z użyciem React Hooks. Dążymy do ich reużywalności.
+- **Integracje i Utilsy (`src/lib/`, `src/utils/`)**: Tutaj trzymamy logikę komunikacji z Supabase oraz funkcje pomocnicze.
+- **Środowisko**: Zmienne środowiskowe dla środowiska deweloperskiego trzymamy w `.env.local` (np. klucze Supabase. Dla Supabase dla kluczy korzystaj z przedrostka NEXT_PUBLIC_).
+
+## 3. Stylizacja i UI
+- Interfejs ma być nowoczesny i responsywny.
+- Opieramy się całkowicie na klasach utility Tailwind CSS wewnątrz `className`. 
+- Unikamy dopisywania własnych klas CSS w plikach `.css`, chyba że wymaga tego globalny konfig lub nadpisanie skomplikowanych zachowań.
+- Do elementów interaktywnych (przyciski, karty, powiadomienia) dodajemy odpowiednie stany najechania (`hover:`), fokusu (`focus:`) oraz przejścia (`transition`).
+
+## 4. Logika i Komunikacja z API (Supabase)
+- **Zarządzanie stanem**: Opieramy się na wbudowanych hookach Reacta (`useState`, `useEffect`, `useContext`, `useMemo`, `useCallback`). W przypadku złożonych stanów korzystamy z Context API.
+- **Zapytania do bazy**: Wykonywane są asynchronicznie przez klienta Supabase (`@supabase/supabase-js`). Zawsze pamiętaj o obsłudze błędów (bloki `try/catch`) i prezentowaniu użytkownikowi stanów ładowania (np. spinner lub szkielet).
+- **Bezpieczeństwo**: Opieramy się na logice Supabase (RLS - Row Level Security, autoryzacja).
+
+## 5. Kontekst Biznesowy (Ważne!)
+- System to narzędzie logistyczne dla **Grupy Eltron** do zarządzania bębnami kablowymi.
+- **Role użytkowników**: W systemie istnieje podział na role, np. "handlowiec" i "pozostałe". Ma to wpływ na to, kto może być wybrany w formularzach (np. na liście spedytorów/kierowców).
+- **Logika bębnów**: System śledzi czas posiadania bębnów (domyślny okres zwrotu to zazwyczaj 120 dni). Używane są kody QR do identyfikacji.
+- **Moduły**: Zwracaj uwagę na istniejące podziały na moduły takie jak spedycja, transport, dashboard, użytkownicy, planowanie/kalendarz.
+
+## 6. Dobre Praktyki Code Review
+- Nazewnictwo zmiennych, funkcji i plików w języku angielskim (np. `DrumList`, `fetchDrums`), chyba że obecny kod dla danego modułu ewidentnie stosuje nazewnictwo polskie w bazie danych lub kodzie – wtedy dopasowujemy się do konwencji.
+- Zawsze usuwaj `console.log` używane do debugowania przed uznaniem kodu za gotowy.
+- Trzymaj kod w czystości zgodnie z regułą DRY (Don't Repeat Yourself). Powtarzalne fragmenty UI przenoś do mniejszych komponentów.
