@@ -185,7 +185,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
       case 1:
         return formData.street.trim() && formData.postalCode.trim() && formData.city.trim();
       case 2:
-        return formData.email.trim() && formData.phoneNumber.trim() && formData.loadingHours.trim() && formData.collectionDateStart && formData.collectionDateEnd;
+        return formData.email.trim() && formData.phoneNumber.trim() && formData.loadingHours.trim() && formData.collectionDateStart && formData.collectionDateEnd && formData.availableEquipment.trim();
       case 3:
         return formData.selectedDrums.length > 0;
       case 4:
@@ -406,6 +406,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                       locale="pl"
                       dateFormat="dd.MM.yyyy"
                       className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white cursor-pointer ${dateError ? 'border-red-500' : 'border-gray-300'}`}
+                      wrapperClassName="w-full"
                       placeholderText="Kliknij, aby wybrać zakres na kalendarzu"
                     />
                     {dateError ? (
@@ -469,7 +470,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Truck className="inline w-4 h-4 mr-2" />
-                  Dostępny sprzęt załadunkowy
+                  Dostępny sprzęt załadunkowy *
                 </label>
                 <input
                   type="text"
