@@ -120,8 +120,13 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
             ...d,
             isReported: reportedDrums.has(d.cecha)
           }));
-          console.log(`✅ ReturnForm: Załadowano ${drumsWithReportedFlag.length} bębnów`);
-          setUserDrums(drumsWithReportedFlag);
+          // Sortujemy tak, żeby zgłoszone były na samym dole
+          const sortedDrums = drumsWithReportedFlag.sort((a, b) => {
+            if (a.isReported === b.isReported) return 0;
+            return a.isReported ? 1 : -1;
+          });
+          console.log(`✅ ReturnForm: Załadowano ${sortedDrums.length} bębnów`);
+          setUserDrums(sortedDrums);
         }
       } catch (err) {
         console.error('❌ Błąd podczas pobierania bębnów:', err);
@@ -556,7 +561,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                   ).map((drum, index) => {
                   const drumCecha = drum.cecha; // UŻYWAMY CECHY JAKO ID
                   const returnDate = drum.data_zwrotu_do_dostawcy;
-                  const address = drum.adres_dostawy || drum.nazwa_punktu_dostawy || 'Brak adresu';
+                  const address = drum.adres_dostawy || drum.nazwa_punktu_dostawy || 'Brak informacji o adresie';
                   const invoice = drum.numer_faktury || 'Brak faktury';
 
                   // Obliczanie dni pozostałych do zwrotu
@@ -641,9 +646,9 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                         Faktura: <span className="font-medium">{invoice}</span>
                       </p>
 
-                      <p className={`text-xs mb-3 font-medium ${isLateOrSoon ? 'text-red-600' : 'text-gray-500'}`}>
+                      <p className={`text-xs mb-3 font-medium ${isLateOrSoon && !isReported ? 'text-red-600' : 'text-gray-500'}`}>
                         Termin zwrotu: {returnDate ? new Date(returnDate).toLocaleDateString('pl-PL') : 'Brak'}
-                        {daysLeft !== null && ` (${daysLeft >= 0 ? `Pozostało: ${daysLeft} dni` : `Opóźnienie: ${Math.abs(daysLeft)} dni`})`}
+                        {!isReported && daysLeft !== null && ` (${daysLeft >= 0 ? `Pozostało: ${daysLeft} dni` : `Opóźnienie: ${Math.abs(daysLeft)} dni`})`}
                       </p>
 
                       {/* Sekcja przycisków akcji */}

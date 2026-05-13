@@ -57,6 +57,7 @@ const AdminNavbar = ({
     { path: '/admin/drums', label: 'Wszystkie bębny', icon: Package, description: 'Monitoruj wszystkie bębny' },
     { path: '/admin/returns', label: 'Zgłoszenia zwrotów', icon: Truck, description: 'Zarządzaj zwrotami' },
     { path: '/admin/return-periods', label: 'Terminy zwrotu', icon: Settings, description: 'Ustaw terminy dla klientów' },
+    { path: '/admin/supplier-rules', label: 'Terminy kablowni', icon: Settings, description: 'Zasady zwrotów dostawców' },
     { path: '/admin/reports', label: 'Raporty i analizy', icon: BarChart3, description: 'Statystyki i raporty' }
   ];
 

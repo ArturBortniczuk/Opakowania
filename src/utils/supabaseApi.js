@@ -786,6 +786,32 @@ export const rulesAPI = {
       console.error('Błąd podczas pobierania zasad zwrotów:', error);
       return [];
     }
+  },
+  async addRule(rule) {
+    try {
+      const { data, error } = await supabase
+        .from('supplier_return_rules')
+        .insert([rule])
+        .select();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Błąd dodawania reguły:', error);
+      throw error;
+    }
+  },
+  async deleteRule(id) {
+    try {
+      const { error } = await supabase
+        .from('supplier_return_rules')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Błąd usuwania reguły:', error);
+      throw error;
+    }
   }
 };
 

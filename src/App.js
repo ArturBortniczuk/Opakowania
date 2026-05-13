@@ -14,6 +14,7 @@ import AdminReturnPeriodsManager from './components/AdminReturnPeriodsManager';
 import AdminDrumsList from './components/AdminDrumsList';
 import AdminReturnRequests from './components/AdminReturnRequests';
 import AdminReports from './components/AdminReports';
+import AdminSupplierRules from './components/AdminSupplierRules';
 import './App.css';
 
 
@@ -147,6 +148,7 @@ const App = () => {
                     'admin-drums': '/admin/drums',
                     'admin-returns': '/admin/returns',
                     'admin-return-periods': '/admin/return-periods',
+                    'admin-supplier-rules': '/admin/supplier-rules',
                     'admin-reports': '/admin/reports'
                   };
                   if (routes[page]) {
@@ -174,6 +176,7 @@ const App = () => {
                     'admin-drums': '/admin/drums',
                     'admin-returns': '/admin/returns',
                     'admin-return-periods': '/admin/return-periods',
+                    'admin-supplier-rules': '/admin/supplier-rules',
                     'admin-reports': '/admin/reports'
                   };
                   if (routes[page]) {
@@ -209,6 +212,11 @@ const App = () => {
           <Route path="/admin/return-periods" element={
             <ProtectedRoute adminOnly>
               <AdminReturnPeriodsManager user={currentUser} />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/supplier-rules" element={
+            <ProtectedRoute adminOnly>
+              <AdminSupplierRules user={currentUser} />
             </ProtectedRoute>
           } />
 
