@@ -1,5 +1,12 @@
 // src/components/ReturnForm.js - WERSJA Z OBSŁUGĄ CECHY I USZKODZEŃ
 import React, { useState, useEffect } from 'react';
+import DatePicker, { registerLocale } from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { pl } from 'date-fns/locale/pl';
+import { format, addDays, differenceInDays } from 'date-fns';
+
+registerLocale('pl', pl);
+
 import {
   Calendar,
   MapPin,
@@ -124,16 +131,43 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
     }
   }, [user?.nip]);
 
-  // Obsługa zmiany daty
-  const handleStartDateChange = (e) => {
-    const newDate = e.target.value;
-    const newEndDateStr = getEndDate(newDate);
+  // Obsługa zmiany daty z kalendarza (zakres)
+  const handleDateRangeChange = (dates) => {
+    const [start, end] = dates;
     
-    setFormData(prev => ({ 
-      ...prev, 
-      collectionDateStart: newDate, 
-      collectionDateEnd: newEndDateStr 
-    }));
+    if (start && end) {
+      const diffDays = differenceInDays(end, start);
+      if (diffDays < 14) {
+        // Jeśli wybrano mniej niż 14 dni, wymuszamy 14 dni
+        const newEnd = addDays(start, 14);
+        setFormData(prev => ({ 
+          ...prev, 
+          collectionDateStart: format(start, 'yyyy-MM-dd'), 
+          collectionDateEnd: format(newEnd, 'yyyy-MM-dd')
+        }));
+      } else {
+        // Okres > 14 dni
+        setFormData(prev => ({ 
+          ...prev, 
+          collectionDateStart: format(start, 'yyyy-MM-dd'), 
+          collectionDateEnd: format(end, 'yyyy-MM-dd')
+        }));
+      }
+    } else if (start) {
+      // Wybrano tylko początek, czekamy na kliknięcie końca
+      setFormData(prev => ({ 
+        ...prev, 
+        collectionDateStart: format(start, 'yyyy-MM-dd'), 
+        collectionDateEnd: ''
+      }));
+    } else {
+      // Wyczyszczono daty
+      setFormData(prev => ({ 
+        ...prev, 
+        collectionDateStart: '', 
+        collectionDateEnd: ''
+      }));
+    }
   };
 
   const steps = [
@@ -303,32 +337,22 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Calendar className="inline w-4 h-4 mr-2" />
-                  Termin zwrotu (Od - Do) *
+                  Wybierz zakres dat odbioru (od - do) *
                 </label>
-                <div className="space-y-2">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Wybierz datę początkową (od):</label>
-                      <input
-                        type="date"
-                        value={formData.collectionDateStart}
-                        onChange={handleStartDateChange}
-                        min={minDate}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Data końcowa (do) - automatycznie +14 dni:</label>
-                      <input
-                        type="date"
-                        value={formData.collectionDateEnd}
-                        readOnly
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-100 text-gray-500 cursor-not-allowed"
-                      />
-                    </div>
-                  </div>
+                <div className="space-y-2 relative z-50">
+                  <DatePicker
+                    selectsRange={true}
+                    startDate={formData.collectionDateStart ? new Date(formData.collectionDateStart) : null}
+                    endDate={formData.collectionDateEnd ? new Date(formData.collectionDateEnd) : null}
+                    onChange={handleDateRangeChange}
+                    minDate={new Date()}
+                    locale="pl"
+                    dateFormat="dd.MM.yyyy"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white cursor-pointer"
+                    placeholderText="Kliknij, aby wybrać zakres na kalendarzu"
+                  />
                   <p className="text-xs text-gray-500">
-                    Odstęp między datami to równe 14 dni. Data początkowa nie może być wcześniejsza niż dzień dzisiejszy.
+                    Wybierz datę początkową, a następnie datę końcową na kalendarzu (minimum 14 dni odstępu).
                   </p>
                 </div>
               </div>
