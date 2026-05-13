@@ -170,24 +170,21 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   };
 
   const steps = [
-    { id: 1, title: 'Dane podstawowe', icon: Building2 },
-    { id: 2, title: 'Adres odbioru', icon: MapPin },
-    { id: 3, title: 'Szczegóły', icon: MessageSquare },
-    { id: 4, title: 'Wybór bębnów', icon: Package },
-    { id: 5, title: 'Potwierdzenie', icon: CheckCircle }
+    { id: 1, title: 'Adres odbioru', icon: MapPin },
+    { id: 2, title: 'Szczegóły', icon: MessageSquare },
+    { id: 3, title: 'Wybór bębnów', icon: Package },
+    { id: 4, title: 'Potwierdzenie', icon: CheckCircle }
   ];
 
   const validateStep = (step) => {
     switch (step) {
       case 1:
-        return formData.collectionDateStart && formData.collectionDateEnd && formData.companyName;
-      case 2:
         return formData.street.trim() && formData.postalCode.trim() && formData.city.trim();
+      case 2:
+        return formData.email.trim() && formData.phoneNumber.trim() && formData.loadingHours.trim() && formData.collectionDateStart && formData.collectionDateEnd;
       case 3:
-        return formData.email.trim() && formData.phoneNumber.trim() && formData.loadingHours.trim();
-      case 4:
         return formData.selectedDrums.length > 0;
-      case 5:
+      case 4:
         return formData.confirmType && formData.confirmEmpty;
       default:
         return false;
@@ -205,7 +202,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   };
 
   const handleSubmit = async () => {
-    if (!validateStep(5)) return;
+    if (!validateStep(4)) return;
 
     setLoading(true);
     try {
@@ -327,56 +324,6 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
         return (
           <div className="space-y-6">
             <div className="text-center mb-6">
-              <Building2 className="w-16 h-16 mx-auto text-blue-600 mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900">Podstawowe informacje</h2>
-              <p className="text-gray-600">Określ datę i firmę dla odbioru</p>
-            </div>
-
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Calendar className="inline w-4 h-4 mr-2" />
-                  Wybierz zakres dat odbioru (od - do) *
-                </label>
-                <div className="space-y-2 relative z-50">
-                  <DatePicker
-                    selectsRange={true}
-                    startDate={formData.collectionDateStart ? new Date(formData.collectionDateStart) : null}
-                    endDate={formData.collectionDateEnd ? new Date(formData.collectionDateEnd) : null}
-                    onChange={handleDateRangeChange}
-                    minDate={new Date()}
-                    locale="pl"
-                    dateFormat="dd.MM.yyyy"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white cursor-pointer"
-                    placeholderText="Kliknij, aby wybrać zakres na kalendarzu"
-                  />
-                  <p className="text-xs text-gray-500">
-                    Wybierz datę początkową, a następnie datę końcową na kalendarzu (minimum 14 dni odstępu).
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Building2 className="inline w-4 h-4 mr-2" />
-                  Nazwa firmy
-                </label>
-                <input
-                  type="text"
-                  value={formData.companyName}
-                  readOnly
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-100 text-gray-500 cursor-not-allowed"
-                  placeholder="Pełna nazwa firmy"
-                />
-              </div>
-            </div>
-          </div>
-        );
-
-      case 2:
-        return (
-          <div className="space-y-6">
-            <div className="text-center mb-6">
               <MapPin className="w-16 h-16 mx-auto text-blue-600 mb-4" />
               <h2 className="text-2xl font-bold text-gray-900">Adres odbioru</h2>
               <p className="text-gray-600">Podaj dokładny adres skąd mają być odebrane bębny</p>
@@ -428,16 +375,39 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
           </div>
         );
 
-      case 3:
+      case 2:
         return (
           <div className="space-y-6">
             <div className="text-center mb-6">
               <MessageSquare className="w-16 h-16 mx-auto text-blue-600 mb-4" />
               <h2 className="text-2xl font-bold text-gray-900">Szczegóły odbioru</h2>
-              <p className="text-gray-600">Dodaj informacje o kontakcie i logistyce</p>
+              <p className="text-gray-600">Określ datę odbioru oraz informacje o kontakcie i logistyce</p>
             </div>
 
             <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Calendar className="inline w-4 h-4 mr-2" />
+                  Wybierz zakres dat odbioru (od - do) *
+                </label>
+                <div className="space-y-2 relative z-50">
+                  <DatePicker
+                    selectsRange={true}
+                    startDate={formData.collectionDateStart ? new Date(formData.collectionDateStart) : null}
+                    endDate={formData.collectionDateEnd ? new Date(formData.collectionDateEnd) : null}
+                    onChange={handleDateRangeChange}
+                    minDate={new Date()}
+                    locale="pl"
+                    dateFormat="dd.MM.yyyy"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white cursor-pointer"
+                    placeholderText="Kliknij, aby wybrać zakres na kalendarzu"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Wybierz datę początkową, a następnie datę końcową na kalendarzu (minimum 14 dni odstępu).
+                  </p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -512,7 +482,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
           </div>
         );
 
-      case 4:
+      case 3:
         return (
           <div className="space-y-6">
             <div className="text-center mb-6">
@@ -644,7 +614,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
           </div>
         );
 
-      case 5:
+      case 4:
         return (
           <div className="space-y-6">
             <div className="text-center mb-6">
@@ -664,10 +634,6 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                 <div>
                   <p className="text-sm text-gray-500">Telefon</p>
                   <p className="font-medium text-gray-900">{formData.phoneNumber}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Firma</p>
-                  <p className="font-medium text-gray-900">{formData.companyName}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Adres</p>
@@ -759,7 +725,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
             </button>
 
             <div className="flex items-center space-x-4">
-              {currentStep < 5 ? (
+              {currentStep < 4 ? (
                 <button
                   onClick={handleNext}
                   disabled={!validateStep(currentStep)}
@@ -774,8 +740,8 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
               ) : (
                 <button
                   onClick={handleSubmit}
-                  disabled={!validateStep(5) || loading}
-                  className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 flex items-center space-x-2 ${validateStep(5) && !loading
+                  disabled={!validateStep(4) || loading}
+                  className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 flex items-center space-x-2 ${validateStep(4) && !loading
                       ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 shadow-lg'
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     }`}
