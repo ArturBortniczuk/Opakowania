@@ -4,9 +4,6 @@ import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { pl } from 'date-fns/locale/pl';
 import { format, addDays, differenceInDays } from 'date-fns';
-
-registerLocale('pl', pl);
-
 import {
   Calendar,
   MapPin,
@@ -27,6 +24,8 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
+
+registerLocale('pl', pl);
 
 const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   const navigate = useNavigate();
