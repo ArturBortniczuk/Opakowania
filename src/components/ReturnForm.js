@@ -25,16 +25,14 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
 
-  // Oblicz minimalną datę (dzisiaj + 7 dni)
+  // Oblicz minimalną datę (dzisiaj)
   const getMinDate = () => {
-    const date = new Date();
-    date.setDate(date.getDate() + 7);
-    return date.toISOString().split('T')[0];
+    return new Date().toISOString().split('T')[0];
   };
 
   const getEndDate = (startDateStr) => {
     const date = new Date(startDateStr);
-    date.setDate(date.getDate() + 7);
+    date.setDate(date.getDate() + 14);
     return date.toISOString().split('T')[0];
   };
 
@@ -64,7 +62,6 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   const [loading, setLoading] = useState(false);
   const [userDrums, setUserDrums] = useState([]);
   const [drumsLoading, setDrumsLoading] = useState(true);
-  const [dateWarning, setDateWarning] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Pobierz bębny użytkownika
@@ -81,17 +78,33 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
           sortOrder: 'asc'
         };
 
-        const result = await drumsAPI.getDrums(user.nip, options);
+        const [result, returns] = await Promise.all([
+          drumsAPI.getDrums(user.nip, options),
+          returnsAPI.getReturns(user.nip)
+        ]);
+        
         console.log('✅ ReturnForm: Otrzymano dane:', result);
 
         const drums = result.data || result;
+
+        // Zbieramy cechy bębnów, które są już w aktywnych zgłoszeniach zwrotu
+        const reportedDrums = new Set();
+        if (Array.isArray(returns)) {
+          returns.forEach(req => {
+            if (req.status !== 'Rejected' && req.status !== 'Cancelled') {
+              if (Array.isArray(req.selected_drums)) {
+                req.selected_drums.forEach(d => reportedDrums.add(d.cecha));
+              }
+            }
+          });
+        }
 
         if (!Array.isArray(drums)) {
           console.error('❌ ReturnForm: Dane nie są tablicą!', drums);
           setUserDrums([]);
         } else {
-          // Filtrujemy, żeby nie pokazywać zagubionych (chociaż API domyślnie to robi)
-          const availableDrums = drums.filter(d => d.status !== 'Lost');
+          // Filtrujemy, żeby nie pokazywać zagubionych (chociaż API domyślnie to robi) oraz bębnów już w zgłoszeniach
+          const availableDrums = drums.filter(d => d.status !== 'Lost' && !reportedDrums.has(d.cecha));
           console.log(`✅ ReturnForm: Załadowano ${availableDrums.length} bębnów`);
           setUserDrums(availableDrums);
         }
@@ -111,33 +124,16 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
     }
   }, [user?.nip]);
 
-  // Obsługa zmiany daty z ostrzeżeniem
+  // Obsługa zmiany daty
   const handleStartDateChange = (e) => {
     const newDate = e.target.value;
-    const selectedDate = new Date(newDate);
-    const minAllowedDate = new Date(minDate);
-
-    // Sprawdź czy data jest wcześniejsza niż minimalna (7 dni)
-    if (selectedDate < minAllowedDate) {
-      setDateWarning(true);
-    } else {
-      setDateWarning(false);
-    }
-
     const newEndDateStr = getEndDate(newDate);
-    const currentEndDate = new Date(formData.collectionDateEnd);
-    const minEndDate = new Date(newEndDateStr);
     
-    if (currentEndDate < minEndDate) {
-      setFormData(prev => ({ ...prev, collectionDateStart: newDate, collectionDateEnd: newEndDateStr }));
-    } else {
-      setFormData(prev => ({ ...prev, collectionDateStart: newDate }));
-    }
-  };
-
-  const handleEndDateChange = (e) => {
-    const newDate = e.target.value;
-    setFormData(prev => ({ ...prev, collectionDateEnd: newDate }));
+    setFormData(prev => ({ 
+      ...prev, 
+      collectionDateStart: newDate, 
+      collectionDateEnd: newEndDateStr 
+    }));
   };
 
   const steps = [
@@ -307,35 +303,32 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Calendar className="inline w-4 h-4 mr-2" />
-                  Sugerowany termin zwrotu (Od - Do) *
+                  Termin zwrotu (Od - Do) *
                 </label>
                 <div className="space-y-2">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input
-                      type="date"
-                      value={formData.collectionDateStart}
-                      onChange={handleStartDateChange}
-                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white ${dateWarning ? 'border-yellow-400 bg-yellow-50' : 'border-gray-300'
-                        }`}
-                    />
-                    <input
-                      type="date"
-                      value={formData.collectionDateEnd}
-                      onChange={handleEndDateChange}
-                      min={getEndDate(formData.collectionDateStart)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
-                    />
-                  </div>
-                  {dateWarning && (
-                    <div className="flex items-start space-x-2 text-yellow-700 text-sm bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                      <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-                      <span>
-                        Wybrana data początkowa jest krótsza niż zalecane 7 dni od dzisiaj. Może to wpłynąć na terminowość odbioru.
-                      </span>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Wybierz datę początkową (od):</label>
+                      <input
+                        type="date"
+                        value={formData.collectionDateStart}
+                        onChange={handleStartDateChange}
+                        min={minDate}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                      />
                     </div>
-                  )}
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Data końcowa (do) - automatycznie +14 dni:</label>
+                      <input
+                        type="date"
+                        value={formData.collectionDateEnd}
+                        readOnly
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-100 text-gray-500 cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
                   <p className="text-xs text-gray-500">
-                    Zalecany przedział to minimum 7 dni od daty początkowej.
+                    Odstęp między datami to równe 14 dni. Data początkowa nie może być wcześniejsza niż dzień dzisiejszy.
                   </p>
                 </div>
               </div>
@@ -343,13 +336,13 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Building2 className="inline w-4 h-4 mr-2" />
-                  Nazwa firmy *
+                  Nazwa firmy
                 </label>
                 <input
                   type="text"
                   value={formData.companyName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                  readOnly
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-100 text-gray-500 cursor-not-allowed"
                   placeholder="Pełna nazwa firmy"
                 />
               </div>
@@ -489,11 +482,8 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                   value={formData.notes}
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
-                  placeholder={dateWarning ? "WPISZ TUTAJ INFORMACJĘ O TURBO PILNOŚCI!..." : "Dodatkowe informacje dla kuriera..."}
+                  placeholder="Dodatkowe informacje dla kuriera..."
                 />
-                {dateWarning && (
-                  <p className="text-xs text-red-500 mt-1 font-medium">Ze względu na krótki termin, prosimy o wyraźne zaznaczenie pilności w uwagach.</p>
-                )}
               </div>
             </div>
           </div>
@@ -543,7 +533,8 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                   {userDrums.filter(d => 
                     d.cecha?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                     d.nazwa?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    d.kod_bebna?.toLowerCase().includes(searchQuery.toLowerCase())
+                    d.kod_bebna?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    d.numer_faktury?.toLowerCase().includes(searchQuery.toLowerCase())
                   ).map((drum, index) => {
                   const drumCecha = drum.cecha; // UŻYWAMY CECHY JAKO ID
                   const drumName = drum.nazwa;
