@@ -763,6 +763,33 @@ export const statsAPI = {
 };
 
 // ==================================
+//  API do Zasad Zwrotów
+// ==================================
+export const rulesAPI = {
+  async getRules() {
+    try {
+      const { data, error } = await supabase
+        .from('supplier_return_rules')
+        .select('*')
+        .order('supplier_name', { ascending: true })
+        .order('max_days_overdue', { ascending: true });
+
+      if (error) {
+        if (error.code === '42P01') {
+          // Tabela może jeszcze nie istnieć
+          return [];
+        }
+        throw error;
+      }
+      return data || [];
+    } catch (error) {
+      console.error('Błąd podczas pobierania zasad zwrotów:', error);
+      return [];
+    }
+  }
+};
+
+// ==================================
 //  Funkcje pomocnicze
 // ==================================
 /**

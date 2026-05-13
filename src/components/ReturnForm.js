@@ -23,7 +23,7 @@ import {
   Search
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
+import { drumsAPI, returnsAPI, rulesAPI } from '../utils/supabaseApi';
 
 registerLocale('pl', pl);
 
@@ -70,6 +70,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   const [drumsLoading, setDrumsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateError, setDateError] = useState(false);
+  const [supplierRules, setSupplierRules] = useState([]);
 
   // Pobierz bębny użytkownika
   useEffect(() => {
@@ -85,10 +86,13 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
           sortOrder: 'asc'
         };
 
-        const [result, returns] = await Promise.all([
+        const [result, returns, rules] = await Promise.all([
           drumsAPI.getDrums(user.nip, options),
-          returnsAPI.getReturns(user.nip)
+          returnsAPI.getReturns(user.nip),
+          rulesAPI.getRules()
         ]);
+        
+        setSupplierRules(rules);
         
         console.log('✅ ReturnForm: Otrzymano dane:', result);
 
@@ -110,10 +114,14 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
           console.error('❌ ReturnForm: Dane nie są tablicą!', drums);
           setUserDrums([]);
         } else {
-          // Filtrujemy, żeby nie pokazywać zagubionych (chociaż API domyślnie to robi) oraz bębnów już w zgłoszeniach
-          const availableDrums = drums.filter(d => d.status !== 'Lost' && !reportedDrums.has(d.cecha));
-          console.log(`✅ ReturnForm: Załadowano ${availableDrums.length} bębnów`);
-          setUserDrums(availableDrums);
+          // Filtrujemy tylko zagubione. Bębny już zgłoszone otrzymują flagę isReported.
+          const visibleDrums = drums.filter(d => d.status !== 'Lost');
+          const drumsWithReportedFlag = visibleDrums.map(d => ({
+            ...d,
+            isReported: reportedDrums.has(d.cecha)
+          }));
+          console.log(`✅ ReturnForm: Załadowano ${drumsWithReportedFlag.length} bębnów`);
+          setUserDrums(drumsWithReportedFlag);
         }
       } catch (err) {
         console.error('❌ Błąd podczas pobierania bębnów:', err);
@@ -542,46 +550,109 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                     d.cecha?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                     d.nazwa?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                     d.kod_bebna?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    d.numer_faktury?.toLowerCase().includes(searchQuery.toLowerCase())
+                    d.numer_faktury?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    d.adres_dostawy?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    d.nazwa_punktu_dostawy?.toLowerCase().includes(searchQuery.toLowerCase())
                   ).map((drum, index) => {
                   const drumCecha = drum.cecha; // UŻYWAMY CECHY JAKO ID
-                  const drumName = drum.nazwa;
                   const returnDate = drum.data_zwrotu_do_dostawcy;
+                  const address = drum.adres_dostawy || drum.nazwa_punktu_dostawy || 'Brak adresu';
+                  const invoice = drum.numer_faktury || 'Brak faktury';
+
+                  // Obliczanie dni pozostałych do zwrotu
+                  let daysLeft = null;
+                  let isLateOrSoon = false;
+                  if (returnDate) {
+                    daysLeft = differenceInDays(new Date(returnDate), new Date());
+                    if (daysLeft < 20) {
+                      isLateOrSoon = true;
+                    }
+                  }
 
                   // Sprawdź czy wybrany
                   const selectedItem = formData.selectedDrums.find(d => d.cecha === drumCecha);
                   const isSelected = !!selectedItem;
+                  const isReported = drum.isReported; // Flaga zgłoszonego bębna
+
+                  // Obliczanie % zwrotu
+                  let returnPercentage = 100; // Domyślnie 100%
+                  let appliedRule = null;
+                  const supplier = drum.kon_dostawca || drum.KON_DOSTAWCA; // wsparcie dla małych i dużych liter
+
+                  if (supplier && supplierRules.length > 0 && daysLeft !== null) {
+                    const overdueDays = daysLeft < 0 ? Math.abs(daysLeft) : 0; // ile dni po terminie
+                    
+                    // Szukamy reguł dla tego dostawcy
+                    const sRules = supplierRules.filter(r => r.supplier_name.toUpperCase() === supplier.toUpperCase());
+                    
+                    if (sRules.length > 0) {
+                      // Znajdź pierwszą regułę, gdzie nasze opóźnienie <= max_days_overdue
+                      const validRule = sRules.find(r => overdueDays <= r.max_days_overdue);
+                      
+                      if (validRule) {
+                        returnPercentage = validRule.return_percentage;
+                        appliedRule = validRule;
+                      } else {
+                        // Przekroczone wszystkie limity, bierzemy ostatnią (najgorszą) zdefiniowaną regułę
+                        const lastRule = sRules[sRules.length - 1];
+                        returnPercentage = lastRule.return_percentage;
+                        appliedRule = lastRule;
+                      }
+                    }
+                  }
 
                   return (
                     <div
                       key={drumCecha || index}
-                      className={`border-2 rounded-xl p-4 transition-all duration-200 ${isSelected
-                          ? 'border-blue-600 bg-blue-50'
-                          : 'border-gray-200 hover:border-blue-300 bg-white'
+                      className={`border-2 rounded-xl p-4 transition-all duration-200 ${isReported
+                          ? 'border-gray-200 bg-gray-100 opacity-60'
+                          : isSelected
+                            ? 'border-blue-600 bg-blue-50'
+                            : 'border-gray-200 hover:border-blue-300 bg-white'
                         }`}
                     >
                       {/* Nagłówek Karty */}
                       <div
-                        className="flex items-center justify-between mb-2 cursor-pointer"
-                        onClick={() => handleDrumToggle(drumCecha)}
+                        className={`flex items-center justify-between mb-2 ${isReported ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                        onClick={() => !isReported && handleDrumToggle(drumCecha)}
                       >
                         <span className="font-semibold text-gray-900">{drumCecha}</span>
                         <input
                           type="checkbox"
                           checked={isSelected}
+                          disabled={isReported}
                           onChange={() => { }} // Obsłużone przez onClick diva
-                          className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                       </div>
 
-                      <p className="text-sm text-gray-600 mb-2">{drumName}</p>
-                      <p className="text-xs text-gray-500 mb-3">
-                        Termin: {returnDate ? new Date(returnDate).toLocaleDateString('pl-PL') : 'Brak'}
+                      {/* Oszacowany zwrot */}
+                      {appliedRule && (
+                        <div className="mb-2 inline-block px-2 py-1 bg-indigo-50 border border-indigo-100 rounded text-xs font-semibold text-indigo-700">
+                          Możliwy zwrot wartości: {returnPercentage}%
+                        </div>
+                      )}
+
+                      {/* Adres i Faktura */}
+                      <p className="text-sm text-gray-600 mb-1">
+                        Adres: <span className="font-medium">{address}</span>
+                      </p>
+                      <p className="text-sm text-gray-600 mb-2">
+                        Faktura: <span className="font-medium">{invoice}</span>
+                      </p>
+
+                      <p className={`text-xs mb-3 font-medium ${isLateOrSoon ? 'text-red-600' : 'text-gray-500'}`}>
+                        Termin zwrotu: {returnDate ? new Date(returnDate).toLocaleDateString('pl-PL') : 'Brak'}
+                        {daysLeft !== null && ` (${daysLeft >= 0 ? `Pozostało: ${daysLeft} dni` : `Opóźnienie: ${Math.abs(daysLeft)} dni`})`}
                       </p>
 
                       {/* Sekcja przycisków akcji */}
                       <div className="mt-3 pt-3 border-t border-gray-200">
-                        {isSelected ? (
+                        {isReported ? (
+                          <div className="w-full text-center py-1.5 text-sm font-medium text-orange-600 bg-orange-50 border border-orange-200 rounded-lg">
+                            Bęben już zgłoszony
+                          </div>
+                        ) : isSelected ? (
                           // Sekcja Uszkodzeń (tylko gdy wybrany)
                           <div className="space-y-3">
                             <label className="flex items-center space-x-2 cursor-pointer text-sm text-gray-700 font-medium">
