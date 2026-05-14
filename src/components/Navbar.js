@@ -66,13 +66,8 @@ const Navbar = ({
                 {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
-                  <Building2 className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-                    Grupa Eltron
-                  </h1>
+                <img src="/logo40.png" alt="Grupa Eltron" className="h-10 w-auto object-contain" />
+                <div className="hidden sm:block">
                   <p className="text-xs text-gray-500">System Zarządzania Bębnami</p>
                 </div>
               </div>
