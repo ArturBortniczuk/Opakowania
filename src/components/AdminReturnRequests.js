@@ -184,19 +184,53 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
     setShowRequestDetails(true);
   };
 
-  const handleStatusChange = async (requestId, newStatus) => {
+  const handleStatusChange = async (requestId, updates) => {
     try {
-      await returnsAPI.updateReturnStatus(requestId, newStatus);
+      const isStringStatus = typeof updates === 'string';
+      const statusValue = isStringStatus ? updates : updates.status;
+
+      await returnsAPI.updateReturnStatus(requestId, updates);
 
       // Zaktualizuj lokalny stan
       setRequests(prev => prev.map(req =>
-        req.id === requestId ? { ...req, status: newStatus, updated_at: new Date().toISOString() } : req
+        req.id === requestId ? { 
+          ...req, 
+          ...(isStringStatus ? { status: updates } : updates),
+          updated_at: new Date().toISOString() 
+        } : req
       ));
 
-      alert(`✅ Status zgłoszenia #${requestId} został zmieniony na: ${newStatus}`);
+      // Jeśli edytujemy wybrane zgłoszenie, zaktualizuj je również
+      if (selectedRequest && selectedRequest.id === requestId) {
+        setSelectedRequest(prev => ({
+          ...prev,
+          ...(isStringStatus ? { status: updates } : updates),
+          updated_at: new Date().toISOString()
+        }));
+      }
+
+      const statusLabel = statusValue === 'Approved' ? 'Przekazane do transportu' :
+                         statusValue === 'InTransit' ? 'W trakcie transportu' : 
+                         statusValue === 'Completed' ? 'Zakończone' : statusValue;
+
+      alert(`✅ Zgłoszenie #${requestId} zostało zaktualizowane: ${statusLabel}`);
     } catch (error) {
       console.error('Błąd podczas zmiany statusu:', error);
       alert('❌ Wystąpił błąd podczas zmiany statusu. Spróbuj ponownie.');
+    }
+  };
+
+  const handleSetInTransit = async (requestId) => {
+    const transportDate = prompt('Podaj datę transportu (RRRR-MM-DD):', new Date().toISOString().split('T')[0]);
+    if (transportDate) {
+      await handleStatusChange(requestId, { status: 'InTransit', transport_date: transportDate });
+    }
+  };
+
+  const handleAddCorrectionNumber = async (requestId) => {
+    const correctionNumber = prompt('Podaj numer korekty:');
+    if (correctionNumber !== null) {
+      await handleStatusChange(requestId, { correction_number: correctionNumber });
     }
   };
 
@@ -224,7 +258,8 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
   const getStatusBadge = (status) => {
     const badges = {
       Pending: { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', text: 'Oczekuje', icon: Clock },
-      Approved: { color: 'bg-blue-100 text-blue-800 border-blue-200', text: 'Zatwierdzony', icon: CheckCircle },
+      Approved: { color: 'bg-blue-100 text-blue-800 border-blue-200', text: 'Przekazane do transportu', icon: Truck },
+      InTransit: { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', text: 'W trakcie transportu', icon: Truck },
       Completed: { color: 'bg-green-100 text-green-800 border-green-200', text: 'Zakończony', icon: CheckCircle },
       Rejected: { color: 'bg-red-100 text-red-800 border-red-200', text: 'Odrzucony', icon: XCircle }
     };
@@ -411,11 +446,31 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
 
           {request.status === 'Approved' && (
             <button
+              onClick={() => handleSetInTransit(request.id)}
+              className="flex-1 bg-indigo-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-indigo-700 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
+            >
+              <Truck className="w-4 h-4" />
+              <span>Transport</span>
+            </button>
+          )}
+
+          {request.status === 'InTransit' && (
+            <button
               onClick={() => handleStatusChange(request.id, 'Completed')}
               className="flex-1 bg-green-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-green-700 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
             >
               <CheckCircle className="w-4 h-4" />
               <span>Zakończ</span>
+            </button>
+          )}
+
+          {request.status === 'Completed' && !request.correction_number && (
+            <button
+              onClick={() => handleAddCorrectionNumber(request.id)}
+              className="flex-1 bg-gray-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-gray-700 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
+            >
+              <Edit className="w-4 h-4" />
+              <span>Korekta</span>
             </button>
           )}
         </div>
@@ -524,6 +579,18 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                     <label className="text-sm font-medium text-gray-500">Priorytet</label>
                     <div className="mt-1">{getPriorityBadge(selectedRequest.priority)}</div>
                   </div>
+                  {selectedRequest.transport_date && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Data transportu</label>
+                      <p className="text-indigo-700 font-semibold">{new Date(selectedRequest.transport_date).toLocaleDateString('pl-PL')}</p>
+                    </div>
+                  )}
+                  {selectedRequest.correction_number && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Numer korekty</label>
+                      <p className="text-green-700 font-bold">{selectedRequest.correction_number}</p>
+                    </div>
+                  )}
                   <div>
                     <label className="text-sm font-medium text-gray-500">Data zgłoszenia</label>
                     <p className="text-gray-900">
@@ -601,6 +668,16 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
 
               {selectedRequest.status === 'Approved' && (
                 <button
+                  onClick={() => handleSetInTransit(selectedRequest.id)}
+                  className="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-indigo-700 transition-colors duration-200 flex items-center justify-center space-x-2"
+                >
+                  <Truck className="w-5 h-5" />
+                  <span>Rozpocznij transport</span>
+                </button>
+              )}
+
+              {selectedRequest.status === 'InTransit' && (
+                <button
                   onClick={() => {
                     handleStatusChange(selectedRequest.id, 'Completed');
                     handleCloseModal();
@@ -609,6 +686,16 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                 >
                   <CheckCircle className="w-5 h-5" />
                   <span>Oznacz jako zakończone</span>
+                </button>
+              )}
+
+              {selectedRequest.status === 'Completed' && (
+                <button
+                  onClick={() => handleAddCorrectionNumber(selectedRequest.id)}
+                  className="flex-1 bg-gray-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-gray-700 transition-colors duration-200 flex items-center justify-center space-x-2"
+                >
+                  <Edit className="w-5 h-5" />
+                  <span>{selectedRequest.correction_number ? 'Zmień numer korekty' : 'Dodaj numer korekty'}</span>
                 </button>
               )}
 
@@ -716,7 +803,8 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
               >
                 <option value="all">Wszystkie statusy</option>
                 <option value="Pending">Oczekujące</option>
-                <option value="Approved">Zatwierdzone</option>
+                <option value="Approved">Przekazane do transportu</option>
+                <option value="InTransit">W trakcie transportu</option>
                 <option value="Completed">Zakończone</option>
                 <option value="Rejected">Odrzucone</option>
               </select>

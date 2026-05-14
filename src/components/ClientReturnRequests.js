@@ -32,7 +32,8 @@ const ClientReturnRequests = ({ user }) => {
   const getStatusBadge = (status) => {
     const badges = {
       Pending: { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', text: 'Oczekuje', icon: Clock },
-      Approved: { color: 'bg-blue-100 text-blue-800 border-blue-200', text: 'Zatwierdzone', icon: CheckCircle },
+      Approved: { color: 'bg-blue-100 text-blue-800 border-blue-200', text: 'Przekazane do transportu', icon: Truck },
+      InTransit: { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', text: 'W trakcie transportu', icon: Truck },
       Completed: { color: 'bg-green-100 text-green-800 border-green-200', text: 'Zakończone', icon: CheckCircle },
       Rejected: { color: 'bg-red-100 text-red-800 border-red-200', text: 'Odrzucone', icon: XCircle }
     };
@@ -161,6 +162,33 @@ const ClientReturnRequests = ({ user }) => {
                       </div>
                     </div>
                   </div>
+
+                  {(req.transport_date || req.correction_number) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 p-3 bg-blue-50/50 rounded-xl border border-blue-100">
+                      {req.transport_date && (
+                        <div className="flex items-center space-x-2">
+                          <Truck className="w-4 h-4 text-indigo-600" />
+                          <div>
+                            <span className="text-gray-500 text-xs block">Data transportu</span>
+                            <span className="font-semibold text-indigo-700">
+                              {new Date(req.transport_date).toLocaleDateString('pl-PL')}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {req.correction_number && (
+                        <div className="flex items-center space-x-2">
+                          <CheckCircle className="w-4 h-4 text-green-600" />
+                          <div>
+                            <span className="text-gray-500 text-xs block">Numer korekty</span>
+                            <span className="font-bold text-green-700">
+                              {req.correction_number}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="space-y-2 mb-4 text-sm bg-gray-50 p-3 rounded-xl border border-gray-100">
                     <div className="flex items-center space-x-2 text-gray-600">

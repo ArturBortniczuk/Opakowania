@@ -600,16 +600,24 @@ export const returnsAPI = {
   },
 
   /**
-   * Aktualizuje status zgłoszenia zwrotu.
+   * Aktualizuje zgłoszenie zwrotu (status, daty, numer korekty itp.).
    * @param {number} id - ID zgłoszenia.
-   * @param {string} status - Nowy status.
+   * @param {object} updates - Obiekt z polami do aktualizacji (np. { status, transport_date }).
    * @returns {Promise<object>} Zaktualizowane zgłoszenie.
    */
-  async updateReturnStatus(id, status) {
+  async updateReturnStatus(id, updates) {
     try {
+      // Jeśli updates jest stringiem, traktujemy to jako sam status (kompatybilność wsteczna)
+      const updatePayload = typeof updates === 'string' 
+        ? { status: updates } 
+        : updates;
+
       const { data, error } = await supabase
         .from('return_requests')
-        .update({ status, updated_at: new Date().toISOString() })
+        .update({ 
+          ...updatePayload, 
+          updated_at: new Date().toISOString() 
+        })
         .eq('id', id)
         .select()
         .single();
@@ -617,7 +625,7 @@ export const returnsAPI = {
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('Błąd aktualizacji statusu zwrotu:', error);
+      console.error('Błąd aktualizacji zgłoszenia zwrotu:', error);
       throw error;
     }
   }
