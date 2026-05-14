@@ -21,7 +21,9 @@ import {
   Edit,
   Download,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Circle,
+  ArrowDown
 } from 'lucide-react';
 
 const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
@@ -245,57 +247,40 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
       ]);
 
       setRequests(requestsData);
-      setCompanies(companiesData);
-
-    } catch (err) {
-      console.error('Błąd podczas odświeżania:', err);
-      setError('Nie udało się odświeżyć danych.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const getStatusBadge = (status) => {
     const badges = {
-      Pending: { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', text: 'Oczekuje', icon: Clock },
-      Approved: { color: 'bg-blue-100 text-blue-800 border-blue-200', text: 'Przekazane do transportu', icon: Truck },
-      InTransit: { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', text: 'W trakcie transportu', icon: Truck },
-      Completed: { color: 'bg-green-100 text-green-800 border-green-200', text: 'Zakończony', icon: CheckCircle },
-      Rejected: { color: 'bg-red-100 text-red-800 border-red-200', text: 'Odrzucony', icon: XCircle }
+      Pending: { color: 'text-amber-500', bg: 'bg-amber-50', text: 'Oczekuje', icon: Clock },
+      Approved: { color: 'text-sky-500', bg: 'bg-sky-50', text: 'Przekazane do transportu', icon: Truck },
+      InTransit: { color: 'text-indigo-500', bg: 'bg-indigo-50', text: 'W trakcie transportu', icon: Truck },
+      Completed: { color: 'text-emerald-500', bg: 'bg-emerald-50', text: 'Zakończony', icon: CheckCircle },
+      Rejected: { color: 'text-rose-500', bg: 'bg-rose-50', text: 'Odrzucony', icon: XCircle }
     };
 
     const badge = badges[status] || badges.Pending;
     const Icon = badge.icon;
 
     return (
-      <span className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium border ${badge.color}`}>
-        <Icon className="w-3 h-3" />
-        <span>{badge.text}</span>
-      </span>
+      <div className={`p-2 rounded-xl border border-transparent hover:border-current transition-colors cursor-help ${badge.bg} ${badge.color}`} title={badge.text}>
+        <Icon className="w-5 h-5" />
+      </div>
     );
   };
 
   const getPriorityBadge = (priority) => {
     const badges = {
-      High: { color: 'bg-red-100 text-red-800 border-red-200', text: 'Wysoki' },
-      Normal: { color: 'bg-gray-100 text-gray-800 border-gray-200', text: 'Normalny' },
-      Low: { color: 'bg-blue-100 text-blue-800 border-blue-200', text: 'Niski' }
+      High: { color: 'text-red-500', bg: 'bg-red-50', text: 'Priorytet: Wysoki', icon: AlertTriangle },
+      Normal: { color: 'text-gray-400', bg: 'bg-gray-50', text: 'Priorytet: Normalny', icon: Circle },
+      Low: { color: 'text-blue-400', bg: 'bg-blue-50', text: 'Priorytet: Niski', icon: ArrowDown }
     };
 
     const badge = badges[priority] || badges.Normal;
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${badge.color}`}>
-        {badge.text}
-      </span>
-    );
-  };
+    const Icon = badge.icon || Circle;
 
-  const getUrgencyColor = (urgencyLevel) => {
-    switch (urgencyLevel) {
-      case 'high': return 'border-red-200 hover:border-red-300';
-      case 'medium': return 'border-yellow-200 hover:border-yellow-300';
-      default: return 'border-blue-100 hover:border-blue-200';
-    }
+    return (
+      <div className={`p-2 rounded-xl border border-transparent hover:border-current transition-colors cursor-help ${badge.bg} ${badge.color}`} title={badge.text}>
+        <Icon className="w-5 h-5" />
+      </div>
+    );
   };
 
   const getStatistics = () => {
@@ -318,87 +303,71 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
 
     return (
       <div
-        className={`bg-white rounded-3xl p-6 shadow-xl border-2 transition-all duration-500 hover:shadow-2xl hover:-translate-y-2 relative overflow-hidden flex flex-col h-full ${getUrgencyColor(request.urgencyLevel)}`}
-        style={{ animationDelay: `${index * 50}ms` }}
+        className={`bg-white rounded-2xl p-6 shadow-sm border transition-all duration-300 hover:shadow-md relative flex flex-col h-full ${request.urgencyLevel === 'high' ? 'border-red-200 bg-red-50/10' : 'border-gray-100'}`}
       >
-        {/* Urgency indicator strip */}
-        {request.urgencyLevel === 'high' && (
-          <div className="absolute top-0 left-0 w-full h-1.5 bg-red-500 animate-pulse" />
-        )}
-
         <div className="flex items-start justify-between gap-4 mb-6">
-          <div className="flex items-center space-x-4 min-w-0">
-            <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-800 rounded-2xl flex items-center justify-center shadow-lg transform rotate-3 hover:rotate-0 transition-transform duration-300">
-              <Truck className="w-8 h-8 text-white" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-xl font-black text-gray-900 leading-tight">Zgłoszenie #{request.id}</h3>
-              <p className="text-sm font-semibold text-blue-600 truncate">{request.company_name}</p>
-              <p className="text-[11px] text-gray-400 font-medium tracking-widest uppercase mt-0.5">NIP: {request.user_nip}</p>
-            </div>
+          <div className="min-w-0">
+            <h3 className="text-lg font-bold text-gray-900 leading-tight">Zgłoszenie #{request.id}</h3>
+            <p className="text-sm font-medium text-blue-600 truncate mt-0.5">{request.company_name}</p>
+            <p className="text-[11px] text-gray-400 font-medium tracking-wider uppercase">NIP: {request.user_nip}</p>
           </div>
 
-          <div className="flex flex-col items-end gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {getStatusBadge(request.status)}
-            <div className="flex items-center gap-2">
-              {getPriorityBadge(request.priority)}
-              {request.urgencyLevel === 'high' && (
-                <AlertCircle className="w-5 h-5 text-red-500 animate-bounce" />
-              )}
-            </div>
+            {getPriorityBadge(request.priority)}
           </div>
         </div>
 
         {/* Info Grid */}
         <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-blue-50/50 p-3 rounded-2xl border border-blue-100/50">
+          <div className="p-3 rounded-xl border border-gray-100 bg-gray-50/50">
             <div className="flex items-center space-x-2 mb-1">
-              <Calendar className="w-4 h-4 text-blue-600" />
-              <span className="text-[10px] font-bold text-blue-400 uppercase tracking-tighter">Planowany odbiór</span>
+              <Calendar className="w-4 h-4 text-gray-400" />
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Odbiór</span>
             </div>
-            <div className="font-bold text-gray-900 text-sm pl-6">
+            <div className="font-semibold text-gray-900 text-sm pl-6">
               {new Date(request.collection_date).toLocaleDateString('pl-PL')}
               {request.daysUntilCollection < 0 ? (
-                <div className="text-[10px] text-red-600 font-black italic">PRZETERMINOWANE</div>
+                <div className="text-[10px] text-red-500 font-bold uppercase mt-0.5">Przeterminowane</div>
               ) : request.daysUntilCollection <= 3 ? (
-                <div className="text-[10px] text-orange-600 font-black italic">ZA {request.daysUntilCollection} DNI</div>
+                <div className="text-[10px] text-orange-500 font-bold uppercase mt-0.5">Za {request.daysUntilCollection} dni</div>
               ) : null}
             </div>
           </div>
 
-          <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50">
+          <div className="p-3 rounded-xl border border-gray-100 bg-gray-50/50">
             <div className="flex items-center space-x-2 mb-1">
-              <Package className="w-4 h-4 text-emerald-600" />
-              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">Bębny</span>
+              <Package className="w-4 h-4 text-gray-400" />
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Bębny</span>
             </div>
-            <div className="font-bold text-gray-900 text-sm pl-6">
+            <div className="font-semibold text-gray-900 text-sm pl-6">
               {request.drumsCount} szt.
               {damagedCount > 0 && (
-                <span className="text-red-500 ml-1 text-[11px] font-black underline decoration-2">({damagedCount} USZK.)</span>
+                <span className="text-red-500 ml-1 text-[11px] font-bold">({damagedCount} uszk.)</span>
               )}
             </div>
           </div>
         </div>
 
-        {/* Transport & Correction Details - EXPOSED ON CARD */}
+        {/* Transport & Correction Details */}
         {(request.transport_date || request.correction_number) && (
-          <div className="mb-6 p-4 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl border border-indigo-100 shadow-inner space-y-3">
+          <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-3">
             {request.transport_date && (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-indigo-600" />
-                  <span className="text-[11px] font-bold text-indigo-400 uppercase">Data transportu</span>
+                  <Truck className="w-4 h-4 text-gray-400" />
+                  <span className="text-[11px] font-bold text-gray-400 uppercase">Transport</span>
                 </div>
-                <span className="text-sm font-black text-indigo-900">{new Date(request.transport_date).toLocaleDateString('pl-PL')}</span>
+                <span className="text-sm font-bold text-gray-900">{new Date(request.transport_date).toLocaleDateString('pl-PL')}</span>
               </div>
             )}
             {request.correction_number && (
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Edit className="w-4 h-4 text-emerald-600" />
-                  <span className="text-[11px] font-bold text-emerald-400 uppercase">Numer korekty</span>
+                  <Edit className="w-4 h-4 text-gray-400" />
+                  <span className="text-[11px] font-bold text-gray-400 uppercase">Korekta</span>
                 </div>
-                <span className="text-sm font-black text-emerald-900">{request.correction_number}</span>
+                <span className="text-sm font-bold text-gray-900">{request.correction_number}</span>
               </div>
             )}
           </div>
@@ -406,104 +375,61 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
 
         {/* Address & Contact */}
         <div className="space-y-3 mb-6 flex-grow">
-          <div className="flex items-start space-x-3 text-sm group">
-            <div className="bg-gray-100 p-1.5 rounded-lg group-hover:bg-blue-100 transition-colors">
-              <MapPin className="w-4 h-4 text-gray-500 group-hover:text-blue-600" />
-            </div>
-            <span className="text-gray-600 leading-snug font-medium pt-0.5">{request.street}, {request.postal_code} {request.city}</span>
+          <div className="flex items-start space-x-3 text-sm">
+            <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+            <span className="text-gray-600 leading-snug font-medium truncate">{request.street}, {request.postal_code} {request.city}</span>
           </div>
-          <div className="flex items-center space-x-3 text-sm group">
-            <div className="bg-gray-100 p-1.5 rounded-lg group-hover:bg-blue-100 transition-colors">
-              <Clock className="w-4 h-4 text-gray-500 group-hover:text-blue-600" />
-            </div>
+          <div className="flex items-center space-x-3 text-sm">
+            <Clock className="w-4 h-4 text-gray-400 shrink-0" />
             <span className="text-gray-600 font-medium">Godziny: {request.loading_hours}</span>
           </div>
         </div>
 
-        {/* Drums chips */}
-        <div className="flex flex-wrap gap-1.5 mb-6">
-          {Array.isArray(request.selected_drums) && request.selected_drums.slice(0, 4).map((drum, idx) => {
-            const label = getDrumLabel(drum);
-            const damaged = isDrumDamaged(drum);
-            return (
-              <span key={idx} className={`px-2.5 py-1 rounded-lg text-[10px] font-black border shadow-sm transition-transform hover:scale-105 ${damaged ? 'bg-red-50 text-red-700 border-red-100' : 'bg-blue-50 text-blue-700 border-blue-100'
-                }`}>
-                {label}
-              </span>
-            );
-          })}
-          {request.drumsCount > 4 && (
-            <span className="px-2.5 py-1 bg-gray-50 text-gray-400 border border-gray-100 rounded-lg text-[10px] font-black">
-              +{request.drumsCount - 4}
-            </span>
-          )}
-        </div>
-
         {/* Action Buttons */}
-        <div className="grid grid-cols-2 gap-3 mt-auto pt-4 border-t border-gray-100">
+        <div className="flex gap-2 mt-auto pt-4 border-t border-gray-100">
           <button
             onClick={() => handleViewRequest(request)}
-            className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 py-3 px-4 rounded-2xl font-bold hover:bg-gray-200 transition-all duration-300 text-sm active:scale-95"
+            className="flex-1 bg-gray-100 text-gray-700 py-2.5 px-4 rounded-xl font-bold hover:bg-gray-200 transition-colors text-sm"
           >
-            <Eye className="w-4 h-4" />
-            <span>Szczegóły</span>
+            Szczegóły
           </button>
 
           {request.status === 'Pending' && (
             <button
               onClick={() => handleStatusChange(request.id, 'Approved')}
-              className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 px-4 rounded-2xl font-bold hover:from-emerald-600 hover:to-green-700 shadow-lg shadow-green-200 transition-all duration-300 text-sm active:scale-95"
+              className="flex-1 bg-emerald-600 text-white py-2.5 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors text-sm"
             >
-              <CheckCircle className="w-4 h-4" />
-              <span>Zatwierdź</span>
+              Zatwierdź
             </button>
           )}
 
           {request.status === 'Approved' && (
             <button
               onClick={() => handleSetInTransit(request.id)}
-              className="flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-blue-600 text-white py-3 px-4 rounded-2xl font-bold hover:from-indigo-600 hover:to-blue-700 shadow-lg shadow-indigo-200 transition-all duration-300 text-sm active:scale-95"
+              className="flex-1 bg-indigo-600 text-white py-2.5 px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors text-sm"
             >
-              <Truck className="w-4 h-4" />
-              <span>Transport</span>
+              Transport
             </button>
           )}
 
           {request.status === 'InTransit' && (
             <button
               onClick={() => handleStatusChange(request.id, 'Completed')}
-              className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 px-4 rounded-2xl font-bold hover:from-emerald-600 hover:to-green-700 shadow-lg shadow-green-200 transition-all duration-300 text-sm active:scale-95"
+              className="flex-1 bg-emerald-600 text-white py-2.5 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors text-sm"
             >
-              <CheckCircle className="w-4 h-4" />
-              <span>Zakończ</span>
+              Zakończ
             </button>
           )}
 
           {request.status === 'Completed' && (
             <button
               onClick={() => handleAddCorrectionNumber(request.id)}
-              className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl font-bold transition-all duration-300 text-sm active:scale-95 ${
+              className={`flex-1 py-2.5 px-4 rounded-xl font-bold transition-colors text-sm border ${
                 request.correction_number 
-                ? 'bg-emerald-50 text-emerald-700 border-2 border-emerald-200 hover:bg-emerald-100' 
-                : 'bg-indigo-50 text-indigo-700 border-2 border-indigo-200 hover:bg-indigo-100'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100' 
+                : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
               }`}
             >
-              <Edit className="w-4 h-4" />
-              <span>{request.correction_number ? 'Korekta' : '+ Korekta'}</span>
-            </button>
-          )}
-
-          {request.status === 'Rejected' && (
-             <div className="flex items-center justify-center gap-2 bg-gray-50 text-gray-400 py-3 px-4 rounded-2xl font-bold border border-gray-100 text-sm opacity-50 cursor-not-allowed">
-              <XCircle className="w-4 h-4" />
-              <span>Odrzucone</span>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   const RequestDetailsModal = () => {
     if (!showRequestDetails || !selectedRequest) return null;
 
@@ -673,8 +599,68 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                       handleStatusChange(selectedRequest.id, 'Approved');
                       handleCloseModal();
                     }}
-                    className="flex-1 bg-green-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-green-700 transition-colors duration-200 flex items-center justify-center space-x-2"
+                    className="flex-1 bg-emerald-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
                   >
+                    <CheckCircle className="w-5 h-5" />
+                    <span>Zatwierdź zgłoszenie</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleStatusChange(selectedRequest.id, 'Rejected');
+                      handleCloseModal();
+                    }}
+                    className="bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-bold hover:bg-red-50 hover:text-red-600 transition-all flex items-center justify-center gap-2"
+                  >
+                    <XCircle className="w-5 h-5" />
+                    <span>Odrzuć</span>
+                  </button>
+                </>
+              )}
+
+              {selectedRequest.status === 'Approved' && (
+                <button
+                  onClick={() => {
+                    handleSetInTransit(selectedRequest.id);
+                    handleCloseModal();
+                  }}
+                  className="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Truck className="w-5 h-5" />
+                  <span>Rozpocznij transport</span>
+                </button>
+              )}
+
+              {selectedRequest.status === 'InTransit' && (
+                <button
+                  onClick={() => {
+                    handleStatusChange(selectedRequest.id, 'Completed');
+                    handleCloseModal();
+                  }}
+                  className="flex-1 bg-emerald-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <CheckCircle className="w-5 h-5" />
+                  <span>Zakończ transport</span>
+                </button>
+              )}
+
+              {selectedRequest.status === 'Completed' && (
+                <button
+                  onClick={() => {
+                    handleAddCorrectionNumber(selectedRequest.id);
+                    handleCloseModal();
+                  }}
+                  className="flex-1 bg-indigo-50 text-indigo-700 py-3 px-4 rounded-xl font-bold hover:bg-indigo-100 border border-indigo-100 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Edit className="w-5 h-5" />
+                  <span>{selectedRequest.correction_number ? 'Edytuj numer korekty' : 'Dodaj numer korekty'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };                  >
                     <CheckCircle className="w-5 h-5" />
                     <span>Zatwierdź zgłoszenie</span>
                   </button>
