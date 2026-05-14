@@ -396,9 +396,9 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         </div>
 
         <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Dokument PZ</span>
-          <span className="text-sm font-medium text-gray-900 truncate ml-2">
-            {drum.nr_dokumentupz || 'Brak'}
+          <span className="text-sm text-gray-500">Lokalizacja</span>
+          <span className="text-sm font-medium text-gray-900 truncate ml-2" title={drum.adres_dostawy || drum.nazwa_punktu_dostawy}>
+            {drum.adres_dostawy || drum.nazwa_punktu_dostawy || 'Brak'}
           </span>
         </div>
 
