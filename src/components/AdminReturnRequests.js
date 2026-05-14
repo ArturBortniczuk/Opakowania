@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 
 const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const urlSearchTerm = searchParams.get('searchTerm');
   const urlClientNip = searchParams.get('clientNip');
 
@@ -44,9 +44,9 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
 
   useEffect(() => {
     fetchRequests();
-  }, [urlClientNip]);
+  }, [urlClientNip, fetchRequests]);
 
-  const fetchRequests = async () => {
+  const fetchRequests = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -54,7 +54,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
       if (urlClientNip) {
         data = await returnsAPI.getReturns(urlClientNip);
       } else {
-        data = await returnsAPI.getAllReturns();
+        data = await returnsAPI.getReturns();
       }
       setRequests(data);
     } catch (err) {
@@ -63,7 +63,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [urlClientNip]);
 
   const handleRefresh = () => {
     fetchRequests();
@@ -222,7 +222,6 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
       ? request.selected_drums.filter(d => isDrumDamaged(d)).length
       : 0;
 
-    const daysOld = Math.floor((new Date() - new Date(request.created_at)) / (1000 * 60 * 60 * 24));
     const collectionDate = new Date(request.collection_date);
     const daysUntilCollection = Math.ceil((collectionDate - new Date()) / (1000 * 60 * 60 * 24));
 

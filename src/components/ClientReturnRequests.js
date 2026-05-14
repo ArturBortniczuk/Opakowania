@@ -9,7 +9,7 @@ const ClientReturnRequests = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchRequests = async () => {
+  const fetchRequests = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -21,13 +21,13 @@ const ClientReturnRequests = ({ user }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.nip]);
 
   useEffect(() => {
     if (user?.nip) {
       fetchRequests();
     }
-  }, [user?.nip]);
+  }, [user?.nip, fetchRequests]);
 
   const getStatusBadge = (status) => {
     const badges = {
