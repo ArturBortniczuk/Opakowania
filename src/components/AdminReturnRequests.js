@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { returnsAPI } from '../utils/supabaseApi';
+import { returnsAPI, companiesAPI, drumsAPI } from '../utils/supabaseApi';
 import {
   Truck,
   Search,
