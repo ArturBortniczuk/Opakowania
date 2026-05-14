@@ -381,6 +381,27 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         </div>
 
         <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-500">Dostawca</span>
+          <span className="text-sm font-medium text-gray-900 truncate ml-2" title={drum.kon_dostawca}>
+            {drum.kon_dostawca || 'Brak'}
+          </span>
+        </div>
+
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-500">Nr faktury</span>
+          <span className="text-sm font-medium text-gray-900 truncate ml-2">
+            {drum.numer_faktury || 'Brak'}
+          </span>
+        </div>
+
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-500">Dokument PZ</span>
+          <span className="text-sm font-medium text-gray-900 truncate ml-2">
+            {drum.nr_dokumentupz || 'Brak'}
+          </span>
+        </div>
+
+        <div className="flex justify-between items-center">
           <span className="text-sm text-gray-500">Zwrot do dostawcy</span>
           <span className="text-sm font-medium text-gray-900">
             {drum.DATA_ZWROTU_DO_DOSTAWCY ?
@@ -791,7 +812,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Szukaj po kodzie, nazwie, adresie dostawy lub numerze faktury..."
+                  placeholder="Szukaj po kodzie, ceche, dostawcy, fakturze lub adresie..."
                   value={localSearchTerm}
                   onChange={(e) => setLocalSearchTerm(e.target.value)}
                   className="pl-10 w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -826,7 +847,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         {/* Results - ZMIENIONE: używa drumsData.data zamiast filteredAndSortedDrums */}
         {drumsData.data.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-8 items-stretch">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8 items-stretch">
               {drumsData.data.map((drum, index) => (
                 <DrumCard key={drum.id || drum.cecha || index} drum={drum} index={index} />
               ))}
