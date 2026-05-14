@@ -119,9 +119,6 @@ const AdminNavbar = ({
             </button>
             <div className="flex items-center space-x-3">
               <img src="/logo40.png" alt="Grupa Eltron" className="h-10 w-auto object-contain" />
-              <div className="hidden sm:block">
-                <p className="text-xs text-gray-500">Panel Administratora</p>
-              </div>
             </div>
           </div>
           <div className="flex items-center space-x-4">

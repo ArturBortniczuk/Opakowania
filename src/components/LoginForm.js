@@ -226,11 +226,8 @@ const LoginForm = ({ onLogin }) => {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <div className="mb-6 flex justify-center">
-            <img src="/logo40.png" alt="Grupa Eltron" className="h-20 w-auto object-contain" />
-          </div>
-          <p className="mt-2 text-lg text-gray-600">System Zarządzania Bębnami</p>
+        <div className="mb-6 flex justify-center">
+          <img src="/logo40.png" alt="Grupa Eltron" className="h-20 w-auto object-contain" />
         </div>
 
         <div className="bg-white/60 backdrop-blur-lg rounded-2xl p-2 shadow-lg border border-blue-100">
