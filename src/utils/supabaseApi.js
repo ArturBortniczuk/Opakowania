@@ -116,6 +116,26 @@ export const authAPI = {
 // ==================================
 export const drumsAPI = {
   /**
+   * Pobiera bębny na podstawie listy cech.
+   * @param {Array} cechy - Lista cech bębnów.
+   * @returns {Promise<Array>} Lista bębnów.
+   */
+  async getDrumsByCechy(cechy) {
+    if (!cechy || cechy.length === 0) return [];
+    try {
+      const { data, error } = await supabase
+        .from('drums')
+        .select('*')
+        .in('cecha', cechy);
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Błąd pobierania bębnów po cechach:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Pobiera listę bębnów, opcjonalnie filtrując po NIP z paginacją.
    * @param {string|null} nip - NIP klienta do filtrowania.
    * @param {object} options - Opcje paginacji i sortowania.

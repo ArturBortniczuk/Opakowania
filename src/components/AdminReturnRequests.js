@@ -32,6 +32,7 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
   const [sortOrder, setSortOrder] = useState('desc');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showRequestDetails, setShowRequestDetails] = useState(false);
+  const [enriching, setEnriching] = useState(false);
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
@@ -106,9 +107,35 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
     }
   };
 
-  const handleViewRequest = (request) => {
+  const handleViewRequest = async (request) => {
     setSelectedRequest(request);
     setShowRequestDetails(true);
+    setEnriching(true);
+
+    try {
+      const cechy = request.selected_drums?.map(d => typeof d === 'object' ? d.cecha : d) || [];
+      if (cechy.length > 0) {
+        const enrichedDrums = await drumsAPI.getDrumsByCechy(cechy);
+        
+        // Łączymy dane ze snapshotu z aktualnymi danymi z bazy
+        const mergedDrums = request.selected_drums.map(d => {
+          const cecha = typeof d === 'object' ? d.cecha : d;
+          const liveData = enrichedDrums.find(ld => ld.cecha === cecha);
+          return {
+            ...d,
+            ...(liveData || {}),
+            isDamaged: d.isDamaged, // Zachowujemy informację o uszkodzeniu ze zgłoszenia
+            description: d.description // Zachowujemy opis ze zgłoszenia
+          };
+        });
+
+        setSelectedRequest(prev => prev ? { ...prev, selected_drums: mergedDrums } : null);
+      }
+    } catch (err) {
+      console.error('Błąd wzbogacania danych bębnów:', err);
+    } finally {
+      setEnriching(false);
+    }
   };
 
   const handleCloseModal = () => {
@@ -472,7 +499,15 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
             </div>
 
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Wybrane bębny ({selectedRequest.selected_drums?.length || 0} szt.)</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Wybrane bębny ({selectedRequest.selected_drums?.length || 0} szt.)</h3>
+                {enriching && (
+                  <div className="flex items-center space-x-2 text-xs text-blue-600 font-medium animate-pulse">
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    <span>Pobieranie aktualnych danych...</span>
+                  </div>
+                )}
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {Array.isArray(selectedRequest.selected_drums) && selectedRequest.selected_drums.map((drum, idx) => {
                   const label = getDrumLabel(drum);
