@@ -106,25 +106,8 @@ const Navbar = ({
         lg:translate-x-0
       `}>
         <div className="h-full flex flex-col pt-16">
-          <div className="p-4 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-blue-100">
-            <div className={`flex items-center space-x-4 ${isCollapsed ? 'justify-center' : ''}`}>
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
-                <User className="w-6 h-6 text-white" />
-              </div>
-              {!isCollapsed && (
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-900 truncate">{user.companyName}</h3>
-                  <p className="text-sm text-gray-600">NIP: {user.nip}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* ZMIANA: Dodano overflow-y-auto dla przewijania */}
           <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-            <h4 className={`text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 ${isCollapsed ? 'text-center' : 'pl-4'}`}>
-              {isCollapsed ? 'MENU' : 'Nawigacja'}
-            </h4>
             {menuItems.map((item) => (
               <NavItem
                 key={item.path}
