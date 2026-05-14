@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { returnsAPI } from '../utils/supabaseApi';
 import { Truck, Clock, CheckCircle, XCircle, Calendar, Package, MapPin, Plus, RefreshCw } from 'lucide-react';
@@ -9,7 +9,8 @@ const ClientReturnRequests = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchRequests = React.useCallback(async () => {
+  const fetchRequests = useCallback(async () => {
+    if (!user?.nip) return;
     setLoading(true);
     setError(null);
     try {
@@ -24,10 +25,8 @@ const ClientReturnRequests = ({ user }) => {
   }, [user?.nip]);
 
   useEffect(() => {
-    if (user?.nip) {
-      fetchRequests();
-    }
-  }, [user?.nip, fetchRequests]);
+    fetchRequests();
+  }, [fetchRequests]);
 
   const getStatusBadge = (status) => {
     const badges = {

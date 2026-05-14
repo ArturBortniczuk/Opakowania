@@ -1,40 +1,31 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { returnsAPI, companiesAPI } from '../utils/supabaseApi';
+import { returnsAPI } from '../utils/supabaseApi';
 import {
   Truck,
   Search,
-  Filter,
-  Eye,
   CheckCircle,
   XCircle,
   Clock,
   AlertTriangle,
   MapPin,
   Calendar,
-  Mail,
-  Phone,
   Package,
-  Building2,
   ArrowUpDown,
-  MoreVertical,
   Edit,
-  Download,
   RefreshCw,
-  AlertCircle,
   Circle,
   ArrowDown
 } from 'lucide-react';
 
-const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
+const AdminReturnRequests = ({ initialFilter = {} }) => {
   const [searchParams] = useSearchParams();
-  const urlSearchTerm = searchParams.get('searchTerm');
   const urlClientNip = searchParams.get('clientNip');
 
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState(urlSearchTerm || '');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('searchTerm') || '');
   const [filterStatus, setFilterStatus] = useState(initialFilter.status || 'all');
   const [filterPriority, setFilterPriority] = useState(initialFilter.priority || 'all');
   const [sortBy, setSortBy] = useState('created_at');
@@ -42,20 +33,11 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showRequestDetails, setShowRequestDetails] = useState(false);
 
-  useEffect(() => {
-    fetchRequests();
-  }, [urlClientNip, fetchRequests]);
-
-  const fetchRequests = React.useCallback(async () => {
+  const fetchRequests = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      let data;
-      if (urlClientNip) {
-        data = await returnsAPI.getReturns(urlClientNip);
-      } else {
-        data = await returnsAPI.getReturns();
-      }
+      const data = await returnsAPI.getReturns(urlClientNip);
       setRequests(data);
     } catch (err) {
       console.error('Błąd pobierania zgłoszeń:', err);
@@ -64,6 +46,10 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
       setLoading(false);
     }
   }, [urlClientNip]);
+
+  useEffect(() => {
+    fetchRequests();
+  }, [fetchRequests]);
 
   const handleRefresh = () => {
     fetchRequests();
@@ -167,7 +153,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
   };
 
   const getStatistics = () => {
-    const stats = {
+    return {
       total: requests.length,
       pending: requests.filter(r => r.status === 'Pending').length,
       approved: requests.filter(r => r.status === 'Approved').length,
@@ -175,17 +161,16 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
       completed: requests.filter(r => r.status === 'Completed').length,
       urgent: requests.filter(r => r.priority === 'High' && r.status !== 'Completed').length
     };
-    return stats;
   };
 
   const filteredAndSortedRequests = useMemo(() => {
     return requests
       .filter(req => {
         const matchesSearch = 
-          req.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          req.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          req.user_nip.includes(searchTerm) ||
-          req.id.toString().includes(searchTerm);
+          req.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          req.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          req.user_nip?.includes(searchTerm) ||
+          req.id?.toString().includes(searchTerm);
         
         const matchesStatus = filterStatus === 'all' || req.status === filterStatus;
         const matchesPriority = filterPriority === 'all' || req.priority === filterPriority;
