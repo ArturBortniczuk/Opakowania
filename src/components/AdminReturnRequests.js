@@ -83,7 +83,7 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
 
   const handleAddCorrectionNumber = async (requestId) => {
     const currentReq = requests.find(r => r.id === requestId);
-    const number = prompt("Podaj numer korekty:", currentReq?.correction_number || "");
+    const number = prompt("Podaj numer(y) korekt (oddziel przecinkami):", currentReq?.correction_number || "");
     if (number === null) return;
 
     try {
@@ -218,7 +218,10 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
           <div className="min-w-0">
             <h3 className="text-lg font-bold text-gray-900 leading-tight">Zgłoszenie #{request.id}</h3>
             <p className="text-sm font-medium text-blue-600 truncate mt-0.5">{request.company_name}</p>
-            <p className="text-[11px] text-gray-400 font-medium tracking-wider uppercase">NIP: {request.user_nip}</p>
+            <div className="flex flex-col mt-1">
+              <p className="text-[10px] text-gray-400 font-bold tracking-wider uppercase leading-none">NIP: {request.user_nip}</p>
+              <p className="text-[10px] text-gray-400 font-bold tracking-wider uppercase mt-1 leading-none">Zgłoszono: {new Date(request.created_at).toLocaleDateString('pl-PL')}</p>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -227,56 +230,58 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="p-3 rounded-xl border border-gray-100 bg-gray-50/50">
-            <div className="flex items-center space-x-2 mb-1">
-              <Calendar className="w-4 h-4 text-gray-400" />
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Odbiór</span>
+        <div className="mb-6">
+          <div className="p-4 rounded-xl border border-gray-100 bg-gray-50/50 space-y-3">
+            <div className="flex items-center justify-between border-b border-gray-100/50 pb-2">
+              <div className="flex items-center space-x-2">
+                <Calendar className="w-4 h-4 text-blue-500" />
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Okres odbioru (14 dni)</span>
+              </div>
+              <div className="text-right">
+                <div className="font-bold text-gray-900 text-sm">
+                  {collectionDate.toLocaleDateString('pl-PL')} - {new Date(collectionDate.getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('pl-PL')}
+                </div>
+                {daysUntilCollection < 0 ? (
+                  <div className="text-[10px] text-red-500 font-bold uppercase">Przeterminowane</div>
+                ) : daysUntilCollection <= 3 ? (
+                  <div className="text-[10px] text-orange-500 font-bold uppercase">Za {daysUntilCollection} dni</div>
+                ) : null}
+              </div>
             </div>
-            <div className="font-semibold text-gray-900 text-sm pl-6">
-              {collectionDate.toLocaleDateString('pl-PL')}
-              {daysUntilCollection < 0 ? (
-                <div className="text-[10px] text-red-500 font-bold uppercase mt-0.5">Przeterminowane</div>
-              ) : daysUntilCollection <= 3 ? (
-                <div className="text-[10px] text-orange-500 font-bold uppercase mt-0.5">Za {daysUntilCollection} dni</div>
-              ) : null}
-            </div>
-          </div>
 
-          <div className="p-3 rounded-xl border border-gray-100 bg-gray-50/50">
-            <div className="flex items-center space-x-2 mb-1">
-              <Package className="w-4 h-4 text-gray-400" />
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Bębny</span>
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center space-x-2">
+                <Clock className="w-4 h-4 text-gray-400" />
+                <span className="text-[10px] font-bold text-gray-400 uppercase">Godziny załadunku</span>
+              </div>
+              <span className="font-semibold text-gray-700">{request.loading_hours}</span>
             </div>
-            <div className="font-semibold text-gray-900 text-sm pl-6">
-              {request.selected_drums?.length || 0} szt.
-              {damagedCount > 0 && (
-                <span className="text-red-500 ml-1 text-[11px] font-bold">({damagedCount} uszk.)</span>
-              )}
-            </div>
+
+            {request.transport_date && (
+              <div className="flex items-center justify-between text-sm pt-1 border-t border-gray-100/50">
+                <div className="flex items-center space-x-2">
+                  <Truck className="w-4 h-4 text-indigo-500" />
+                  <span className="text-[10px] font-bold text-indigo-400 uppercase">Zaplanowany transport</span>
+                </div>
+                <span className="font-bold text-indigo-700">{new Date(request.transport_date).toLocaleDateString('pl-PL')}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {(request.transport_date || request.correction_number) && (
-          <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-3">
-            {request.transport_date && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-gray-400" />
-                  <span className="text-[11px] font-bold text-gray-400 uppercase">Transport</span>
-                </div>
-                <span className="text-sm font-bold text-gray-900">{new Date(request.transport_date).toLocaleDateString('pl-PL')}</span>
-              </div>
-            )}
-            {request.correction_number && (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Edit className="w-4 h-4 text-gray-400" />
-                  <span className="text-[11px] font-bold text-gray-400 uppercase">Korekta</span>
-                </div>
-                <span className="text-sm font-bold text-gray-900">{request.correction_number}</span>
-              </div>
-            )}
+        {request.correction_number && (
+          <div className="mb-6 p-4 bg-emerald-50 rounded-xl border border-emerald-100 space-y-2">
+            <div className="flex items-center gap-2 mb-1">
+              <Edit className="w-4 h-4 text-emerald-500" />
+              <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Numery korekt</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {request.correction_number.split(',').map((num, i) => (
+                <span key={i} className="px-2 py-1 bg-white border border-emerald-200 text-emerald-700 text-[11px] font-bold rounded-lg shadow-sm">
+                  {num.trim()}
+                </span>
+              ))}
+            </div>
           </div>
         )}
 
@@ -284,10 +289,6 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
           <div className="flex items-start space-x-3 text-sm">
             <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
             <span className="text-gray-600 leading-snug font-medium truncate">{request.street}, {request.postal_code} {request.city}</span>
-          </div>
-          <div className="flex items-center space-x-3 text-sm">
-            <Clock className="w-4 h-4 text-gray-400 shrink-0" />
-            <span className="text-gray-600 font-medium">Godziny: {request.loading_hours}</span>
           </div>
         </div>
 
@@ -474,19 +475,68 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
                   const label = getDrumLabel(drum);
                   const damaged = isDrumDamaged(drum);
                   const description = damaged ? drum.description : '';
+                  
+                  // Obliczenia dla bębna
+                  const issueDate = new Date(drum.data_wydania || selectedRequest.created_at);
+                  const pzDate = new Date(drum.data_przyjecia_na_stan || drum.data_wydania || selectedRequest.created_at);
+                  const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
+                  const daysSincePurchase = Math.ceil((new Date() - pzDate) / (1000 * 60 * 60 * 24));
+                  const isOurDrum = daysSincePurchase > 360;
+                  
+                  const returnPeriod = drum.returnPeriodDays || 120;
+                  const returnPercentage = daysInPossession <= returnPeriod ? 100 : 0;
+                  
+                  let daysToSupplier = 'Brak danych';
+                  if (drum.data_zwrotu_do_dostawcy) {
+                    const supplierDeadline = new Date(drum.data_zwrotu_do_dostawcy);
+                    daysToSupplier = Math.ceil((supplierDeadline - new Date()) / (1000 * 60 * 60 * 24));
+                  }
 
                   return (
-                    <div key={idx} className={`p-3 rounded-lg border ${damaged ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'
-                      }`}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`font-semibold ${damaged ? 'text-red-700' : 'text-blue-700'}`}>
+                    <div key={idx} className={`p-4 rounded-xl border flex flex-col ${damaged ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`font-bold text-lg ${damaged ? 'text-red-700' : 'text-blue-700'}`}>
                           {label}
                         </span>
-                        {damaged && <AlertTriangle className="w-4 h-4 text-red-500" title="Uszkodzony" />}
+                        {damaged && <AlertTriangle className="w-5 h-5 text-red-500" title="Uszkodzony" />}
                       </div>
+                      
+                      <div className="space-y-2 text-[11px]">
+                        <div>
+                          <span className="text-gray-400 font-bold uppercase block">Nazwa:</span>
+                          <span className="text-gray-700 font-medium">{drum.nazwa || 'Nieznana'}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400 font-bold uppercase block">Faktura:</span>
+                          <span className="text-gray-700 font-medium">{drum.numer_faktury || 'Brak danych'}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100">
+                          <div>
+                            <span className="text-gray-400 font-bold uppercase block">W posiadaniu:</span>
+                            <span className="text-gray-900 font-bold">{daysInPossession} dni</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 font-bold uppercase block">Zwrot:</span>
+                            <span className={`font-bold ${returnPercentage === 100 ? 'text-emerald-600' : 'text-red-600'}`}>{returnPercentage}%</span>
+                          </div>
+                        </div>
+                        <div className="pt-1 border-t border-gray-100">
+                          <span className="text-gray-400 font-bold uppercase block">Własność:</span>
+                          {isOurDrum ? (
+                            <span className="text-blue-700 font-bold">NASZ (Własny bęben)</span>
+                          ) : (
+                            <div className="flex flex-col">
+                              <span className="text-amber-700 font-bold uppercase">KABLOWNI</span>
+                              <span className="text-gray-500">Zwrócić do kablowni za: <span className={`font-bold ${Number(daysToSupplier) < 7 ? 'text-red-600' : 'text-gray-900'}`}>{daysToSupplier} dni</span></span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
                       {damaged && description && (
-                        <div className="text-xs text-red-600 mt-2 p-1 bg-white rounded border border-red-100">
-                          <span className="font-medium">Opis: </span>{description}
+                        <div className="mt-3 p-2 bg-white rounded border border-red-100 text-[10px]">
+                          <span className="font-bold text-red-600 uppercase block mb-1 text-[9px]">Opis uszkodzeń:</span>
+                          <p className="text-gray-700 italic">"{description}"</p>
                         </div>
                       )}
                     </div>
