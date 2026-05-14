@@ -302,10 +302,11 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
     const total = enrichedRequests.length;
     const pending = enrichedRequests.filter(r => r.status === 'Pending').length;
     const approved = enrichedRequests.filter(r => r.status === 'Approved').length;
+    const inTransit = enrichedRequests.filter(r => r.status === 'InTransit').length;
     const completed = enrichedRequests.filter(r => r.status === 'Completed').length;
     const urgent = enrichedRequests.filter(r => r.urgencyLevel === 'high').length;
 
-    return { total, pending, approved, completed, urgent };
+    return { total, pending, approved, inTransit, completed, urgent };
   };
 
   const stats = getStatistics();
@@ -317,137 +318,151 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
 
     return (
       <div
-        className={`bg-white/90 rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${getUrgencyColor(request.urgencyLevel)}`}
+        className={`bg-white rounded-3xl p-6 shadow-xl border-2 transition-all duration-500 hover:shadow-2xl hover:-translate-y-2 relative overflow-hidden flex flex-col h-full ${getUrgencyColor(request.urgencyLevel)}`}
         style={{ animationDelay: `${index * 50}ms` }}
       >
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
-              <Truck className="w-6 h-6 text-white" />
+        {/* Urgency indicator strip */}
+        {request.urgencyLevel === 'high' && (
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-red-500 animate-pulse" />
+        )}
+
+        <div className="flex items-start justify-between gap-4 mb-6">
+          <div className="flex items-center space-x-4 min-w-0">
+            <div className="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-800 rounded-2xl flex items-center justify-center shadow-lg transform rotate-3 hover:rotate-0 transition-transform duration-300">
+              <Truck className="w-8 h-8 text-white" />
             </div>
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">Zgłoszenie #{request.id}</h3>
-              <p className="text-sm text-gray-600">{request.company_name}</p>
-              <p className="text-xs text-gray-500">NIP: {request.user_nip}</p>
+            <div className="min-w-0">
+              <h3 className="text-xl font-black text-gray-900 leading-tight">Zgłoszenie #{request.id}</h3>
+              <p className="text-sm font-semibold text-blue-600 truncate">{request.company_name}</p>
+              <p className="text-[11px] text-gray-400 font-medium tracking-widest uppercase mt-0.5">NIP: {request.user_nip}</p>
             </div>
           </div>
 
-          <div className="flex flex-col items-end space-y-2">
+          <div className="flex flex-col items-end gap-2 shrink-0">
             {getStatusBadge(request.status)}
-            {getPriorityBadge(request.priority)}
-            {request.urgencyLevel === 'high' && (
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+            <div className="flex items-center gap-2">
+              {getPriorityBadge(request.priority)}
+              {request.urgencyLevel === 'high' && (
+                <AlertCircle className="w-5 h-5 text-red-500 animate-bounce" />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Info Grid */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="bg-blue-50/50 p-3 rounded-2xl border border-blue-100/50">
+            <div className="flex items-center space-x-2 mb-1">
+              <Calendar className="w-4 h-4 text-blue-600" />
+              <span className="text-[10px] font-bold text-blue-400 uppercase tracking-tighter">Planowany odbiór</span>
+            </div>
+            <div className="font-bold text-gray-900 text-sm pl-6">
+              {new Date(request.collection_date).toLocaleDateString('pl-PL')}
+              {request.daysUntilCollection < 0 ? (
+                <div className="text-[10px] text-red-600 font-black italic">PRZETERMINOWANE</div>
+              ) : request.daysUntilCollection <= 3 ? (
+                <div className="text-[10px] text-orange-600 font-black italic">ZA {request.daysUntilCollection} DNI</div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50">
+            <div className="flex items-center space-x-2 mb-1">
+              <Package className="w-4 h-4 text-emerald-600" />
+              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">Bębny</span>
+            </div>
+            <div className="font-bold text-gray-900 text-sm pl-6">
+              {request.drumsCount} szt.
+              {damagedCount > 0 && (
+                <span className="text-red-500 ml-1 text-[11px] font-black underline decoration-2">({damagedCount} USZK.)</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Transport & Correction Details - EXPOSED ON CARD */}
+        {(request.transport_date || request.correction_number) && (
+          <div className="mb-6 p-4 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl border border-indigo-100 shadow-inner space-y-3">
+            {request.transport_date && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Truck className="w-4 h-4 text-indigo-600" />
+                  <span className="text-[11px] font-bold text-indigo-400 uppercase">Data transportu</span>
+                </div>
+                <span className="text-sm font-black text-indigo-900">{new Date(request.transport_date).toLocaleDateString('pl-PL')}</span>
+              </div>
+            )}
+            {request.correction_number && (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Edit className="w-4 h-4 text-emerald-600" />
+                  <span className="text-[11px] font-bold text-emerald-400 uppercase">Numer korekty</span>
+                </div>
+                <span className="text-sm font-black text-emerald-900">{request.correction_number}</span>
+              </div>
             )}
           </div>
-        </div>
+        )}
 
-        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-          <div className="flex items-center space-x-2">
-            <Calendar className="w-4 h-4 text-blue-600" />
-            <div>
-              <span className="text-gray-600">Odbiór:</span>
-              <div className="font-medium text-gray-900">
-                {new Date(request.collection_date).toLocaleDateString('pl-PL')}
-              </div>
-              {request.daysUntilCollection < 0 && (
-                <div className="text-xs text-red-600">Przeterminowany</div>
-              )}
-              {request.daysUntilCollection >= 0 && request.daysUntilCollection <= 7 && (
-                <div className="text-xs text-yellow-600">Za {request.daysUntilCollection} dni</div>
-              )}
+        {/* Address & Contact */}
+        <div className="space-y-3 mb-6 flex-grow">
+          <div className="flex items-start space-x-3 text-sm group">
+            <div className="bg-gray-100 p-1.5 rounded-lg group-hover:bg-blue-100 transition-colors">
+              <MapPin className="w-4 h-4 text-gray-500 group-hover:text-blue-600" />
             </div>
+            <span className="text-gray-600 leading-snug font-medium pt-0.5">{request.street}, {request.postal_code} {request.city}</span>
           </div>
-
-          <div className="flex items-center space-x-2">
-            <Package className="w-4 h-4 text-green-600" />
-            <div>
-              <span className="text-gray-600">Bębny:</span>
-              <div className="font-medium text-gray-900">
-                {request.drumsCount} szt.
-                {damagedCount > 0 && (
-                  <span className="text-red-500 ml-1 text-xs">({damagedCount} uszk.)</span>
-                )}
-              </div>
+          <div className="flex items-center space-x-3 text-sm group">
+            <div className="bg-gray-100 p-1.5 rounded-lg group-hover:bg-blue-100 transition-colors">
+              <Clock className="w-4 h-4 text-gray-500 group-hover:text-blue-600" />
             </div>
+            <span className="text-gray-600 font-medium">Godziny: {request.loading_hours}</span>
           </div>
         </div>
 
-        <div className="space-y-2 mb-4 text-sm">
-          <div className="flex items-center space-x-2 text-gray-600">
-            <MapPin className="w-4 h-4" />
-            <span className="truncate">{request.street}, {request.postal_code} {request.city}</span>
-          </div>
-          <div className="flex items-center space-x-2 text-gray-600">
-            <Mail className="w-4 h-4" />
-            <span>{request.email}</span>
-          </div>
-          <div className="flex items-center space-x-2 text-gray-600">
-            <Clock className="w-4 h-4" />
-            <span>Godziny: {request.loading_hours}</span>
-          </div>
-          {request.available_equipment && (
-            <div className="flex items-center space-x-2 text-gray-600">
-              <Truck className="w-4 h-4" />
-              <span>Sprzęt: {request.available_equipment}</span>
-            </div>
+        {/* Drums chips */}
+        <div className="flex flex-wrap gap-1.5 mb-6">
+          {Array.isArray(request.selected_drums) && request.selected_drums.slice(0, 4).map((drum, idx) => {
+            const label = getDrumLabel(drum);
+            const damaged = isDrumDamaged(drum);
+            return (
+              <span key={idx} className={`px-2.5 py-1 rounded-lg text-[10px] font-black border shadow-sm transition-transform hover:scale-105 ${damaged ? 'bg-red-50 text-red-700 border-red-100' : 'bg-blue-50 text-blue-700 border-blue-100'
+                }`}>
+                {label}
+              </span>
+            );
+          })}
+          {request.drumsCount > 4 && (
+            <span className="px-2.5 py-1 bg-gray-50 text-gray-400 border border-gray-100 rounded-lg text-[10px] font-black">
+              +{request.drumsCount - 4}
+            </span>
           )}
         </div>
 
-        {/* Podgląd bębnów na karcie - pierwsze 5 */}
-        <div className="space-y-2">
-          <div className="text-xs text-gray-500 mb-1">Wybrane bębny:</div>
-          <div className="flex flex-wrap gap-1">
-            {Array.isArray(request.selected_drums) && request.selected_drums.slice(0, 5).map((drum, idx) => {
-              const label = getDrumLabel(drum);
-              const damaged = isDrumDamaged(drum);
-              return (
-                <span key={idx} className={`px-2 py-1 rounded text-xs font-medium flex items-center space-x-1 ${damaged ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
-                  }`}>
-                  <span>{label}</span>
-                  {damaged && <AlertCircle className="w-3 h-3" />}
-                </span>
-              );
-            })}
-            {request.drumsCount > 5 && (
-              <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-medium">
-                +{request.drumsCount - 5} więcej
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex space-x-2 mt-4">
+        {/* Action Buttons */}
+        <div className="grid grid-cols-2 gap-3 mt-auto pt-4 border-t border-gray-100">
           <button
             onClick={() => handleViewRequest(request)}
-            className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2 px-3 rounded-xl font-medium hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
+            className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 py-3 px-4 rounded-2xl font-bold hover:bg-gray-200 transition-all duration-300 text-sm active:scale-95"
           >
             <Eye className="w-4 h-4" />
             <span>Szczegóły</span>
           </button>
 
           {request.status === 'Pending' && (
-            <>
-              <button
-                onClick={() => handleStatusChange(request.id, 'Approved')}
-                className="flex-1 bg-green-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-green-700 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
-              >
-                <CheckCircle className="w-4 h-4" />
-                <span>Zatwierdź</span>
-              </button>
-
-              <button
-                onClick={() => handleStatusChange(request.id, 'Rejected')}
-                className="bg-red-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-red-700 transition-all duration-200 flex items-center justify-center text-sm"
-              >
-                <XCircle className="w-4 h-4" />
-              </button>
-            </>
+            <button
+              onClick={() => handleStatusChange(request.id, 'Approved')}
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 px-4 rounded-2xl font-bold hover:from-emerald-600 hover:to-green-700 shadow-lg shadow-green-200 transition-all duration-300 text-sm active:scale-95"
+            >
+              <CheckCircle className="w-4 h-4" />
+              <span>Zatwierdź</span>
+            </button>
           )}
 
           {request.status === 'Approved' && (
             <button
               onClick={() => handleSetInTransit(request.id)}
-              className="flex-1 bg-indigo-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-indigo-700 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-blue-600 text-white py-3 px-4 rounded-2xl font-bold hover:from-indigo-600 hover:to-blue-700 shadow-lg shadow-indigo-200 transition-all duration-300 text-sm active:scale-95"
             >
               <Truck className="w-4 h-4" />
               <span>Transport</span>
@@ -457,21 +472,32 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
           {request.status === 'InTransit' && (
             <button
               onClick={() => handleStatusChange(request.id, 'Completed')}
-              className="flex-1 bg-green-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-green-700 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 px-4 rounded-2xl font-bold hover:from-emerald-600 hover:to-green-700 shadow-lg shadow-green-200 transition-all duration-300 text-sm active:scale-95"
             >
               <CheckCircle className="w-4 h-4" />
               <span>Zakończ</span>
             </button>
           )}
 
-          {request.status === 'Completed' && !request.correction_number && (
+          {request.status === 'Completed' && (
             <button
               onClick={() => handleAddCorrectionNumber(request.id)}
-              className="flex-1 bg-gray-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-gray-700 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
+              className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl font-bold transition-all duration-300 text-sm active:scale-95 ${
+                request.correction_number 
+                ? 'bg-emerald-50 text-emerald-700 border-2 border-emerald-200 hover:bg-emerald-100' 
+                : 'bg-indigo-50 text-indigo-700 border-2 border-indigo-200 hover:bg-indigo-100'
+              }`}
             >
               <Edit className="w-4 h-4" />
-              <span>Korekta</span>
+              <span>{request.correction_number ? 'Korekta' : '+ Korekta'}</span>
             </button>
+          )}
+
+          {request.status === 'Rejected' && (
+             <div className="flex items-center justify-center gap-2 bg-gray-50 text-gray-400 py-3 px-4 rounded-2xl font-bold border border-gray-100 text-sm opacity-50 cursor-not-allowed">
+              <XCircle className="w-4 h-4" />
+              <span>Odrzucone</span>
+            </div>
           )}
         </div>
       </div>
@@ -849,26 +875,30 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-blue-100 text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-              <div className="text-sm text-gray-600">Wszystkie</div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+            <div className="bg-white rounded-3xl p-5 shadow-lg border border-blue-50 text-center group hover:scale-105 transition-transform duration-300">
+              <div className="text-3xl font-black text-blue-600 mb-1 group-hover:animate-pulse">{stats.total}</div>
+              <div className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Wszystkie</div>
             </div>
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-yellow-100 text-center">
-              <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
-              <div className="text-sm text-gray-600">Oczekujące</div>
+            <div className="bg-white rounded-3xl p-5 shadow-lg border border-amber-50 text-center group hover:scale-105 transition-transform duration-300">
+              <div className="text-3xl font-black text-amber-600 mb-1 group-hover:animate-pulse">{stats.pending}</div>
+              <div className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Oczekujące</div>
             </div>
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-blue-100 text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.approved}</div>
-              <div className="text-sm text-gray-600">Zatwierdzone</div>
+            <div className="bg-white rounded-3xl p-5 shadow-lg border border-sky-50 text-center group hover:scale-105 transition-transform duration-300">
+              <div className="text-3xl font-black text-sky-600 mb-1 group-hover:animate-pulse">{stats.approved}</div>
+              <div className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Transport</div>
             </div>
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-green-100 text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
-              <div className="text-sm text-gray-600">Zakończone</div>
+            <div className="bg-white rounded-3xl p-5 shadow-lg border border-indigo-50 text-center group hover:scale-105 transition-transform duration-300">
+              <div className="text-3xl font-black text-indigo-600 mb-1 group-hover:animate-pulse">{stats.inTransit}</div>
+              <div className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">W trasie</div>
             </div>
-            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-red-100 text-center">
-              <div className="text-2xl font-bold text-red-600">{stats.urgent}</div>
-              <div className="text-sm text-gray-600">Pilne</div>
+            <div className="bg-white rounded-3xl p-5 shadow-lg border border-emerald-50 text-center group hover:scale-105 transition-transform duration-300">
+              <div className="text-3xl font-black text-emerald-600 mb-1 group-hover:animate-pulse">{stats.completed}</div>
+              <div className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Zakończone</div>
+            </div>
+            <div className="bg-white rounded-3xl p-5 shadow-lg border border-rose-50 text-center group hover:scale-105 transition-transform duration-300">
+              <div className="text-3xl font-black text-rose-600 mb-1 group-hover:animate-pulse">{stats.urgent}</div>
+              <div className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Pilne</div>
             </div>
           </div>
         </div>
