@@ -524,10 +524,12 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
                   // Nowa logika "Nasze":
                   // 1. Brak daty zwrotu do dostawcy
                   // 2. Nazwa zaczyna się od "BĘBEN ELTRON"
-                  // 3. Termin zwrotu do dostawcy przekroczony o ponad 360 dni
+                  // 3. Klient posiada bęben powyżej 360 dni
+                  // 4. Termin zwrotu do dostawcy przekroczony o ponad 360 dni
                   const isOurDrum = 
                     !returnDeadline || 
                     nameUpper.startsWith('BĘBEN ELTRON') || 
+                    daysInPossession > 360 ||
                     (returnDeadline && (new Date() - returnDeadline) / (1000 * 60 * 60 * 24) > 360);
                   
                   const returnPeriod = drum.returnPeriodDays || 120;
