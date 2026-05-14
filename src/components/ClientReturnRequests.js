@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { returnsAPI } from '../utils/supabaseApi';
-import { Truck, Clock, CheckCircle, XCircle, Calendar, Package, MapPin, Plus, RefreshCw, AlertCircle } from 'lucide-react';
+import { Truck, Clock, CheckCircle, XCircle, Calendar, Package, MapPin, Plus, RefreshCw } from 'lucide-react';
 
 const ClientReturnRequests = ({ user }) => {
   const navigate = useNavigate();
@@ -122,6 +122,12 @@ const ClientReturnRequests = ({ user }) => {
             </button>
           </div>
         ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {requests.map((req) => {
+              const drumsCount = Array.isArray(req.selected_drums) ? req.selected_drums.length : 0;
+              const damagedCount = Array.isArray(req.selected_drums) ? req.selected_drums.filter(d => isDrumDamaged(d)).length : 0;
+              
+              return (
                 <div key={req.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 transition-all duration-300 hover:shadow-md relative flex flex-col h-full">
                   <div className="flex justify-between items-start mb-6 pb-4 border-b border-gray-100">
                     <div>

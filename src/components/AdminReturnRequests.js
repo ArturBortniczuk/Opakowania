@@ -30,154 +30,93 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const urlSearchTerm = searchParams.get('searchTerm');
   const urlClientNip = searchParams.get('clientNip');
-  const urlOpenModal = searchParams.get('openModal') === 'true';
-  const urlFilterStatus = searchParams.get('filterStatus');
 
-  const initialSearch = urlSearchTerm || urlClientNip || '';
-  
-  const [searchTerm, setSearchTerm] = useState(initialSearch);
-  const [sortBy, setSortBy] = useState('created_at');
-  const [sortOrder, setSortOrder] = useState('desc');
-  const [filterStatus, setFilterStatus] = useState(urlFilterStatus || (initialFilter && initialFilter.status) || 'all');
-  const [filterPriority, setFilterPriority] = useState('all');
-  const [selectedRequest, setSelectedRequest] = useState(null);
-  const [showRequestDetails, setShowRequestDetails] = useState(false);
   const [requests, setRequests] = useState([]);
-  const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState(urlSearchTerm || '');
+  const [filterStatus, setFilterStatus] = useState(initialFilter.status || 'all');
+  const [filterPriority, setFilterPriority] = useState(initialFilter.priority || 'all');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [showRequestDetails, setShowRequestDetails] = useState(false);
 
-  // Helper do bezpiecznego wyciągania identyfikatora bębna (cecha lub stary kod)
-  const getDrumLabel = (drum) => {
-    if (typeof drum === 'object' && drum !== null) {
-      return drum.cecha || drum.kod_bebna || 'Nieznany';
-    }
-    return drum; // Stary format (string)
-  };
-
-  const isDrumDamaged = (drum) => {
-    return typeof drum === 'object' && drum !== null && drum.isDamaged;
-  };
-
-  // Pobierz zgłoszenia zwrotów i firmy
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
+    fetchRequests();
+  }, [urlClientNip]);
 
-      try {
-        const [requestsData, companiesData] = await Promise.all([
-          returnsAPI.getReturns(),
-          companiesAPI.getCompanies()
-        ]);
-
-        setRequests(requestsData);
-        setCompanies(companiesData);
-
-      } catch (err) {
-        console.error('Błąd podczas pobierania danych:', err);
-        setError('Nie udało się pobrać danych. Spróbuj ponownie.');
-      } finally {
-        setLoading(false);
+  const fetchRequests = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      let data;
+      if (urlClientNip) {
+        data = await returnsAPI.getReturns(urlClientNip);
+      } else {
+        data = await returnsAPI.getAllReturns();
       }
-    };
-
-    fetchData();
-  }, []);
-
-  // DODANE: Auto-otwieranie modala zgłoszenia
-  useEffect(() => {
-    if (urlOpenModal && urlSearchTerm && !loading && !showRequestDetails && requests.length > 0) {
-      const targetId = parseInt(urlSearchTerm, 10);
-      const targetRequest = requests.find(r => r.id === targetId || r.company_name === urlSearchTerm);
-      if (targetRequest) {
-        setSelectedRequest(targetRequest);
-        setShowRequestDetails(true);
-      }
-    }
-  }, [requests, urlOpenModal, urlSearchTerm, loading, showRequestDetails]);
-
-  const handleCloseModal = () => {
-    setShowRequestDetails(false);
-    if (urlOpenModal) {
-      const newParams = new URLSearchParams(searchParams);
-      newParams.delete('openModal');
-      setSearchParams(newParams);
+      setRequests(data);
+    } catch (err) {
+      console.error('Błąd pobierania zgłoszeń:', err);
+      setError('Nie udało się pobrać zgłoszeń.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const enrichedRequests = useMemo(() => {
-    return requests.map(request => {
-      const now = new Date();
-      const collectionDate = new Date(request.collection_date);
-      const createdDate = new Date(request.created_at);
+  const handleRefresh = () => {
+    fetchRequests();
+  };
 
-      const daysUntilCollection = Math.ceil((collectionDate - now) / (1000 * 60 * 60 * 24));
-      const daysOld = Math.ceil((now - createdDate) / (1000 * 60 * 60 * 24));
+  const handleStatusChange = async (requestId, newStatus) => {
+    try {
+      await returnsAPI.updateReturnStatus(requestId, newStatus);
+      handleRefresh();
+    } catch (err) {
+      console.error('Błąd zmiany statusu:', err);
+      alert('Nie udało się zmienić statusu.');
+    }
+  };
 
-      let urgencyLevel = 'normal';
-      if (request.priority === 'High' || daysUntilCollection < 0) {
-        urgencyLevel = 'high';
-      } else if (daysUntilCollection <= 3) {
-        urgencyLevel = 'medium';
-      }
+  const handleSetInTransit = async (requestId) => {
+    const date = prompt("Podaj datę transportu (RRRR-MM-DD):", new Date().toISOString().split('T')[0]);
+    if (!date) return;
 
-      return {
-        ...request,
-        daysUntilCollection,
-        daysOld,
-        urgencyLevel,
-        drumsCount: Array.isArray(request.selected_drums) ? request.selected_drums.length : 0
-      };
-    });
-  }, [requests]);
-
-  const filteredAndSortedRequests = useMemo(() => {
-    let filtered = enrichedRequests.filter(request => {
-      // Rozszerzone wyszukiwanie o strukturę obiektową bębnów
-      const drumsMatch = Array.isArray(request.selected_drums) && request.selected_drums.some(drum => {
-        const label = getDrumLabel(drum);
-        return label.toLowerCase().includes(searchTerm.toLowerCase());
+    try {
+      await returnsAPI.updateReturnStatus(requestId, {
+        status: 'InTransit',
+        transport_date: date
       });
+      handleRefresh();
+    } catch (err) {
+      console.error('Błąd ustawiania transportu:', err);
+      alert('Nie udało się ustawić transportu.');
+    }
+  };
 
-      const matchesSearch = request.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        request.user_nip.includes(searchTerm) ||
-        request.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        request.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        drumsMatch;
+  const handleAddCorrectionNumber = async (requestId) => {
+    const currentReq = requests.find(r => r.id === requestId);
+    const number = prompt("Podaj numer korekty:", currentReq?.correction_number || "");
+    if (number === null) return;
 
-      if (!matchesSearch) return false;
-
-      if (filterStatus !== 'all' && request.status !== filterStatus) return false;
-      if (filterPriority !== 'all' && request.priority !== filterPriority) return false;
-
-      return true;
-    });
-
-    return filtered.sort((a, b) => {
-      let aValue = a[sortBy];
-      let bValue = b[sortBy];
-
-      if (sortBy === 'created_at' || sortBy === 'collection_date') {
-        aValue = new Date(aValue);
-        bValue = new Date(bValue);
-      } else if (sortBy === 'daysUntilCollection' || sortBy === 'daysOld' || sortBy === 'drumsCount') {
-        aValue = Number(aValue);
-        bValue = Number(bValue);
-      }
-
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [enrichedRequests, searchTerm, sortBy, sortOrder, filterStatus, filterPriority]);
+    try {
+      await returnsAPI.updateReturnStatus(requestId, {
+        correction_number: number
+      });
+      handleRefresh();
+    } catch (err) {
+      console.error('Błąd dodawania numeru korekty:', err);
+      alert('Nie udało się zapisać numeru korekty.');
+    }
+  };
 
   const handleSort = (field) => {
     if (sortBy === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
       setSortBy(field);
-      setSortOrder('asc');
+      setSortOrder('desc');
     }
   };
 
@@ -186,67 +125,11 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
     setShowRequestDetails(true);
   };
 
-  const handleStatusChange = async (requestId, updates) => {
-    try {
-      const isStringStatus = typeof updates === 'string';
-      const statusValue = isStringStatus ? updates : updates.status;
-
-      await returnsAPI.updateReturnStatus(requestId, updates);
-
-      // Zaktualizuj lokalny stan
-      setRequests(prev => prev.map(req =>
-        req.id === requestId ? { 
-          ...req, 
-          ...(isStringStatus ? { status: updates } : updates),
-          updated_at: new Date().toISOString() 
-        } : req
-      ));
-
-      // Jeśli edytujemy wybrane zgłoszenie, zaktualizuj je również
-      if (selectedRequest && selectedRequest.id === requestId) {
-        setSelectedRequest(prev => ({
-          ...prev,
-          ...(isStringStatus ? { status: updates } : updates),
-          updated_at: new Date().toISOString()
-        }));
-      }
-
-      const statusLabel = statusValue === 'Approved' ? 'Przekazane do transportu' :
-                         statusValue === 'InTransit' ? 'W trakcie transportu' : 
-                         statusValue === 'Completed' ? 'Zakończone' : statusValue;
-
-      alert(`✅ Zgłoszenie #${requestId} zostało zaktualizowane: ${statusLabel}`);
-    } catch (error) {
-      console.error('Błąd podczas zmiany statusu:', error);
-      alert('❌ Wystąpił błąd podczas zmiany statusu. Spróbuj ponownie.');
-    }
+  const handleCloseModal = () => {
+    setShowRequestDetails(false);
+    setSelectedRequest(null);
   };
 
-  const handleSetInTransit = async (requestId) => {
-    const transportDate = prompt('Podaj datę transportu (RRRR-MM-DD):', new Date().toISOString().split('T')[0]);
-    if (transportDate) {
-      await handleStatusChange(requestId, { status: 'InTransit', transport_date: transportDate });
-    }
-  };
-
-  const handleAddCorrectionNumber = async (requestId) => {
-    const correctionNumber = prompt('Podaj numer korekty:');
-    if (correctionNumber !== null) {
-      await handleStatusChange(requestId, { correction_number: correctionNumber });
-    }
-  };
-
-  const handleRefresh = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const [requestsData, companiesData] = await Promise.all([
-        returnsAPI.getReturns(),
-        companiesAPI.getCompanies()
-      ]);
-
-      setRequests(requestsData);
   const getStatusBadge = (status) => {
     const badges = {
       Pending: { color: 'text-amber-500', bg: 'bg-amber-50', text: 'Oczekuje', icon: Clock },
@@ -284,26 +167,68 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
   };
 
   const getStatistics = () => {
-    const total = enrichedRequests.length;
-    const pending = enrichedRequests.filter(r => r.status === 'Pending').length;
-    const approved = enrichedRequests.filter(r => r.status === 'Approved').length;
-    const inTransit = enrichedRequests.filter(r => r.status === 'InTransit').length;
-    const completed = enrichedRequests.filter(r => r.status === 'Completed').length;
-    const urgent = enrichedRequests.filter(r => r.urgencyLevel === 'high').length;
-
-    return { total, pending, approved, inTransit, completed, urgent };
+    const stats = {
+      total: requests.length,
+      pending: requests.filter(r => r.status === 'Pending').length,
+      approved: requests.filter(r => r.status === 'Approved').length,
+      inTransit: requests.filter(r => r.status === 'InTransit').length,
+      completed: requests.filter(r => r.status === 'Completed').length,
+      urgent: requests.filter(r => r.priority === 'High' && r.status !== 'Completed').length
+    };
+    return stats;
   };
 
-  const stats = getStatistics();
+  const filteredAndSortedRequests = useMemo(() => {
+    return requests
+      .filter(req => {
+        const matchesSearch = 
+          req.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          req.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          req.user_nip.includes(searchTerm) ||
+          req.id.toString().includes(searchTerm);
+        
+        const matchesStatus = filterStatus === 'all' || req.status === filterStatus;
+        const matchesPriority = filterPriority === 'all' || req.priority === filterPriority;
 
-  const RequestCard = ({ request, index }) => {
+        return matchesSearch && matchesStatus && matchesPriority;
+      })
+      .sort((a, b) => {
+        let valA = a[sortBy];
+        let valB = b[sortBy];
+
+        if (sortBy === 'created_at' || sortBy === 'collection_date') {
+          valA = new Date(valA || 0).getTime();
+          valB = new Date(valB || 0).getTime();
+        }
+
+        if (sortOrder === 'asc') return valA > valB ? 1 : -1;
+        return valA < valB ? 1 : -1;
+      });
+  }, [requests, searchTerm, filterStatus, filterPriority, sortBy, sortOrder]);
+
+  const getDrumLabel = (drum) => {
+    if (typeof drum === 'object' && drum !== null) {
+      return drum.cecha || drum.kod_bebna || 'Nieznany';
+    }
+    return drum;
+  };
+
+  const isDrumDamaged = (drum) => {
+    return typeof drum === 'object' && drum !== null && drum.isDamaged;
+  };
+
+  const RequestCard = ({ request }) => {
     const damagedCount = Array.isArray(request.selected_drums)
       ? request.selected_drums.filter(d => isDrumDamaged(d)).length
       : 0;
 
+    const daysOld = Math.floor((new Date() - new Date(request.created_at)) / (1000 * 60 * 60 * 24));
+    const collectionDate = new Date(request.collection_date);
+    const daysUntilCollection = Math.ceil((collectionDate - new Date()) / (1000 * 60 * 60 * 24));
+
     return (
       <div
-        className={`bg-white rounded-2xl p-6 shadow-sm border transition-all duration-300 hover:shadow-md relative flex flex-col h-full ${request.urgencyLevel === 'high' ? 'border-red-200 bg-red-50/10' : 'border-gray-100'}`}
+        className={`bg-white rounded-2xl p-6 shadow-sm border transition-all duration-300 hover:shadow-md relative flex flex-col h-full ${request.priority === 'High' ? 'border-red-200 bg-red-50/10' : 'border-gray-100'}`}
       >
         <div className="flex items-start justify-between gap-4 mb-6">
           <div className="min-w-0">
@@ -318,7 +243,6 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
           </div>
         </div>
 
-        {/* Info Grid */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="p-3 rounded-xl border border-gray-100 bg-gray-50/50">
             <div className="flex items-center space-x-2 mb-1">
@@ -326,11 +250,11 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Odbiór</span>
             </div>
             <div className="font-semibold text-gray-900 text-sm pl-6">
-              {new Date(request.collection_date).toLocaleDateString('pl-PL')}
-              {request.daysUntilCollection < 0 ? (
+              {collectionDate.toLocaleDateString('pl-PL')}
+              {daysUntilCollection < 0 ? (
                 <div className="text-[10px] text-red-500 font-bold uppercase mt-0.5">Przeterminowane</div>
-              ) : request.daysUntilCollection <= 3 ? (
-                <div className="text-[10px] text-orange-500 font-bold uppercase mt-0.5">Za {request.daysUntilCollection} dni</div>
+              ) : daysUntilCollection <= 3 ? (
+                <div className="text-[10px] text-orange-500 font-bold uppercase mt-0.5">Za {daysUntilCollection} dni</div>
               ) : null}
             </div>
           </div>
@@ -341,7 +265,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Bębny</span>
             </div>
             <div className="font-semibold text-gray-900 text-sm pl-6">
-              {request.drumsCount} szt.
+              {request.selected_drums?.length || 0} szt.
               {damagedCount > 0 && (
                 <span className="text-red-500 ml-1 text-[11px] font-bold">({damagedCount} uszk.)</span>
               )}
@@ -349,7 +273,6 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
           </div>
         </div>
 
-        {/* Transport & Correction Details */}
         {(request.transport_date || request.correction_number) && (
           <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-3">
             {request.transport_date && (
@@ -373,7 +296,6 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
           </div>
         )}
 
-        {/* Address & Contact */}
         <div className="space-y-3 mb-6 flex-grow">
           <div className="flex items-start space-x-3 text-sm">
             <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
@@ -385,7 +307,6 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="flex gap-2 mt-auto pt-4 border-t border-gray-100">
           <button
             onClick={() => handleViewRequest(request)}
@@ -430,6 +351,14 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                 : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
               }`}
             >
+              {request.correction_number ? 'Korekta' : '+ Korekta'}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const RequestDetailsModal = () => {
     if (!showRequestDetails || !selectedRequest) return null;
 
@@ -547,7 +476,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                     <label className="text-sm font-medium text-gray-500">Data zgłoszenia</label>
                     <p className="text-gray-900">
                       {new Date(selectedRequest.created_at).toLocaleDateString('pl-PL')}
-                      <span className="text-gray-500 ml-2">({selectedRequest.daysOld} dni temu)</span>
+                      <span className="text-gray-500 ml-2">({Math.floor((new Date() - new Date(selectedRequest.created_at)) / (1000 * 60 * 60 * 24))} dni temu)</span>
                     </p>
                   </div>
                 </div>
@@ -555,7 +484,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
             </div>
 
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Wybrane bębny ({selectedRequest.drumsCount} szt.)</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Wybrane bębny ({selectedRequest.selected_drums?.length || 0} szt.)</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {Array.isArray(selectedRequest.selected_drums) && selectedRequest.selected_drums.map((drum, idx) => {
                   const label = getDrumLabel(drum);
@@ -660,99 +589,16 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
         </div>
       </div>
     );
-  };                  >
-                    <CheckCircle className="w-5 h-5" />
-                    <span>Zatwierdź zgłoszenie</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      handleStatusChange(selectedRequest.id, 'Rejected');
-                      handleCloseModal();
-                    }}
-                    className="flex-1 bg-red-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-red-700 transition-colors duration-200 flex items-center justify-center space-x-2"
-                  >
-                    <XCircle className="w-5 h-5" />
-                    <span>Odrzuć zgłoszenie</span>
-                  </button>
-                </>
-              )}
-
-              {selectedRequest.status === 'Approved' && (
-                <button
-                  onClick={() => handleSetInTransit(selectedRequest.id)}
-                  className="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-indigo-700 transition-colors duration-200 flex items-center justify-center space-x-2"
-                >
-                  <Truck className="w-5 h-5" />
-                  <span>Rozpocznij transport</span>
-                </button>
-              )}
-
-              {selectedRequest.status === 'InTransit' && (
-                <button
-                  onClick={() => {
-                    handleStatusChange(selectedRequest.id, 'Completed');
-                    handleCloseModal();
-                  }}
-                  className="flex-1 bg-green-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-green-700 transition-colors duration-200 flex items-center justify-center space-x-2"
-                >
-                  <CheckCircle className="w-5 h-5" />
-                  <span>Oznacz jako zakończone</span>
-                </button>
-              )}
-
-              {selectedRequest.status === 'Completed' && (
-                <button
-                  onClick={() => handleAddCorrectionNumber(selectedRequest.id)}
-                  className="flex-1 bg-gray-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-gray-700 transition-colors duration-200 flex items-center justify-center space-x-2"
-                >
-                  <Edit className="w-5 h-5" />
-                  <span>{selectedRequest.correction_number ? 'Zmień numer korekty' : 'Dodaj numer korekty'}</span>
-                </button>
-              )}
-
-              <button
-                onClick={() => {
-                  handleCloseModal();
-                  onNavigate('admin-clients');
-                }}
-                className="flex-1 bg-gray-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-gray-700 transition-colors duration-200 flex items-center justify-center space-x-2"
-              >
-                <Building2 className="w-5 h-5" />
-                <span>Zobacz klienta</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
   };
+
+  const stats = getStatistics();
 
   if (loading) {
     return (
       <div className="min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center py-12">
-            <div className="text-red-600 mb-4">{error}</div>
-            <button
-              onClick={handleRefresh}
-              className="px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors duration-200 flex items-center space-x-2 mx-auto"
-            >
-              <RefreshCw className="w-4 h-4" />
-              <span>Spróbuj ponownie</span>
-            </button>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         </div>
       </div>
@@ -762,15 +608,14 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
   return (
     <div className="min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
                 <Truck className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-800 bg-clip-text text-transparent">
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
                   Zgłoszenia zwrotów
                 </h1>
                 <p className="text-gray-600">Zarządzaj wszystkimi zgłoszeniami zwrotu bębnów</p>
@@ -778,13 +623,9 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
             </div>
 
             <div className="flex space-x-2">
-              <button className="px-4 py-2 bg-white border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors duration-200 flex items-center space-x-2">
-                <Download className="w-4 h-4" />
-                <span>Export</span>
-              </button>
               <button
                 onClick={handleRefresh}
-                className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors duration-200 flex items-center space-x-2"
+                className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2"
               >
                 <RefreshCw className="w-4 h-4" />
                 <span>Odśwież</span>
@@ -792,10 +633,8 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
             </div>
           </div>
 
-          {/* Filters */}
           <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -807,7 +646,6 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                 />
               </div>
 
-              {/* Status Filter */}
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
@@ -821,7 +659,6 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                 <option value="Rejected">Odrzucone</option>
               </select>
 
-              {/* Priority Filter */}
               <select
                 value={filterPriority}
                 onChange={(e) => setFilterPriority(e.target.value)}
@@ -833,7 +670,6 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                 <option value="Low">Niski</option>
               </select>
 
-              {/* Sort buttons */}
               <div className="flex space-x-2">
                 <button
                   onClick={() => handleSort('created_at')}
@@ -845,7 +681,6 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
                   <span>Data</span>
                   <ArrowUpDown className="w-3 h-3" />
                 </button>
-
                 <button
                   onClick={() => handleSort('collection_date')}
                   className={`flex-1 px-3 py-3 rounded-xl border transition-all duration-200 flex items-center justify-center space-x-1 text-sm ${sortBy === 'collection_date'
@@ -860,40 +695,38 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
             </div>
           </div>
 
-          {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-            <div className="bg-white rounded-3xl p-5 shadow-lg border border-blue-50 text-center group hover:scale-105 transition-transform duration-300">
-              <div className="text-3xl font-black text-blue-600 mb-1 group-hover:animate-pulse">{stats.total}</div>
+            <div className="bg-white rounded-3xl p-5 shadow-lg border border-blue-50 text-center">
+              <div className="text-3xl font-black text-blue-600 mb-1">{stats.total}</div>
               <div className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Wszystkie</div>
             </div>
-            <div className="bg-white rounded-3xl p-5 shadow-lg border border-amber-50 text-center group hover:scale-105 transition-transform duration-300">
-              <div className="text-3xl font-black text-amber-600 mb-1 group-hover:animate-pulse">{stats.pending}</div>
+            <div className="bg-white rounded-3xl p-5 shadow-lg border border-amber-50 text-center">
+              <div className="text-3xl font-black text-amber-600 mb-1">{stats.pending}</div>
               <div className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Oczekujące</div>
             </div>
-            <div className="bg-white rounded-3xl p-5 shadow-lg border border-sky-50 text-center group hover:scale-105 transition-transform duration-300">
-              <div className="text-3xl font-black text-sky-600 mb-1 group-hover:animate-pulse">{stats.approved}</div>
+            <div className="bg-white rounded-3xl p-5 shadow-lg border border-sky-50 text-center">
+              <div className="text-3xl font-black text-sky-600 mb-1">{stats.approved}</div>
               <div className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Transport</div>
             </div>
-            <div className="bg-white rounded-3xl p-5 shadow-lg border border-indigo-50 text-center group hover:scale-105 transition-transform duration-300">
-              <div className="text-3xl font-black text-indigo-600 mb-1 group-hover:animate-pulse">{stats.inTransit}</div>
+            <div className="bg-white rounded-3xl p-5 shadow-lg border border-indigo-50 text-center">
+              <div className="text-3xl font-black text-indigo-600 mb-1">{stats.inTransit}</div>
               <div className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">W trasie</div>
             </div>
-            <div className="bg-white rounded-3xl p-5 shadow-lg border border-emerald-50 text-center group hover:scale-105 transition-transform duration-300">
-              <div className="text-3xl font-black text-emerald-600 mb-1 group-hover:animate-pulse">{stats.completed}</div>
+            <div className="bg-white rounded-3xl p-5 shadow-lg border border-emerald-50 text-center">
+              <div className="text-3xl font-black text-emerald-600 mb-1">{stats.completed}</div>
               <div className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Zakończone</div>
             </div>
-            <div className="bg-white rounded-3xl p-5 shadow-lg border border-rose-50 text-center group hover:scale-105 transition-transform duration-300">
-              <div className="text-3xl font-black text-rose-600 mb-1 group-hover:animate-pulse">{stats.urgent}</div>
+            <div className="bg-white rounded-3xl p-5 shadow-lg border border-rose-50 text-center">
+              <div className="text-3xl font-black text-rose-600 mb-1">{stats.urgent}</div>
               <div className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Pilne</div>
             </div>
           </div>
         </div>
 
-        {/* Requests Grid */}
         {filteredAndSortedRequests.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
-            {filteredAndSortedRequests.map((request, index) => (
-              <RequestCard key={request.id} request={request} index={index} />
+            {filteredAndSortedRequests.map((request) => (
+              <RequestCard key={request.id} request={request} />
             ))}
           </div>
         ) : (
@@ -902,17 +735,7 @@ const AdminReturnRequests = ({ onNavigate, initialFilter = {} }) => {
               <Truck className="w-12 h-12 text-gray-400" />
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Nie znaleziono zgłoszeń</h3>
-            <p className="text-gray-600 mb-6">Spróbuj zmienić kryteria wyszukiwania lub filtry</p>
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setFilterStatus('all');
-                setFilterPriority('all');
-              }}
-              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200"
-            >
-              Wyczyść filtry
-            </button>
+            <p className="text-gray-600">Spróbuj zmienić kryteria wyszukiwania lub filtry</p>
           </div>
         )}
 
