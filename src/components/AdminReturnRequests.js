@@ -514,12 +514,21 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
                   const damaged = isDrumDamaged(drum);
                   const description = damaged ? drum.description : '';
                   
-                  // Obliczenia dla bębna zgodne z nowymi wytycznymi
+                  // Obliczenia dla bębna zgodne z nowymi wytycznymi systemowymi
                   const issueDate = new Date(drum.data_wydania || selectedRequest.created_at);
                   const returnDeadline = drum.data_zwrotu_do_dostawcy ? new Date(drum.data_zwrotu_do_dostawcy) : null;
+                  const nameUpper = (drum.nazwa || '').toUpperCase();
                   
                   const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
-                  const isPastDeadline = returnDeadline && new Date() > returnDeadline;
+                  
+                  // Nowa logika "Nasze":
+                  // 1. Brak daty zwrotu do dostawcy
+                  // 2. Nazwa zaczyna się od "BĘBEN ELTRON"
+                  // 3. Termin zwrotu do dostawcy przekroczony o ponad 360 dni
+                  const isOurDrum = 
+                    !returnDeadline || 
+                    nameUpper.startsWith('BĘBEN ELTRON') || 
+                    (returnDeadline && (new Date() - returnDeadline) / (1000 * 60 * 60 * 24) > 360);
                   
                   const returnPeriod = drum.returnPeriodDays || 120;
                   const returnPercentage = daysInPossession <= returnPeriod ? 100 : 0;
@@ -559,7 +568,7 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
                         </div>
                         <div className="pt-1 border-t border-gray-100">
                           <span className="text-gray-400 font-bold uppercase block">Własność:</span>
-                          {isPastDeadline ? (
+                          {isOurDrum ? (
                             <span className="text-blue-700 font-bold">NASZ (Własny bęben)</span>
                           ) : (
                             <div className="flex flex-col">
