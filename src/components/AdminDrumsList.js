@@ -52,7 +52,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     data: [],
     pagination: {
       page: 1,
-      limit: 300, // 300 na stronę dla adminów
+      limit: 99, // 99 na stronę dla adminów (podzielne przez 3)
       total: 0,
       totalPages: 1,
       hasNext: false,
@@ -73,7 +73,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     try {
       const requestOptions = {
         page: drumsData.pagination.page,
-        limit: 100,
+        limit: 99,
         sortBy,
         sortOrder,
         search: searchTerm,
@@ -362,9 +362,10 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
             </p>
           </div>
         </div>
-        <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.color || 'bg-gray-100 text-gray-600'}`}>
-          {drum.text || drum.status}
-        </div>
+        <div 
+          className={`w-4 h-4 rounded-full shadow-sm cursor-help ${drum.color?.replace('text-', 'bg-') || 'bg-gray-400'}`}
+          title={drum.text || drum.status}
+        />
       </div>
 
       <div className="space-y-3 flex-1">
