@@ -127,7 +127,8 @@ const ClientReturnRequests = ({ user }) => {
             {requests.map((req) => {
               const drumsCount = Array.isArray(req.selected_drums) ? req.selected_drums.length : 0;
               const damagedCount = Array.isArray(req.selected_drums) ? req.selected_drums.filter(d => isDrumDamaged(d)).length : 0;
-                         <div key={req.id} className="bg-white rounded-3xl p-6 shadow-xl border border-blue-50 hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 relative overflow-hidden flex flex-col h-full">
+              return (
+                <div key={req.id} className="bg-white rounded-3xl p-6 shadow-xl border border-blue-50 hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 relative overflow-hidden flex flex-col h-full">
                   <div className="flex justify-between items-start mb-6 pb-4 border-b border-gray-100">
                     <div>
                       <h3 className="text-xl font-black text-gray-900 leading-tight">Zgłoszenie #{req.id}</h3>
@@ -219,7 +220,6 @@ const ClientReturnRequests = ({ user }) => {
                       </span>
                     )}
                   </div>
-                </div>      </div>
                 </div>
               );
             })}
