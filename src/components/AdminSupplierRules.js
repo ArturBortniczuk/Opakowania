@@ -7,10 +7,11 @@ import {
   Truck,
   AlertCircle
 } from 'lucide-react';
-import { rulesAPI } from '../utils/supabaseApi';
+import { rulesAPI, drumsAPI } from '../utils/supabaseApi';
 
 const AdminSupplierRules = () => {
   const [rules, setRules] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
@@ -20,20 +21,36 @@ const AdminSupplierRules = () => {
     return_percentage: 100
   });
 
-  const fetchRules = async () => {
+  const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const data = await rulesAPI.getRules();
-      setRules(data);
+      const [rulesData, suppliersData] = await Promise.all([
+        rulesAPI.getRules(),
+        drumsAPI.getUniqueSuppliers()
+      ]);
+      setRules(rulesData);
+      setSuppliers(suppliersData);
+      if (suppliersData.length > 0) {
+        setNewRule(prev => ({ ...prev, supplier_name: suppliersData[0] }));
+      }
     } catch (err) {
-      setError('Nie udało się pobrać zasad dostawców.');
+      setError('Nie udało się pobrać danych.');
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchRules = async () => {
+    try {
+      const data = await rulesAPI.getRules();
+      setRules(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
-    fetchRules();
+    fetchInitialData();
   }, []);
 
   const handleAddRule = async (e) => {
@@ -48,7 +65,7 @@ const AdminSupplierRules = () => {
         max_days_overdue: parseInt(newRule.max_days_overdue, 10),
         return_percentage: parseInt(newRule.return_percentage, 10)
       });
-      setNewRule({ supplier_name: '', max_days_overdue: 0, return_percentage: 100 });
+      setNewRule({ supplier_name: suppliers[0] || '', max_days_overdue: 0, return_percentage: 100 });
       fetchRules();
     } catch (err) {
       setError(err.message || 'Błąd przy dodawaniu reguły');
@@ -100,15 +117,18 @@ const AdminSupplierRules = () => {
           <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">Dodaj nową regułę</h3>
           <form onSubmit={handleAddRule} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Dostawca (np. NKT)</label>
-              <input
-                type="text"
+              <label className="block text-sm font-medium text-gray-700 mb-1">Dostawca</label>
+              <select
                 required
                 value={newRule.supplier_name}
                 onChange={(e) => setNewRule({...newRule, supplier_name: e.target.value})}
-                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 uppercase"
-                placeholder="NKT"
-              />
+                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+              >
+                {suppliers.length === 0 && <option value="">Brak dostawców w bazie</option>}
+                {suppliers.map(sup => (
+                  <option key={sup} value={sup}>{sup}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Maksymalne opóźnienie (dni)</label>

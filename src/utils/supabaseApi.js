@@ -444,6 +444,32 @@ export const drumsAPI = {
       console.error('Błąd pobierania bębna:', error);
       throw error;
     }
+  },
+
+  /**
+   * Pobiera listę unikalnych dostawców z tabeli bębnów.
+   * @returns {Promise<Array<string>>} Lista unikalnych dostawców
+   */
+  async getUniqueSuppliers() {
+    try {
+      // Pobieramy wszystkie wartości kon_dostawca z bazy
+      const { data, error } = await supabase
+        .from('drums')
+        .select('kon_dostawca')
+        .not('kon_dostawca', 'is', null);
+
+      if (error) throw error;
+
+      // Wyodrębniamy unikalne wartości, usuwamy puste i sortujemy
+      const uniqueSuppliers = [...new Set(data.map(item => item.kon_dostawca.trim()))]
+        .filter(supplier => supplier.length > 0)
+        .sort((a, b) => a.localeCompare(b));
+
+      return uniqueSuppliers;
+    } catch (error) {
+      console.error('Błąd pobierania unikalnych dostawców:', error);
+      return [];
+    }
   }
 };
 
