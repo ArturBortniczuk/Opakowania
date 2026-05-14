@@ -168,7 +168,12 @@ const AdminSupplierRules = () => {
 
         {/* Lista aktualnych reguł */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">Istniejące reguły</h3>
+          <div className="flex justify-between items-center mb-4 border-b pb-2">
+            <h3 className="text-lg font-semibold text-gray-900">Istniejące reguły</h3>
+            <span className="text-sm text-gray-500 font-medium">
+              Widok dla: <span className="text-purple-600 font-bold">{newRule.supplier_name || 'Wybierz dostawcę'}</span>
+            </span>
+          </div>
           
           {loading ? (
             <div className="flex justify-center items-center py-8">
@@ -176,13 +181,21 @@ const AdminSupplierRules = () => {
             </div>
           ) : Object.keys(groupedRules).length === 0 ? (
             <div className="text-center py-8 text-gray-500">
-              Brak zdefiniowanych reguł. Dodaj pierwszą po lewej stronie.
+              Brak zdefiniowanych reguł w systemie. Dodaj pierwszą po lewej stronie.
+            </div>
+          ) : !newRule.supplier_name ? (
+            <div className="text-center py-8 text-gray-500">
+              Wybierz dostawcę z listy, aby zobaczyć jego reguły.
+            </div>
+          ) : !groupedRules[newRule.supplier_name] ? (
+            <div className="text-center py-8 text-gray-500">
+              Ten dostawca nie ma jeszcze zdefiniowanych reguł. Dodaj je korzystając z formularza obok.
             </div>
           ) : (
             <div className="space-y-6">
-              {Object.entries(groupedRules).map(([supplier, supplierRules]) => (
-                <div key={supplier} className="border border-gray-200 rounded-xl overflow-hidden">
-                  <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 font-bold text-gray-800 uppercase flex items-center">
+              {[[newRule.supplier_name, groupedRules[newRule.supplier_name]]].map(([supplier, supplierRules]) => (
+                <div key={supplier} className="border border-purple-200 rounded-xl overflow-hidden shadow-sm">
+                  <div className="bg-purple-50 px-4 py-3 border-b border-purple-200 font-bold text-purple-900 uppercase flex items-center">
                     <Truck className="w-5 h-5 mr-2 text-purple-600" />
                     {supplier}
                   </div>
