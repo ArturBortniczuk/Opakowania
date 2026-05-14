@@ -65,7 +65,7 @@ const AdminSupplierRules = () => {
         max_days_overdue: parseInt(newRule.max_days_overdue, 10),
         return_percentage: parseInt(newRule.return_percentage, 10)
       });
-      setNewRule({ supplier_name: suppliers[0] || '', max_days_overdue: 0, return_percentage: 100 });
+      setNewRule(prev => ({ ...prev, max_days_overdue: 0, return_percentage: 100 }));
       fetchRules();
     } catch (err) {
       setError(err.message || 'Błąd przy dodawaniu reguły');
