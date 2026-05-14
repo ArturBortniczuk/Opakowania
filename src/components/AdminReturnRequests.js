@@ -232,20 +232,17 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
 
         <div className="mb-6">
           <div className="p-4 rounded-xl border border-gray-100 bg-gray-50/50 space-y-3">
-            <div className="flex items-center justify-between border-b border-gray-100/50 pb-2">
+            <div className="flex items-start justify-between border-b border-gray-100/50 pb-3">
               <div className="flex items-center space-x-2">
                 <Calendar className="w-4 h-4 text-blue-500" />
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Okres odbioru (14 dni)</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-tight">SUGEROWANY TERMIN ODBIORU</span>
               </div>
               <div className="text-right">
-                <div className="font-bold text-gray-900 text-sm">
-                  {collectionDate.toLocaleDateString('pl-PL')} - {new Date(collectionDate.getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('pl-PL')}
-                </div>
-                {daysUntilCollection < 0 ? (
-                  <div className="text-[10px] text-red-500 font-bold uppercase">Przeterminowane</div>
-                ) : daysUntilCollection <= 3 ? (
-                  <div className="text-[10px] text-orange-500 font-bold uppercase">Za {daysUntilCollection} dni</div>
-                ) : null}
+                <div className="text-[10px] font-bold text-blue-600 uppercase mb-0.5">Od: {collectionDate.toLocaleDateString('pl-PL')}</div>
+                <div className="text-[10px] font-bold text-gray-900 uppercase">Do: {new Date(collectionDate.getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('pl-PL')}</div>
+                {daysUntilCollection < 0 && (
+                  <div className="text-[9px] text-red-500 font-bold uppercase mt-1">Przeterminowane</div>
+                )}
               </div>
             </div>
 
@@ -254,27 +251,27 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
                 <Clock className="w-4 h-4 text-gray-400" />
                 <span className="text-[10px] font-bold text-gray-400 uppercase">Godziny załadunku</span>
               </div>
-              <span className="font-semibold text-gray-700">{request.loading_hours}</span>
+              <span className="font-semibold text-gray-700">{request.loading_hours || 'Brak'}</span>
             </div>
 
-            {request.transport_date && (
-              <div className="flex items-center justify-between text-sm pt-1 border-t border-gray-100/50">
-                <div className="flex items-center space-x-2">
-                  <Truck className="w-4 h-4 text-indigo-500" />
-                  <span className="text-[10px] font-bold text-indigo-400 uppercase">Zaplanowany transport</span>
-                </div>
-                <span className="font-bold text-indigo-700">{new Date(request.transport_date).toLocaleDateString('pl-PL')}</span>
+            <div className="flex items-center justify-between text-sm pt-2 border-t border-gray-100/50">
+              <div className="flex items-center space-x-2">
+                <Truck className="w-4 h-4 text-indigo-500" />
+                <span className="text-[10px] font-bold text-indigo-400 uppercase">Zaplanowany transport</span>
               </div>
-            )}
+              <span className="font-bold text-indigo-700">
+                {request.transport_date ? new Date(request.transport_date).toLocaleDateString('pl-PL') : '---'}
+              </span>
+            </div>
           </div>
         </div>
 
-        {request.correction_number && (
-          <div className="mb-6 p-4 bg-emerald-50 rounded-xl border border-emerald-100 space-y-2">
-            <div className="flex items-center gap-2 mb-1">
-              <Edit className="w-4 h-4 text-emerald-500" />
-              <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Numery korekt</span>
-            </div>
+        <div className="mb-6 p-4 bg-emerald-50 rounded-xl border border-emerald-100 min-h-[80px]">
+          <div className="flex items-center gap-2 mb-2">
+            <Edit className="w-4 h-4 text-emerald-500" />
+            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Numery korekt</span>
+          </div>
+          {request.correction_number ? (
             <div className="flex flex-wrap gap-2">
               {request.correction_number.split(',').map((num, i) => (
                 <span key={i} className="px-2 py-1 bg-white border border-emerald-200 text-emerald-700 text-[11px] font-bold rounded-lg shadow-sm">
@@ -282,8 +279,10 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
                 </span>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <span className="text-[11px] text-emerald-300 font-medium italic">Brak numerów korekt</span>
+          )}
+        </div>
 
         <div className="space-y-3 mb-6 flex-grow">
           <div className="flex items-start space-x-3 text-sm">
@@ -454,7 +453,11 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
                   {selectedRequest.correction_number && (
                     <div>
                       <label className="text-sm font-medium text-gray-500">Numer korekty</label>
-                      <p className="text-green-700 font-bold">{selectedRequest.correction_number}</p>
+                      <div className="flex flex-col space-y-1 mt-1">
+                        {selectedRequest.correction_number.split(',').map((num, i) => (
+                          <p key={i} className="text-green-700 font-bold">{num.trim()}</p>
+                        ))}
+                      </div>
                     </div>
                   )}
                   <div>
@@ -476,20 +479,19 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
                   const damaged = isDrumDamaged(drum);
                   const description = damaged ? drum.description : '';
                   
-                  // Obliczenia dla bębna
+                  // Obliczenia dla bębna zgodne z nowymi wytycznymi
                   const issueDate = new Date(drum.data_wydania || selectedRequest.created_at);
-                  const pzDate = new Date(drum.data_przyjecia_na_stan || drum.data_wydania || selectedRequest.created_at);
+                  const returnDeadline = drum.data_zwrotu_do_dostawcy ? new Date(drum.data_zwrotu_do_dostawcy) : null;
+                  
                   const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
-                  const daysSincePurchase = Math.ceil((new Date() - pzDate) / (1000 * 60 * 60 * 24));
-                  const isOurDrum = daysSincePurchase > 360;
+                  const isPastDeadline = returnDeadline && new Date() > returnDeadline;
                   
                   const returnPeriod = drum.returnPeriodDays || 120;
                   const returnPercentage = daysInPossession <= returnPeriod ? 100 : 0;
                   
-                  let daysToSupplier = 'Brak danych';
-                  if (drum.data_zwrotu_do_dostawcy) {
-                    const supplierDeadline = new Date(drum.data_zwrotu_do_dostawcy);
-                    daysToSupplier = Math.ceil((supplierDeadline - new Date()) / (1000 * 60 * 60 * 24));
+                  let daysLeftToReturn = 'Brak danych';
+                  if (returnDeadline) {
+                    daysLeftToReturn = Math.ceil((returnDeadline - new Date()) / (1000 * 60 * 60 * 24));
                   }
 
                   return (
@@ -522,12 +524,12 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
                         </div>
                         <div className="pt-1 border-t border-gray-100">
                           <span className="text-gray-400 font-bold uppercase block">Własność:</span>
-                          {isOurDrum ? (
+                          {isPastDeadline ? (
                             <span className="text-blue-700 font-bold">NASZ (Własny bęben)</span>
                           ) : (
                             <div className="flex flex-col">
-                              <span className="text-amber-700 font-bold uppercase">KABLOWNI</span>
-                              <span className="text-gray-500">Zwrócić do kablowni za: <span className={`font-bold ${Number(daysToSupplier) < 7 ? 'text-red-600' : 'text-gray-900'}`}>{daysToSupplier} dni</span></span>
+                              <span className="text-amber-700 font-bold uppercase">{drum.kon_dostawca || 'KABLOWNI'}</span>
+                              <span className="text-gray-500">Do zwrotu za: <span className={`font-bold ${Number(daysLeftToReturn) < 7 ? 'text-red-600' : 'text-gray-900'}`}>{daysLeftToReturn} dni</span></span>
                             </div>
                           )}
                         </div>
