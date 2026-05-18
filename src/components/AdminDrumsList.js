@@ -214,15 +214,43 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
       try {
         let bodyData;
         let contentType;
+        let hasPolish = false;
 
         if (fileName.endsWith('.csv')) {
           console.log('📄 Tryb CSV...');
 
           const csvContent = await new Promise((resolve, reject) => {
             const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target.result);
+            reader.onload = (e) => {
+              try {
+                const arrayBuffer = e.target.result;
+                const uint8 = new Uint8Array(arrayBuffer);
+
+                let decodedText = '';
+                // 1. Spróbuj zdekodować jako UTF-8 z fatal: true
+                try {
+                  const decoder = new TextDecoder('utf-8', { fatal: true });
+                  decodedText = decoder.decode(uint8);
+                  console.log('✅ CSV odczytany pomyślnie jako UTF-8');
+                } catch (utf8Error) {
+                  console.warn('⚠️ Niepoprawny format UTF-8, próba dekodowania jako Windows-1250...', utf8Error);
+                  // 2. Jeśli UTF-8 rzuci błąd, spróbuj Windows-1250 (CP1250)
+                  const decoder = new TextDecoder('windows-1250');
+                  decodedText = decoder.decode(uint8);
+                  console.log('✅ CSV odczytany pomyślnie jako Windows-1250');
+                }
+
+                // Wykryj obecność polskich znaków diakrytycznych
+                hasPolish = /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/.test(decodedText);
+                console.log(`🇵🇱 Czy wykryto polskie znaki w pliku CSV: ${hasPolish ? 'Tak' : 'Nie'}`);
+
+                resolve(decodedText);
+              } catch (decodeError) {
+                reject(decodeError);
+              }
+            };
             reader.onerror = () => reject(new Error('Błąd odczytu CSV'));
-            reader.readAsText(file, 'UTF-8');
+            reader.readAsArrayBuffer(file);
           });
 
           // SPRAWDŹ LICZBĘ LINII
@@ -294,10 +322,14 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         const result = await response.json();
         console.log('📝 Odpowiedź serwera:', result);
 
+        if (!fileName.endsWith('.csv')) {
+          hasPolish = result.hasPolishChars || false;
+        }
+
         if (result.success) {
           const message = `✅ SUKCES!\n\n${result.message}\n\n` +
             `📊 Format: ${fileName.endsWith('.csv') ? 'CSV' : 'XLSX'}\n` +
-            `🇵🇱 Polskie znaki: ${result.hasPolishChars ? 'OK' : 'Brak'}\n` +
+            `🇵🇱 Polskie znaki: ${hasPolish ? 'OK' : 'Brak'}\n` +
             `📦 Importowano: ${result.imported} rekordów\n` +
             `🏢 Dodano firm: ${result.companiesAdded || 0}\n` +
             `⚠️ Pominięto: ${result.skipped || 0} błędnych`;
