@@ -23,7 +23,7 @@ import {
   Search
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { drumsAPI, returnsAPI, rulesAPI } from '../utils/supabaseApi';
+import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
 
 registerLocale('pl', pl);
 
@@ -70,8 +70,6 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   const [drumsLoading, setDrumsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateError, setDateError] = useState(false);
-  const [supplierRules, setSupplierRules] = useState([]);
-
   // Pobierz bębny użytkownika
   useEffect(() => {
     const fetchUserDrums = async () => {
@@ -86,13 +84,10 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
           sortOrder: 'asc'
         };
 
-        const [result, returns, rules] = await Promise.all([
+        const [result, returns] = await Promise.all([
           drumsAPI.getDrums(user.nip, options),
-          returnsAPI.getReturns(user.nip),
-          rulesAPI.getRules()
+          returnsAPI.getReturns(user.nip)
         ]);
-        
-        setSupplierRules(rules);
         
         console.log('✅ ReturnForm: Otrzymano dane:', result);
 
@@ -560,7 +555,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                     d.nazwa_punktu_dostawy?.toLowerCase().includes(searchQuery.toLowerCase())
                   ).map((drum, index) => {
                   const drumCecha = drum.cecha; // UŻYWAMY CECHY JAKO ID
-                  const returnDate = drum.data_zwrotu_do_dostawcy;
+                  const returnDate = drum.clientReturnDeadline || drum.data_zwrotu_do_dostawcy;
                   const address = drum.adres_dostawy || drum.nazwa_punktu_dostawy || 'Brak informacji o adresie';
                   const invoice = drum.numer_faktury || 'Brak faktury';
 
@@ -579,32 +574,18 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                   const isSelected = !!selectedItem;
                   const isReported = drum.isReported; // Flaga zgłoszonego bębna
 
-                  // Obliczanie % zwrotu
-                  let returnPercentage = 100; // Domyślnie 100%
-                  let appliedRule = null;
-                  const supplier = drum.kon_dostawca || drum.KON_DOSTAWCA; // wsparcie dla małych i dużych liter
+                  // Obliczanie % zwrotu (zależny wyłącznie od ilości dni w posiadaniu)
+                  let returnPercentage = 100;
+                  const daysInPossession = drum.daysInPossession !== undefined 
+                    ? drum.daysInPossession 
+                    : (drum.data_wydania_z_magazynu ? Math.ceil((new Date() - new Date(drum.data_wydania_z_magazynu)) / (1000 * 60 * 60 * 24)) : 0);
 
-                  if (supplier && supplierRules.length > 0 && daysLeft !== null) {
-                    const overdueDays = daysLeft < 0 ? Math.abs(daysLeft) : 0; // ile dni po terminie
-                    
-                    // Szukamy reguł dla tego dostawcy
-                    const sRules = supplierRules.filter(r => r.supplier_name.toUpperCase() === supplier.toUpperCase());
-                    
-                    if (sRules.length > 0) {
-                      // Znajdź pierwszą regułę, gdzie nasze opóźnienie <= max_days_overdue
-                      const validRule = sRules.find(r => overdueDays <= r.max_days_overdue);
-                      
-                      if (validRule) {
-                        returnPercentage = validRule.return_percentage;
-                        appliedRule = validRule;
-                      } else {
-                        // Przekroczone wszystkie limity, bierzemy ostatnią (najgorszą) zdefiniowaną regułę
-                        const lastRule = sRules[sRules.length - 1];
-                        returnPercentage = lastRule.return_percentage;
-                        appliedRule = lastRule;
-                      }
-                    }
-                  }
+                  if (daysInPossession <= 120) returnPercentage = 100;
+                  else if (daysInPossession <= 150) returnPercentage = 90;
+                  else if (daysInPossession <= 180) returnPercentage = 75;
+                  else if (daysInPossession <= 240) returnPercentage = 50;
+                  else if (daysInPossession <= 340) returnPercentage = 25;
+                  else returnPercentage = 1;
 
                   return (
                     <div
@@ -632,11 +613,9 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                       </div>
 
                       {/* Oszacowany zwrot */}
-                      {appliedRule && (
-                        <div className="mb-2 inline-block px-2 py-1 bg-indigo-50 border border-indigo-100 rounded text-xs font-semibold text-indigo-700">
-                          Możliwy zwrot wartości: {returnPercentage}%
-                        </div>
-                      )}
+                      <div className="mb-2 inline-block px-2 py-1 bg-indigo-50 border border-indigo-100 rounded text-xs font-semibold text-indigo-700">
+                        Możliwy zwrot wartości: {returnPercentage}%
+                      </div>
 
                       {/* Adres i Faktura */}
                       <p className="text-sm text-gray-600 mb-1">

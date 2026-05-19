@@ -48,7 +48,7 @@ const Dashboard = ({ user }) => {
 
     drums.forEach((drum, index) => {
       if (index < 3) {
-        const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
+        const returnDate = drum.clientReturnDeadline ? new Date(drum.clientReturnDeadline) : new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
         const daysDiff = Math.ceil((returnDate - now) / (1000 * 60 * 60 * 24));
 
         if (daysDiff < 0) {
