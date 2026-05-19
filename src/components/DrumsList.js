@@ -40,35 +40,63 @@ const DrumsList = ({ user }) => {
     setError(null);
 
     try {
-      const options = {
-        page,
-        limit: LIMIT,
-        sortBy,
-        sortOrder,
-        search: searchTerm,
-        status: filterStatus === 'all' ? undefined : filterStatus
-      };
+      // W wersji dla klienta pobieramy wszystko i filtrujemy w pamięci,
+      // aby poprawnie uwzględnić niestandardowe terminy i statusy klienta.
+      const allDrums = await drumsAPI.getAllDrums(user.nip);
 
-      const result = await drumsAPI.getDrums(user.nip, options);
-
-      if (result.data) {
-        setDrums(result.data);
-        setTotalPages(result.pagination?.totalPages || 1);
-        setTotalItems(result.pagination?.total || 0);
-
-        // Update stats roughly based on what we know or separate API call
-        // For accurate full stats we might need a separate endpoint or stick to pagination info
-        // Here we can just use the returned counts if available or keep it simple
-        setStats({
-          total: result.pagination?.total || 0,
-          active: result.data.filter(d => d.status === 'active').length, // This is only for current page, but acceptable for now
-          dueSoon: result.data.filter(d => d.status === 'due-soon').length,
-          overdue: result.data.filter(d => d.status === 'overdue').length
-        });
-      } else {
-        // Fallback if API returns array directly (legacy)
-        setDrums(Array.isArray(result) ? result : []);
+      // 1. Filtrowanie (Search)
+      let filtered = allDrums;
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        filtered = filtered.filter(d => 
+          (d.kod_bebna || '').toLowerCase().includes(term) ||
+          (d.nazwa || '').toLowerCase().includes(term) ||
+          (d.adres_dostawy || '').toLowerCase().includes(term) ||
+          (d.numer_faktury || '').toLowerCase().includes(term) ||
+          (d.cecha || '').toLowerCase().includes(term)
+        );
       }
+
+      // 2. Filtrowanie (Status)
+      if (filterStatus !== 'all') {
+        filtered = filtered.filter(d => d.status === filterStatus);
+      }
+
+      // 3. Sortowanie
+      filtered.sort((a, b) => {
+        let valA, valB;
+        if (sortBy === 'kod_bebna') {
+          valA = a.kod_bebna || a.cecha || '';
+          valB = b.kod_bebna || b.cecha || '';
+        } else if (sortBy === 'DATA_ZWROTU_DO_DOSTAWCY' || sortBy === 'termin') {
+          valA = a.clientReturnDeadline || a.data_zwrotu_do_dostawcy || '';
+          valB = b.clientReturnDeadline || b.data_zwrotu_do_dostawcy || '';
+        } else {
+          valA = a[sortBy] || '';
+          valB = b[sortBy] || '';
+        }
+
+        if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+        if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+        return 0;
+      });
+
+      // Zapisujemy statystyki
+      setStats({
+        total: allDrums.length,
+        active: allDrums.filter(d => d.status === 'active').length,
+        dueSoon: allDrums.filter(d => d.status === 'due-soon').length,
+        overdue: allDrums.filter(d => d.status === 'overdue').length
+      });
+
+      setTotalItems(filtered.length);
+      setTotalPages(Math.ceil(filtered.length / LIMIT) || 1);
+
+      // 4. Paginacja w pamięci
+      const startIndex = (page - 1) * LIMIT;
+      const paginatedDrums = filtered.slice(startIndex, startIndex + LIMIT);
+
+      setDrums(paginatedDrums);
 
     } catch (err) {
       console.error('Błąd pobierania bębnów:', err);
