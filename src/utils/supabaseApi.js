@@ -161,10 +161,19 @@ export const drumsAPI = {
         .select(`*, companies (name, email, phone, address, custom_return_periods(return_period_days))`, { count: 'exact' });
 
       // Filtrowanie po NIP
+      const userStr = localStorage.getItem('currentUser');
+      const currentUser = userStr ? JSON.parse(userStr) : null;
+      const isClient = currentUser && currentUser.role === 'client';
+
       if (nip) {
         query = query.eq('nip', nip);
         // Ukryj bębny, które zostały już zwrócone (status kontrahenta: 'Nie wydany')
         query = query.neq('kontrahent', 'Nie wydany');
+
+        if (isClient) {
+          const maxDate = new Date(Date.now() - 456 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          query = query.or(`data_wydania.gte.${maxDate},and(data_wydania.is.null,data_przyjecia_na_stan.gte.${maxDate})`);
+        }
       }
 
       // 1. Filtrowanie po Statusie Bębna (status = dbStatus)
@@ -241,7 +250,6 @@ export const drumsAPI = {
         }
         
         const returnPeriodDays = drum.companies?.custom_return_periods?.[0]?.return_period_days || 120;
-        const statusObj = supabaseHelpers.getDrumStatus(finalReturnDate);
         const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
         const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
 
@@ -249,6 +257,12 @@ export const drumsAPI = {
         if (!isNaN(clientReturnDeadline.getTime())) {
           clientReturnDeadline.setDate(clientReturnDeadline.getDate() + returnPeriodDays);
         }
+
+        const dateForStatus = isClient && !isNaN(clientReturnDeadline.getTime())
+          ? clientReturnDeadline.toISOString().split('T')[0]
+          : finalReturnDate;
+
+        const statusObj = supabaseHelpers.getDrumStatus(dateForStatus);
 
         return {
           ...drum,
@@ -371,8 +385,18 @@ export const drumsAPI = {
         .from('drums')
         .select(`*, companies (name, email, phone, address, custom_return_periods(return_period_days))`);
 
+      const userStr = localStorage.getItem('currentUser');
+      const currentUser = userStr ? JSON.parse(userStr) : null;
+      const isClient = currentUser && currentUser.role === 'client';
+
       if (nip) {
         query = query.eq('nip', nip);
+        query = query.neq('kontrahent', 'Nie wydany');
+
+        if (isClient) {
+          const maxDate = new Date(Date.now() - 456 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          query = query.or(`data_wydania.gte.${maxDate},and(data_wydania.is.null,data_przyjecia_na_stan.gte.${maxDate})`);
+        }
       }
 
       // USUWAMY LIMIT - pobieramy wszystko
@@ -396,7 +420,6 @@ export const drumsAPI = {
         const returnPeriodDays = drum.companies?.custom_return_periods?.[0]?.return_period_days || 120;
         
         // Obliczamy STATUS TERMINOWY
-        const statusObj = supabaseHelpers.getDrumStatus(finalReturnDate);
         const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
         const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
 
@@ -404,6 +427,12 @@ export const drumsAPI = {
         if (!isNaN(clientReturnDeadline.getTime())) {
           clientReturnDeadline.setDate(clientReturnDeadline.getDate() + returnPeriodDays);
         }
+
+        const dateForStatus = isClient && !isNaN(clientReturnDeadline.getTime())
+          ? clientReturnDeadline.toISOString().split('T')[0]
+          : finalReturnDate;
+
+        const statusObj = supabaseHelpers.getDrumStatus(dateForStatus);
 
         return {
           ...drum,
@@ -712,27 +741,26 @@ export const statsAPI = {
       console.log(`🔄 Pobieranie statystyk dla NIP: ${nip || 'ADMIN'}`);
 
       if (nip) {
-        // Statystyki dla klienta - NAPRAWIONE: head: true oznacza że pobieramy TYLKO COUNT
+        // Statystyki dla klienta - idealnie zsynchronizowane z widokami klienta
         console.log(`👤 Liczenie bębnów dla klienta ${nip}...`);
 
-        const [
-          { count: totalDrums },
-          { count: activeDrums },
-          { count: pendingReturns },
-          { count: recentReturns }
-        ] = await Promise.all([
-          supabase.from('drums').select('*', { count: 'exact', head: true }).eq('nip', nip),
-          supabase.from('drums').select('*', { count: 'exact', head: true }).eq('nip', nip).gt('data_zwrotu_do_dostawcy', now),
-          supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('user_nip', nip).eq('status', 'Pending'),
-          supabase.from('drums').select('*', { count: 'exact', head: true }).eq('nip', nip).gte('data_wydania', thirtyDaysAgo)
+        const [userDrums, { count: pendingReturns }] = await Promise.all([
+          drumsAPI.getAllDrums(nip),
+          supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('user_nip', nip).eq('status', 'Pending')
         ]);
+
+        const thirtyDaysAgoStr = thirtyDaysAgo.split('T')[0];
+        
+        const totalDrums = userDrums.length;
+        const activeDrums = userDrums.filter(d => d.status === 'Aktywny').length;
+        const recentReturns = userDrums.filter(d => d.data_wydania && d.data_wydania >= thirtyDaysAgoStr).length;
 
         console.log(`✅ Statystyki klienta ${nip}: ${totalDrums} bębnów, ${activeDrums} aktywnych`);
         return {
-          totalDrums: totalDrums || 0,
-          activeDrums: activeDrums || 0,
+          totalDrums,
+          activeDrums,
           pendingReturns: pendingReturns || 0,
-          recentReturns: recentReturns || 0
+          recentReturns
         };
       }
 
