@@ -437,6 +437,8 @@ export const drumsAPI = {
         return {
           ...drum,
           data_zwrotu_do_dostawcy: finalReturnDate, // Nadpisujemy
+          clientReturnDeadline: !isNaN(clientReturnDeadline.getTime()) ? clientReturnDeadline.toISOString() : null,
+          returnPeriodDays,
           
           // Ujednolicony dostęp do formatu dającego "active", "due-soon", "overdue"
           db_status: drum.status,
