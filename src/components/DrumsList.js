@@ -98,7 +98,12 @@ const DrumsList = ({ user }) => {
         if (sortBy === 'kod_bebna') {
           valA = a.kod_bebna || a.cecha || '';
           valB = b.kod_bebna || b.cecha || '';
-        } else if (sortBy === 'DATA_ZWROTU_DO_DOSTAWCY' || sortBy === 'termin') {
+        } else if (
+          sortBy === 'DATA_ZWROTU_DO_DOSTAWCY' ||
+          sortBy === 'termin' ||
+          sortBy === 'data_zwrotu_do_dostawcy'
+        ) {
+          // Sortujemy po wyznaczonej dacie zwrotu (Termin zwrotu)
           valA = a.clientReturnDeadline || a.data_zwrotu_do_dostawcy || '';
           valB = b.clientReturnDeadline || b.data_zwrotu_do_dostawcy || '';
         } else {
