@@ -83,7 +83,8 @@ const DrumsList = ({ user }) => {
           (d.nazwa || '').toLowerCase().includes(term) ||
           (d.adres_dostawy || '').toLowerCase().includes(term) ||
           (d.numer_faktury || '').toLowerCase().includes(term) ||
-          (d.cecha || '').toLowerCase().includes(term)
+          (d.cecha || '').toLowerCase().includes(term) ||
+          (d.rozmiar_bebna || '').toLowerCase().includes(term)
         );
       }
 
@@ -172,10 +173,13 @@ const DrumsList = ({ user }) => {
 
   const DrumCard = ({ drum, index }) => {
     const kodBebna = drum.kod_bebna || drum.KOD_BEBNA;
-    const nazwa = drum.nazwa || drum.NAZWA;
     const returnDate = drum.clientReturnDeadline || drum.data_zwrotu_do_dostawcy;
     const company = drum.company || drum.pelna_nazwa_kontrahenta;
     const nip = drum.nip || drum.NIP;
+
+    // Przeliczenie ceny netto + 20% marży dla klienta
+    const priceRaw = parseFloat(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
+    const clientPrice = !isNaN(priceRaw) ? priceRaw * 1.2 : null;
 
     return (
       <div
@@ -189,7 +193,9 @@ const DrumsList = ({ user }) => {
             </div>
             <div>
               <h3 className="font-bold text-gray-900 text-lg">{drum.cecha || kodBebna}</h3>
-              <p className="text-gray-600 text-sm">{drum.cecha ? `${kodBebna} • ${nazwa}` : nazwa}</p>
+              {drum.rozmiar_bebna && (
+                <p className="text-gray-600 text-sm">Rozmiar bębna: {drum.rozmiar_bebna}</p>
+              )}
             </div>
           </div>
           <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.color || 'bg-gray-100 text-gray-600'}`}>
@@ -198,6 +204,15 @@ const DrumsList = ({ user }) => {
         </div>
 
         <div className="space-y-3">
+          {clientPrice !== null && (
+            <div className="flex justify-between items-center bg-blue-50/50 p-2.5 rounded-xl border border-blue-100/50 mb-2">
+              <span className="text-sm font-semibold text-blue-800">Wartość bębna</span>
+              <span className="text-sm font-extrabold text-blue-950">
+                {clientPrice.toFixed(2)} PLN
+              </span>
+            </div>
+          )}
+
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Termin zwrotu</span>
             <span className="text-sm font-medium text-gray-900">

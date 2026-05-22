@@ -50,7 +50,11 @@ const ClientReturnRequests = ({ user }) => {
 
   const getDrumLabel = (drum) => {
     if (typeof drum === 'object' && drum !== null) {
-      return drum.cecha || drum.kod_bebna || 'Nieznany';
+      const parts = [drum.cecha || drum.kod_bebna || 'Nieznany'];
+      if (drum.rozmiar || drum.rozmiar_bebna) {
+        parts.push(`(Rozmiar: ${drum.rozmiar || drum.rozmiar_bebna})`);
+      }
+      return parts.join(' ');
     }
     return drum;
   };

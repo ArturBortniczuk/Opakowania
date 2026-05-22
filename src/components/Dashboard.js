@@ -13,6 +13,12 @@ const Dashboard = ({ user }) => {
     pendingReturns: 0,
     recentReturns: 0
   });
+  const [financialStats, setFinancialStats] = useState({
+    totalValue: 0,
+    activeValue: 0,
+    overdueValue: 0,
+    lostValue: 0
+  });
   const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -73,6 +79,41 @@ const Dashboard = ({ user }) => {
         const overdueCount = mappedDrums.filter(d => d.status === 'overdue').length;
         const reportedCount = mappedDrums.filter(d => d.status === 'reported').length;
         
+        // Obliczenia Finansowe na podstawie ceny netto + 20% marży
+        let totalVal = 0;
+        let activeVal = 0;
+        let overdueVal = 0;
+        let lostValTotal = 0;
+
+        mappedDrums.forEach(drum => {
+          const priceRaw = parseFloat(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
+          if (!isNaN(priceRaw)) {
+            const clientPrice = priceRaw * 1.2;
+            totalVal += clientPrice;
+
+            if (drum.status === 'overdue') {
+              overdueVal += clientPrice;
+            } else {
+              activeVal += clientPrice;
+            }
+
+            // Oblicz stratę amortyzacyjną ze względu na czas posiadania
+            const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
+            const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
+            
+            let returnPercentage = 100;
+            if (isNaN(daysInPossession) || daysInPossession <= 120) returnPercentage = 100;
+            else if (daysInPossession <= 150) returnPercentage = 90;
+            else if (daysInPossession <= 180) returnPercentage = 75;
+            else if (daysInPossession <= 240) returnPercentage = 50;
+            else if (daysInPossession <= 340) returnPercentage = 25;
+            else returnPercentage = 1;
+
+            const lostPercent = 100 - returnPercentage;
+            lostValTotal += clientPrice * (lostPercent / 100);
+          }
+        });
+
         // Bębny przyjęte w ciągu ostatnich 30 dni (nowe wydania dla klienta)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -90,6 +131,13 @@ const Dashboard = ({ user }) => {
           activeDrums: activeCount,
           pendingReturns: pendingReturnsCount,
           recentReturns: recentCount
+        });
+
+        setFinancialStats({
+          totalValue: totalVal,
+          activeValue: activeVal,
+          overdueValue: overdueVal,
+          lostValue: lostValTotal
         });
 
         // 3. Oblicz procentowy podział dla wykresu
@@ -411,6 +459,63 @@ const Dashboard = ({ user }) => {
           />
         </div>
 
+        {/* Financial Summary Section */}
+        <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-8 text-white shadow-2xl border border-indigo-500/20 mb-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl -z-10 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl -z-10 pointer-events-none" />
+          
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4 border-b border-white/10 pb-6">
+            <div>
+              <span className="text-[10px] font-extrabold bg-blue-500/20 border border-blue-500/30 text-blue-300 px-3 py-1 rounded-full uppercase tracking-widest block w-fit mb-2">PODSUMOWANIE FINANSOWE KAUCJI</span>
+              <h2 className="text-2xl font-bold tracking-tight">Wartość bębnów w Twoim posiadaniu</h2>
+            </div>
+            <div className="text-left lg:text-right">
+              <p className="text-xs text-slate-400 font-medium">Szacowana całkowita wartość bębnów (z kaucją)</p>
+              <p className="text-3xl font-extrabold bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">
+                {financialStats.totalValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Active Value */}
+            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10 hover:border-emerald-500/30 transition-all duration-300 group">
+              <div className="flex justify-between items-start mb-3">
+                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block">W terminie (Pełny zwrot)</span>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-extrabold uppercase">100% zwrotu</span>
+              </div>
+              <p className="text-2xl font-black text-white group-hover:text-emerald-300 transition-colors duration-200">
+                {financialStats.activeValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
+              </p>
+              <p className="text-xs text-slate-400 mt-2">Bębny z aktywnym terminem, bezpieczne do zwrotu.</p>
+            </div>
+
+            {/* Overdue Value */}
+            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10 hover:border-amber-500/30 transition-all duration-300 group">
+              <div className="flex justify-between items-start mb-3">
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">Przeterminowane</span>
+                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-extrabold uppercase">Zmniejszony zwrot</span>
+              </div>
+              <p className="text-2xl font-black text-white group-hover:text-amber-300 transition-colors duration-200">
+                {financialStats.overdueValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
+              </p>
+              <p className="text-xs text-slate-400 mt-2">Bębny po terminie. Zwróć je pilnie, by zatrzymać amortyzację.</p>
+            </div>
+
+            {/* Lost Value */}
+            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10 hover:border-rose-500/30 transition-all duration-300 group">
+              <div className="flex justify-between items-start mb-3">
+                <span className="text-xs font-bold text-rose-400 uppercase tracking-wider block">Utracona kaucja (Strata)</span>
+                <span className="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded font-extrabold uppercase">Bezpowrotne</span>
+              </div>
+              <p className="text-2xl font-black text-rose-400 group-hover:text-rose-300 transition-colors duration-200">
+                {financialStats.lostValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
+              </p>
+              <p className="text-xs text-slate-400 mt-2">Środki utracone w wyniku przekroczenia dopuszczalnego wieku bębnów.</p>
+            </div>
+          </div>
+        </div>
+
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column: Breakdown + Urgent list */}
@@ -524,7 +629,9 @@ const Dashboard = ({ user }) => {
                           </div>
                           <div>
                             <span className="font-bold text-gray-800 text-sm block">{drum.cecha || drum.kod_bebna}</span>
-                            <span className="text-xs text-gray-500 block truncate max-w-[200px] sm:max-w-xs">{drum.nazwa}</span>
+                            {drum.rozmiar_bebna && (
+                              <span className="text-xs text-gray-500 block font-semibold">Rozmiar: {drum.rozmiar_bebna}</span>
+                            )}
                           </div>
                         </div>
 
@@ -533,6 +640,11 @@ const Dashboard = ({ user }) => {
                             <span className={`text-xs font-bold block ${
                               drum.status === 'overdue' ? 'text-red-600' : 'text-amber-600'
                             }`}>{daysStr}</span>
+                            {drum.cena_netto_bebna && (
+                              <span className="text-[10px] font-bold text-gray-600 block mt-0.5">
+                                Wartość: {((parseFloat(drum.cena_netto_bebna) || 0) * 1.2).toFixed(2)} PLN
+                              </span>
+                            )}
                             <span className="text-[10px] text-gray-400 block font-medium">Termin: {returnDate ? new Date(returnDate).toLocaleDateString('pl-PL') : 'Brak'}</span>
                           </div>
 

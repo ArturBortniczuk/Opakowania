@@ -56,11 +56,13 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
     loadingHours: '',
     availableEquipment: '',
     notes: '',
-    // ZMIANA: selectedDrums to teraz tablica obiektów { cecha, isDamaged, description }
+    // ZMIANA: selectedDrums to teraz tablica obiektów { cecha, isDamaged, description, rozmiar, cena_netto }
     selectedDrums: selectedDrum ? [{
       cecha: selectedDrum.cecha || selectedDrum.CECHA || selectedDrum.kod_bebna,
       isDamaged: false,
-      description: ''
+      description: '',
+      rozmiar: selectedDrum.rozmiar_bebna || selectedDrum.ROZMIAR_BEBNA,
+      cena_netto: selectedDrum.cena_netto_bebna || selectedDrum.CENA_NETTO_BEBNA
     }] : [],
     confirmType: false,
     confirmEmpty: false
@@ -272,8 +274,54 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
     }
   };
 
+  // Oblicz całkowitą wartość wybranych bębnów (netto z marżą 20%)
+  const calculateSelectedDrumsValue = () => {
+    let totalVal = 0;
+    formData.selectedDrums.forEach(selDrum => {
+      // Znajdź powiązany bęben w userDrums
+      const origDrum = userDrums.find(d => d.cecha === selDrum.cecha);
+      const cenaNetto = origDrum?.cena_netto_bebna || selDrum.cena_netto;
+      if (cenaNetto) {
+        const val = parseFloat(cenaNetto) * 1.2;
+        if (!isNaN(val)) {
+          totalVal += val;
+        }
+      }
+    });
+    return totalVal;
+  };
+
+  // Oblicz całkowitą wartość zwrotu z uwzględnieniem amortyzacji czasowej
+  const calculateSelectedDrumsRefund = () => {
+    let totalRefund = 0;
+    formData.selectedDrums.forEach(selDrum => {
+      const origDrum = userDrums.find(d => d.cecha === selDrum.cecha);
+      const cenaNetto = origDrum?.cena_netto_bebna || selDrum.cena_netto;
+      if (cenaNetto) {
+        const val = parseFloat(cenaNetto) * 1.2;
+        if (!isNaN(val)) {
+          // Policz procent zwrotu
+          const daysInPossession = origDrum?.daysInPossession !== undefined 
+            ? origDrum.daysInPossession 
+            : (origDrum?.data_wydania_z_magazynu ? Math.ceil((new Date() - new Date(origDrum.data_wydania_z_magazynu)) / (1000 * 60 * 60 * 24)) : 0);
+
+          let returnPercentage = 100;
+          if (daysInPossession <= 120) returnPercentage = 100;
+          else if (daysInPossession <= 150) returnPercentage = 90;
+          else if (daysInPossession <= 180) returnPercentage = 75;
+          else if (daysInPossession <= 240) returnPercentage = 50;
+          else if (daysInPossession <= 340) returnPercentage = 25;
+          else returnPercentage = 1;
+
+          totalRefund += val * (returnPercentage / 100);
+        }
+      }
+    });
+    return totalRefund;
+  };
+
   // Logika toggle dla nowy struktury danych
-  const handleDrumToggle = (drumCecha) => {
+  const handleDrumToggle = (drumCecha, drumRozmiar, drumCenaNetto) => {
     setFormData(prev => {
       const isSelected = prev.selectedDrums.some(d => d.cecha === drumCecha);
 
@@ -287,7 +335,13 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
         // Dodaj (domyślnie nieuszkodzony)
         return {
           ...prev,
-          selectedDrums: [...prev.selectedDrums, { cecha: drumCecha, isDamaged: false, description: '' }]
+          selectedDrums: [...prev.selectedDrums, { 
+            cecha: drumCecha, 
+            isDamaged: false, 
+            description: '', 
+            rozmiar: drumRozmiar, 
+            cena_netto: drumCenaNetto 
+          }]
         };
       }
     });
@@ -600,9 +654,16 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                       {/* Nagłówek Karty */}
                       <div
                         className={`flex items-center justify-between mb-2 ${isReported ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                        onClick={() => !isReported && handleDrumToggle(drumCecha)}
+                        onClick={() => !isReported && handleDrumToggle(drumCecha, drum.rozmiar_bebna, drum.cena_netto_bebna)}
                       >
-                        <span className="font-semibold text-gray-900">{drumCecha}</span>
+                        <div>
+                          <span className="font-semibold text-gray-900">{drumCecha}</span>
+                          {drum.rozmiar_bebna && (
+                            <span className="ml-2 text-[10px] text-gray-500 font-medium bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded shrink-0">
+                              Rozmiar: {drum.rozmiar_bebna}
+                            </span>
+                          )}
+                        </div>
                         <input
                           type="checkbox"
                           checked={isSelected}
@@ -612,9 +673,16 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                         />
                       </div>
 
-                      {/* Oszacowany zwrot */}
-                      <div className="mb-2 inline-block px-2 py-1 bg-indigo-50 border border-indigo-100 rounded text-xs font-semibold text-indigo-700">
-                        Możliwy zwrot wartości: {returnPercentage}%
+                      {/* Informacje Finansowe i Zwrot */}
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        <div className="inline-block px-2 py-1 bg-indigo-50 border border-indigo-100 rounded text-xs font-semibold text-indigo-700">
+                          Możliwy zwrot wartości: {returnPercentage}%
+                        </div>
+                        {drum.cena_netto_bebna && (
+                          <div className="inline-block px-2 py-1 bg-blue-50 border border-blue-100 rounded text-xs font-semibold text-blue-700">
+                            Wartość bębna: {((parseFloat(drum.cena_netto_bebna) || 0) * 1.2).toFixed(2)} PLN
+                          </div>
+                        )}
                       </div>
 
                       {/* Adres i Faktura */}
@@ -698,7 +766,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                 <div>
                   <p className="text-sm text-gray-500">Sugerowany okres</p>
                   <p className="font-medium text-gray-900">
-                    {new Date(formData.collectionDateStart).toLocaleDateString('pl-PL')} - {new Date(formData.collectionDateEnd).toLocaleDateString('pl-PL')}
+                    {formData.collectionDateStart && new Date(formData.collectionDateStart).toLocaleDateString('pl-PL')} - {formData.collectionDateEnd && new Date(formData.collectionDateEnd).toLocaleDateString('pl-PL')}
                   </p>
                 </div>
                 <div>
@@ -717,7 +785,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Ilość bębnów</p>
-                  <p className="font-medium text-gray-900">{formData.selectedDrums.length}</p>
+                  <p className="font-medium text-gray-900">{formData.selectedDrums.length} szt.</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Uszkodzone</p>
@@ -725,6 +793,18 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                     {formData.selectedDrums.filter(d => d.isDamaged).length} szt.
                   </p>
                 </div>
+                {calculateSelectedDrumsValue() > 0 && (
+                  <>
+                    <div className="pt-2 border-t border-gray-200">
+                      <p className="text-sm text-gray-500">Suma wartości bębnów</p>
+                      <p className="font-semibold text-gray-900">{calculateSelectedDrumsValue().toFixed(2)} PLN</p>
+                    </div>
+                    <div className="pt-2 border-t border-gray-200">
+                      <p className="text-sm text-gray-500">Szacowana kwota zwrotu</p>
+                      <p className="font-extrabold text-blue-700">{calculateSelectedDrumsRefund().toFixed(2)} PLN</p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
