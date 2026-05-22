@@ -266,6 +266,7 @@ export const drumsAPI = {
 
         return {
           ...drum,
+          db_data_zwrotu_do_dostawcy: drum.data_zwrotu_do_dostawcy, // Zachowaj surową wartość przed nadpisaniem
           data_zwrotu_do_dostawcy: finalReturnDate, // Nadpisujemy dla bębnów własnych
           // Zachowaj oryginalne nazwy kolumn z bazy
           kod_bebna: drum.kod_bebna,
@@ -436,6 +437,7 @@ export const drumsAPI = {
 
         return {
           ...drum,
+          db_data_zwrotu_do_dostawcy: drum.data_zwrotu_do_dostawcy, // Zachowaj surową wartość przed nadpisaniem
           data_zwrotu_do_dostawcy: finalReturnDate, // Nadpisujemy
           clientReturnDeadline: !isNaN(clientReturnDeadline.getTime()) ? clientReturnDeadline.toISOString() : null,
           returnPeriodDays,

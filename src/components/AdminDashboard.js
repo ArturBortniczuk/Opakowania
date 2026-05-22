@@ -32,6 +32,12 @@ const AdminDashboard = ({ onNavigate }) => {
 
   const [recentActivity, setRecentActivity] = useState([]);
   const [urgentItems, setUrgentItems] = useState([]);
+  const [financialStats, setFinancialStats] = useState({
+    totalValue: 0,
+    ourValue: 0,
+    inReturnBaseValue: 0,
+    inReturnClientValue: 0
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -53,6 +59,81 @@ const AdminDashboard = ({ onNavigate }) => {
         
         generateRecentActivity(allDrums, allReturns);
         findUrgentItems(allDrums, allReturns);
+
+        // Obliczenia finansowe dla administratora
+        let totalVal = 0;
+        let ourVal = 0;
+        let returnBaseVal = 0;
+        let returnClientVal = 0;
+
+        // Obliczamy wartość ogólną i wartość własną z allDrums
+        allDrums.forEach(drum => {
+          const priceRaw = parseFloat(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA || 0);
+          if (!isNaN(priceRaw) && priceRaw > 0) {
+            totalVal += priceRaw;
+
+            // Logika "Nasze" (własne) bębny
+            const nameUpper = (drum.nazwa || '').toUpperCase();
+            const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
+            const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
+            
+            // Oryginalna data zwrotu do dostawcy (db_data_zwrotu_do_dostawcy, którą dodaliśmy do API)
+            const returnDeadline = drum.db_data_zwrotu_do_dostawcy 
+              ? new Date(drum.db_data_zwrotu_do_dostawcy) 
+              : null;
+
+            const isOurDrum = 
+              !drum.db_data_zwrotu_do_dostawcy || // Brak w bazie pierwotnej daty zwrotu = własny
+              nameUpper.startsWith('BĘBEN ELTRON') || 
+              daysInPossession > 360 ||
+              (returnDeadline && new Date() > returnDeadline);
+
+            if (isOurDrum) {
+              ourVal += priceRaw;
+            }
+          }
+        });
+
+        // Obliczamy bębny w trakcie zwrotów
+        // Tworzymy mapę cech bębnów z ich cenami z allDrums dla szybkiego wyszukiwania
+        const drumPriceMap = {};
+        allDrums.forEach(drum => {
+          if (drum.cecha) {
+            drumPriceMap[drum.cecha] = parseFloat(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA || 0);
+          }
+        });
+
+        const countedReturningDrums = new Set();
+        allReturns.forEach(req => {
+          if (['Pending', 'Approved', 'InTransit'].includes(req.status)) {
+            if (Array.isArray(req.selected_drums)) {
+              req.selected_drums.forEach(d => {
+                const cecha = typeof d === 'object' ? d.cecha : d;
+                if (cecha && !countedReturningDrums.has(cecha)) {
+                  countedReturningDrums.add(cecha);
+                  
+                  // Pobierz cenę netto - najpierw z allDrums (live), potem z obiektu snapshotu
+                  let price = drumPriceMap[cecha];
+                  if (price === undefined && typeof d === 'object') {
+                    price = parseFloat(d.cena_netto || d.cena_netto_bebna || 0);
+                  }
+                  
+                  if (price && !isNaN(price)) {
+                    returnBaseVal += price;
+                    returnClientVal += price * 1.2;
+                  }
+                }
+              });
+            }
+          }
+        });
+
+        setFinancialStats({
+          totalValue: totalVal,
+          ourValue: ourVal,
+          inReturnBaseValue: returnBaseVal,
+          inReturnClientValue: returnClientVal
+        });
         
       } catch (err) {
         console.error('Błąd podczas pobierania danych dashboardu:', err);
@@ -303,6 +384,72 @@ const AdminDashboard = ({ onNavigate }) => {
               hour: '2-digit',
               minute: '2-digit'
             })}</span>
+          </div>
+        </div>
+
+        {/* Podsumowanie finansowe */}
+        <div className="bg-gradient-to-br from-blue-50 via-white to-purple-50/20 rounded-3xl p-6 border border-blue-200/60 shadow-lg mb-8 relative overflow-hidden">
+          {/* Tło dekoracyjne */}
+          <div className="absolute right-0 top-0 w-48 h-48 bg-blue-400/10 rounded-full blur-3xl -z-10 pointer-events-none"></div>
+          <div className="absolute left-1/3 bottom-0 w-64 h-64 bg-purple-400/5 rounded-full blur-3xl -z-10 pointer-events-none"></div>
+
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold bg-gradient-to-r from-blue-700 to-indigo-800 bg-clip-text text-transparent flex items-center">
+              <TrendingUp className="w-5 h-5 mr-2 text-blue-600 animate-pulse" />
+              Podsumowanie finansowe (Wycena Netto)
+            </h2>
+            <span className="text-[11px] font-semibold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full uppercase tracking-wider">
+              Real-Time
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Wartość wszystkich bębnów */}
+            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 border border-blue-100/80 shadow-sm hover:shadow-md transition-all duration-300 flex items-start space-x-4">
+              <div className="p-3 bg-blue-100 text-blue-700 rounded-xl">
+                <Package className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Wszystkie bębny</p>
+                <p className="text-2xl font-extrabold text-gray-900">
+                  {financialStats.totalValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
+                </p>
+                <p className="text-xs text-gray-500">Całkowita wartość netto w systemie</p>
+              </div>
+            </div>
+
+            {/* Wartość "naszych" bębnów */}
+            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 border border-blue-100/80 shadow-sm hover:shadow-md transition-all duration-300 flex items-start space-x-4">
+              <div className="p-3 bg-indigo-100 text-indigo-700 rounded-xl">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Własne bębny (Eltron)</p>
+                <p className="text-2xl font-extrabold text-gray-900">
+                  {financialStats.ourValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
+                </p>
+                <p className="text-xs text-gray-500">Wycena bębnów należących do Eltron</p>
+              </div>
+            </div>
+
+            {/* Wartość w trakcie zwrotów */}
+            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 border border-blue-100/80 shadow-sm hover:shadow-md transition-all duration-300 flex items-start space-x-4">
+              <div className="p-3 bg-amber-100 text-amber-700 rounded-xl">
+                <Truck className="w-6 h-6" />
+              </div>
+              <div className="space-y-1 w-full">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">W trakcie zwrotów</p>
+                <p className="text-2xl font-extrabold text-gray-900">
+                  {financialStats.inReturnBaseValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
+                </p>
+                <div className="pt-1.5 border-t border-amber-100/50 mt-1.5 space-y-0.5">
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Szacowany zwrot dla klientów (z marżą 20%)</p>
+                  <p className="text-sm font-bold text-amber-700">
+                    {financialStats.inReturnClientValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
