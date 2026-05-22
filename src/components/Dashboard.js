@@ -460,18 +460,18 @@ const Dashboard = ({ user }) => {
         </div>
 
         {/* Financial Summary Section */}
-        <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-8 text-white shadow-2xl border border-indigo-500/20 mb-8 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl -z-10 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl -z-10 pointer-events-none" />
+        <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50/30 rounded-3xl p-8 text-gray-900 shadow-lg border border-blue-200/60 mb-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-100/30 rounded-full blur-3xl -z-10 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-100/20 rounded-full blur-3xl -z-10 pointer-events-none" />
           
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4 border-b border-white/10 pb-6">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4 border-b border-blue-100 pb-6">
             <div>
-              <span className="text-[10px] font-extrabold bg-blue-500/20 border border-blue-500/30 text-blue-300 px-3 py-1 rounded-full uppercase tracking-widest block w-fit mb-2">PODSUMOWANIE FINANSOWE KAUCJI</span>
-              <h2 className="text-2xl font-bold tracking-tight">Wartość bębnów w Twoim posiadaniu</h2>
+              <span className="text-[10px] font-extrabold bg-blue-100 border border-blue-200 text-blue-700 px-3 py-1 rounded-full uppercase tracking-widest block w-fit mb-2">PODSUMOWANIE FINANSOWE KAUCJI</span>
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">Wartość bębnów w Twoim posiadaniu</h2>
             </div>
             <div className="text-left lg:text-right">
-              <p className="text-xs text-slate-400 font-medium">Szacowana całkowita wartość bębnów (z kaucją)</p>
-              <p className="text-3xl font-extrabold bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">
+              <p className="text-xs text-slate-500 font-medium">Szacowana całkowita wartość bębnów (z kaucją)</p>
+              <p className="text-3xl font-extrabold text-blue-900">
                 {financialStats.totalValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
               </p>
             </div>
@@ -479,39 +479,39 @@ const Dashboard = ({ user }) => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Active Value */}
-            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10 hover:border-emerald-500/30 transition-all duration-300 group">
+            <div className="bg-white/60 backdrop-blur-md rounded-2xl p-5 border border-blue-100/80 hover:border-emerald-300 hover:shadow-md transition-all duration-300 group">
               <div className="flex justify-between items-start mb-3">
-                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block">W terminie (Pełny zwrot)</span>
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-extrabold uppercase">100% zwrotu</span>
+                <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider block">W terminie (Pełny zwrot)</span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-extrabold uppercase">100% zwrotu</span>
               </div>
-              <p className="text-2xl font-black text-white group-hover:text-emerald-300 transition-colors duration-200">
+              <p className="text-2xl font-black text-emerald-900 group-hover:text-emerald-700 transition-colors duration-200">
                 {financialStats.activeValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
               </p>
-              <p className="text-xs text-slate-400 mt-2">Bębny z aktywnym terminem, bezpieczne do zwrotu.</p>
+              <p className="text-xs text-slate-500 mt-2">Bębny z aktywnym terminem, bezpieczne do zwrotu.</p>
             </div>
 
             {/* Overdue Value */}
-            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10 hover:border-amber-500/30 transition-all duration-300 group">
+            <div className="bg-white/60 backdrop-blur-md rounded-2xl p-5 border border-blue-100/80 hover:border-amber-300 hover:shadow-md transition-all duration-300 group">
               <div className="flex justify-between items-start mb-3">
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">Przeterminowane</span>
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-extrabold uppercase">Zmniejszony zwrot</span>
+                <span className="text-xs font-bold text-amber-700 uppercase tracking-wider block">Przeterminowane</span>
+                <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-extrabold uppercase">Zmniejszony zwrot</span>
               </div>
-              <p className="text-2xl font-black text-white group-hover:text-amber-300 transition-colors duration-200">
+              <p className="text-2xl font-black text-amber-900 group-hover:text-amber-700 transition-colors duration-200">
                 {financialStats.overdueValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
               </p>
-              <p className="text-xs text-slate-400 mt-2">Bębny po terminie. Zwróć je pilnie, by zatrzymać amortyzację.</p>
+              <p className="text-xs text-slate-500 mt-2">Bębny po terminie. Zwróć je pilnie, by zatrzymać amortyzację.</p>
             </div>
 
             {/* Lost Value */}
-            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10 hover:border-rose-500/30 transition-all duration-300 group">
+            <div className="bg-white/60 backdrop-blur-md rounded-2xl p-5 border border-blue-100/80 hover:border-rose-300 hover:shadow-md transition-all duration-300 group">
               <div className="flex justify-between items-start mb-3">
-                <span className="text-xs font-bold text-rose-400 uppercase tracking-wider block">Utracona kaucja (Strata)</span>
-                <span className="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded font-extrabold uppercase">Bezpowrotne</span>
+                <span className="text-xs font-bold text-rose-700 uppercase tracking-wider block">Utracona kaucja (Strata)</span>
+                <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-extrabold uppercase">Bezpowrotne</span>
               </div>
-              <p className="text-2xl font-black text-rose-400 group-hover:text-rose-300 transition-colors duration-200">
+              <p className="text-2xl font-black text-rose-700 group-hover:text-rose-600 transition-colors duration-200">
                 {financialStats.lostValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
               </p>
-              <p className="text-xs text-slate-400 mt-2">Środki utracone w wyniku przekroczenia dopuszczalnego wieku bębnów.</p>
+              <p className="text-xs text-slate-500 mt-2">Środki utracone w wyniku przekroczenia dopuszczalnego wieku bębnów.</p>
             </div>
           </div>
         </div>
