@@ -1,7 +1,7 @@
 // src/components/DrumsList.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { drumsAPI } from '../utils/supabaseApi';
+import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
 import {
   Package, Calendar, Search, Filter, AlertCircle, CheckCircle, Clock,
   ArrowUpDown, Truck, RefreshCw, ChevronLeft, ChevronRight
@@ -42,10 +42,40 @@ const DrumsList = ({ user }) => {
     try {
       // W wersji dla klienta pobieramy wszystko i filtrujemy w pamięci,
       // aby poprawnie uwzględnić niestandardowe terminy i statusy klienta.
-      const allDrums = await drumsAPI.getAllDrums(user.nip);
+      const [allDrums, returns] = await Promise.all([
+        drumsAPI.getAllDrums(user.nip),
+        returnsAPI.getReturns(user.nip)
+      ]);
+
+      // Zbieramy cechy bębnów, które są już w aktywnych zgłoszeniach zwrotu
+      const reportedDrums = new Set();
+      if (Array.isArray(returns)) {
+        returns.forEach(req => {
+          if (req.status !== 'Rejected' && req.status !== 'Cancelled') {
+            if (Array.isArray(req.selected_drums)) {
+              req.selected_drums.forEach(d => reportedDrums.add(d.cecha));
+            }
+          }
+        });
+      }
+
+      // Aktualizujemy statusy bębnów zgłoszonych
+      let mappedDrums = allDrums.map(d => {
+        if (reportedDrums.has(d.cecha)) {
+          return {
+            ...d,
+            isReported: true,
+            status: 'reported',
+            text: 'Zgłoszony do zwrotu',
+            color: 'bg-orange-100 text-orange-700',
+            borderColor: 'border-orange-200'
+          };
+        }
+        return d;
+      });
 
       // 1. Filtrowanie (Search)
-      let filtered = allDrums;
+      let filtered = mappedDrums;
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
         filtered = filtered.filter(d => 
@@ -83,10 +113,11 @@ const DrumsList = ({ user }) => {
 
       // Zapisujemy statystyki
       setStats({
-        total: allDrums.length,
-        active: allDrums.filter(d => d.status === 'active').length,
-        dueSoon: allDrums.filter(d => d.status === 'due-soon').length,
-        overdue: allDrums.filter(d => d.status === 'overdue').length
+        total: mappedDrums.length,
+        active: mappedDrums.filter(d => d.status === 'active').length,
+        dueSoon: mappedDrums.filter(d => d.status === 'due-soon').length,
+        overdue: mappedDrums.filter(d => d.status === 'overdue').length,
+        reported: mappedDrums.filter(d => d.status === 'reported').length
       });
 
       setTotalItems(filtered.length);
@@ -192,13 +223,23 @@ const DrumsList = ({ user }) => {
         </div>
 
         <div className="mt-4 pt-4 border-t border-gray-200">
-          <button
-            onClick={() => navigate('/return', { state: { drum } })}
-            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2 px-4 rounded-xl font-medium hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2"
-          >
-            <Truck className="w-4 h-4" />
-            <span>Zgłoś zwrot</span>
-          </button>
+          {drum.isReported ? (
+            <button
+              disabled
+              className="w-full bg-gray-100 text-gray-500 py-2 px-4 rounded-xl font-medium cursor-not-allowed flex items-center justify-center space-x-2"
+            >
+              <CheckCircle className="w-4 h-4" />
+              <span>Oczekuje na odbiór</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/return', { state: { drum } })}
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2 px-4 rounded-xl font-medium hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2"
+            >
+              <Truck className="w-4 h-4" />
+              <span>Zgłoś zwrot</span>
+            </button>
+          )}
         </div>
       </div>
     );
@@ -281,6 +322,7 @@ const DrumsList = ({ user }) => {
                 <option value="active">Aktywne</option>
                 <option value="due-soon">Zbliża się termin</option>
                 <option value="overdue">Przeterminowane</option>
+                <option value="reported">Zgłoszone do zwrotu</option>
               </select>
 
               <div className="flex gap-2">
