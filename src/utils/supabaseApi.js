@@ -382,33 +382,52 @@ export const drumsAPI = {
     try {
       console.log('🔄 getAllDrums - pobieranie WSZYSTKICH bębnów...');
 
-      let query = supabase
-        .from('drums')
-        .select(`*, companies (name, email, phone, address, custom_return_periods(return_period_days))`);
-
       const userStr = localStorage.getItem('currentUser');
       const currentUser = userStr ? JSON.parse(userStr) : null;
       const isClient = currentUser && currentUser.role === 'client';
 
-      if (nip) {
-        query = query.eq('nip', nip);
-        query = query.neq('kontrahent', 'Nie wydany');
+      let allData = [];
+      let pageIndex = 0;
+      const chunkSize = 1000;
 
-        if (isClient) {
-          const maxDate = new Date(Date.now() - 456 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-          query = query.or(`data_wydania.gte.${maxDate},and(data_wydania.is.null,data_przyjecia_na_stan.gte.${maxDate})`);
+      while (true) {
+        const from = pageIndex * chunkSize;
+        const to = from + chunkSize - 1;
+        
+        let chunkQuery = supabase
+          .from('drums')
+          .select(`*, companies (name, email, phone, address, custom_return_periods(return_period_days))`)
+          .range(from, to)
+          .order('kod_bebna');
+
+        if (nip) {
+          chunkQuery = chunkQuery.eq('nip', nip);
+          chunkQuery = chunkQuery.neq('kontrahent', 'Nie wydany');
+
+          if (isClient) {
+            const maxDate = new Date(Date.now() - 456 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            chunkQuery = chunkQuery.or(`data_wydania.gte.${maxDate},and(data_wydania.is.null,data_przyjecia_na_stan.gte.${maxDate})`);
+          }
         }
+
+        const { data, error } = await chunkQuery;
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          break;
+        }
+
+        allData = allData.concat(data);
+        if (data.length < chunkSize) {
+          break;
+        }
+        pageIndex++;
       }
 
-      // USUWAMY LIMIT - pobieramy wszystko
-      const { data, error } = await query.order('kod_bebna');
-
-      if (error) throw error;
-
-      console.log(`✅ getAllDrums pobrał ${data.length} bębnów z bazy`);
+      console.log(`✅ getAllDrums pobrał ${allData.length} bębnów z bazy w ${pageIndex + 1} zapytaniach`);
 
       // Mapowanie danych (identyczne jak w getDrums)
-      return data.map(drum => {
+      return allData.map(drum => {
         // Obliczenie wirtualnej daty zwrotu dla bębnów 'Własnych' (120 dni od wydania)
         let finalReturnDate = drum.data_zwrotu_do_dostawcy;
         if (!finalReturnDate && drum.data_wydania) {
@@ -505,16 +524,36 @@ export const drumsAPI = {
    */
   async getUniqueSuppliers() {
     try {
-      // Pobieramy wszystkie wartości kon_dostawca z bazy
-      const { data, error } = await supabase
-        .from('drums')
-        .select('kon_dostawca')
-        .not('kon_dostawca', 'is', null);
+      // Pobieramy wszystkie wartości kon_dostawca z bazy przy użyciu paginacji
+      let allData = [];
+      let pageIndex = 0;
+      const chunkSize = 1000;
 
-      if (error) throw error;
+      while (true) {
+        const from = pageIndex * chunkSize;
+        const to = from + chunkSize - 1;
+        
+        const { data, error } = await supabase
+          .from('drums')
+          .select('kon_dostawca')
+          .not('kon_dostawca', 'is', null)
+          .range(from, to);
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          break;
+        }
+
+        allData = allData.concat(data);
+        if (data.length < chunkSize) {
+          break;
+        }
+        pageIndex++;
+      }
 
       // Wyodrębniamy unikalne wartości, usuwamy puste i sortujemy
-      const uniqueSuppliers = [...new Set(data.map(item => item.kon_dostawca.trim()))]
+      const uniqueSuppliers = [...new Set(allData.map(item => item.kon_dostawca.trim()))]
         .filter(supplier => supplier.length > 0)
         .sort((a, b) => a.localeCompare(b));
 
