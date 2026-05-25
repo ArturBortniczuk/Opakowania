@@ -575,17 +575,38 @@ export const companiesAPI = {
    */
   async getCompanies() {
     try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select(`*, custom_return_periods(return_period_days)`)
-        .order('name');
+      console.log('🔄 getCompanies - pobieranie wszystkich firm...');
+      let allData = [];
+      let pageIndex = 0;
+      const chunkSize = 1000;
 
-      if (error) throw error;
+      while (true) {
+        const from = pageIndex * chunkSize;
+        const to = from + chunkSize - 1;
 
-      if (error) throw error;
+        const { data, error } = await supabase
+          .from('companies')
+          .select(`*, custom_return_periods(return_period_days)`)
+          .order('name')
+          .range(from, to);
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          break;
+        }
+
+        allData = allData.concat(data);
+        if (data.length < chunkSize) {
+          break;
+        }
+        pageIndex++;
+      }
+
+      console.log(`✅ getCompanies pobrał ${allData.length} firm z bazy w ${pageIndex + 1} zapytaniach`);
 
       // Mapowanie danych (bez zbędnych zapytań do bazy)
-      const mappedData = data.map(company => ({
+      const mappedData = allData.map(company => ({
         ...company,
         returnPeriodDays: company.custom_return_periods?.[0]?.return_period_days || 120,
         status: 'Aktywny', // Domyślny status
