@@ -1,7 +1,7 @@
 // src/components/AdminClientsList.js - Zaktualizowany o prawdziwe dane
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { companiesAPI, drumsAPI, returnsAPI } from '../utils/supabaseApi';
+import { companiesAPI } from '../utils/supabaseApi';
 import {
   Users,
   Search,
@@ -19,7 +19,6 @@ import {
   ArrowUpDown,
   MoreVertical,
   Edit,
-  Trash2,
   RefreshCw,
   UserCheck,
   User,
@@ -34,12 +33,16 @@ const AdminClientsList = ({ onNavigate }) => {
   const urlOpenModal = searchParams.get('openModal') === 'true';
 
   const [searchTerm, setSearchTerm] = useState(urlClientNip || '');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(urlClientNip || '');
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedClient, setSelectedClient] = useState(null);
   const [showClientDetails, setShowClientDetails] = useState(false);
   const [clients, setClients] = useState([]);
+  const [totalClients, setTotalClients] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [globalStats, setGlobalStats] = useState({ total: 0, withDrums: 0, withPending: 0, noDrums: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -54,6 +57,23 @@ const AdminClientsList = ({ onNavigate }) => {
   const [modalError, setModalError] = useState(null);
   const [modalSuccess, setModalSuccess] = useState(null);
 
+  // Stan paginacji - LIMIT 1000 NA STRONĘ ZGODNIE Z ZAMÓWIENIEM UŻYTKOWNIKA
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 1000;
+
+  // Debouncing dla wyszukiwarki (300ms) w celu uniknięcia obciążania serwera przy każdym znaku
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Automatyczny reset strony przy zmianie filtrów lub sortowania
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, filterStatus, sortBy, sortOrder]);
+
   const handleStartEdit = () => {
     setEditEmail(selectedClient?.email || '');
     setEditPhone(selectedClient?.phone || '');
@@ -65,57 +85,51 @@ const AdminClientsList = ({ onNavigate }) => {
     setIsEditing(true);
   };
 
-  // Pobierz klientów z danymi
+  // Pobierz globalne statystyki dla górnego paska (wywoływane raz lub przy odświeżaniu)
+  const fetchGlobalStats = async () => {
+    try {
+      const stats = await companiesAPI.getGlobalStats();
+      setGlobalStats(stats);
+    } catch (err) {
+      console.error('Błąd pobierania statystyk globalnych:', err);
+    }
+  };
+
+  // Pierwsze pobranie statystyk
+  useEffect(() => {
+    fetchGlobalStats();
+  }, []);
+
+  // Pobierz klientów z serwerową paginacją i wyszukiwaniem
   useEffect(() => {
     const fetchClientsData = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        const [companiesData, allDrums, allReturns] = await Promise.all([
-          companiesAPI.getCompanies(),
-          drumsAPI.getAllDrums(),
-          returnsAPI.getReturns()
-        ]);
-
-        // Wzbogać dane klientów o statystyki
-        const enrichedClients = companiesData.map(company => {
-          const clientDrums = allDrums.filter(drum => drum.NIP === company.nip);
-          const clientReturns = allReturns.filter(ret => ret.user_nip === company.nip);
-
-          const now = new Date();
-          const overdueDrums = clientDrums.filter(drum => {
-            const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
-            return returnDate < now;
-          });
-
-          const pendingRequests = clientReturns.filter(req => req.status === 'Pending');
-
-          return {
-            ...company,
-            drums: clientDrums,
-            drumsCount: clientDrums.length,
-            overdueDrums: overdueDrums.length,
-            pendingRequests: pendingRequests.length,
-            totalRequests: clientReturns.length,
-            riskLevel: overdueDrums.length > 0 ? 'high' :
-              pendingRequests.length > 0 ? 'medium' : 'low',
-            lastActivity: company.created_at || new Date().toISOString().split('T')[0]
-          };
+        const result = await companiesAPI.getCompanies({
+          page: currentPage,
+          limit: ITEMS_PER_PAGE,
+          search: debouncedSearchTerm,
+          sortBy,
+          sortOrder,
+          filterStatus
         });
 
-        setClients(enrichedClients);
+        setClients(result.data);
+        setTotalClients(result.pagination.total);
+        setTotalPages(result.pagination.totalPages);
 
       } catch (err) {
         console.error('Błąd podczas pobierania danych klientów:', err);
-        setError('Nie udało się pobrać listy klientów. Spróbuj ponownie.');
+        setError(err.message || 'Nie udało się pobrać listy klientów. Spróbuj ponownie.');
       } finally {
         setLoading(false);
       }
     };
 
     fetchClientsData();
-  }, []);
+  }, [currentPage, debouncedSearchTerm, filterStatus, sortBy, sortOrder]);
 
   // DODANE: Auto-otwieranie modala klienta
   useEffect(() => {
@@ -140,36 +154,10 @@ const AdminClientsList = ({ onNavigate }) => {
     }
   };
 
-  const filteredAndSortedClients = useMemo(() => {
-    let filtered = clients.filter(client => {
-      const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.nip.includes(searchTerm) ||
-        (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (client.salesperson_name && client.salesperson_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (client.market && client.market.toLowerCase().includes(searchTerm.toLowerCase()));
-
-      if (filterStatus === 'all') return matchesSearch;
-      if (filterStatus === 'active' && client.drumsCount > 0) return matchesSearch;
-      if (filterStatus === 'no-drums' && client.drumsCount === 0) return matchesSearch;
-      if (filterStatus === 'pending' && client.pendingRequests > 0) return matchesSearch;
-
-      return false;
-    });
-
-    return filtered.sort((a, b) => {
-      let aValue = a[sortBy];
-      let bValue = b[sortBy];
-
-      if (sortBy === 'lastActivity') {
-        aValue = new Date(aValue);
-        bValue = new Date(bValue);
-      }
-
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [clients, searchTerm, sortBy, sortOrder, filterStatus]);
+  // Zgodność z istniejącą strukturą JSX
+  const paginatedClients = clients;
+  const filteredAndSortedClients = { length: totalClients };
+  const stats = globalStats;
 
   const handleSort = (field) => {
     if (sortBy === field) {
@@ -188,59 +176,32 @@ const AdminClientsList = ({ onNavigate }) => {
   const handleRefresh = async () => {
     setLoading(true);
     setError(null);
+    setCurrentPage(1);
 
     try {
-      const [companiesData, allDrums, allReturns] = await Promise.all([
-        companiesAPI.getCompanies(),
-        drumsAPI.getAllDrums(),
-        returnsAPI.getReturns()
+      await Promise.all([
+        fetchGlobalStats(),
+        (async () => {
+          const result = await companiesAPI.getCompanies({
+            page: 1,
+            limit: ITEMS_PER_PAGE,
+            search: debouncedSearchTerm,
+            sortBy,
+            sortOrder,
+            filterStatus
+          });
+          setClients(result.data);
+          setTotalClients(result.pagination.total);
+          setTotalPages(result.pagination.totalPages);
+        })()
       ]);
-
-      const enrichedClients = companiesData.map(company => {
-        const clientDrums = allDrums.filter(drum => drum.NIP === company.nip);
-        const clientReturns = allReturns.filter(ret => ret.user_nip === company.nip);
-
-        const now = new Date();
-        const overdueDrums = clientDrums.filter(drum => {
-          const returnDate = new Date(drum.DATA_ZWROTU_DO_DOSTAWCY);
-          return returnDate < now;
-        });
-
-        const pendingRequests = clientReturns.filter(req => req.status === 'Pending');
-
-        return {
-          ...company,
-          drums: clientDrums,
-          drumsCount: clientDrums.length,
-          overdueDrums: overdueDrums.length,
-          pendingRequests: pendingRequests.length,
-          totalRequests: clientReturns.length,
-          riskLevel: overdueDrums.length > 0 ? 'high' :
-            pendingRequests.length > 0 ? 'medium' : 'low',
-          lastActivity: company.created_at || new Date().toISOString().split('T')[0]
-        };
-      });
-
-      setClients(enrichedClients);
-
     } catch (err) {
       console.error('Błąd podczas odświeżania:', err);
-      setError('Nie udało się odświeżyć danych.');
+      setError(err.message || 'Nie udało się odświeżyć danych.');
     } finally {
       setLoading(false);
     }
   };
-
-  const getStatistics = () => {
-    const total = clients.length;
-    const withDrums = clients.filter(c => c.drumsCount > 0).length;
-    const withPending = clients.filter(c => c.pendingRequests > 0).length;
-    const noDrums = clients.filter(c => c.drumsCount === 0).length;
-
-    return { total, withDrums, withPending, noDrums };
-  };
-
-  const stats = getStatistics();
 
   const ClientCard = ({ client, index }) => (
     <div
@@ -809,12 +770,51 @@ const AdminClientsList = ({ onNavigate }) => {
         </div>
 
         {/* Clients Grid */}
-        {filteredAndSortedClients.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
-            {filteredAndSortedClients.map((client, index) => (
-              <ClientCard key={client.nip} client={client} index={index} />
-            ))}
-          </div>
+        {paginatedClients.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
+              {paginatedClients.map((client, index) => (
+                <ClientCard key={client.nip} client={client} index={index} />
+              ))}
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between bg-white/80 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-blue-150 mb-8 gap-4">
+                <div className="text-sm font-semibold text-slate-700">
+                  Pokazywane <span className="text-blue-600 font-extrabold">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> - <span className="text-blue-600 font-extrabold">{Math.min(currentPage * ITEMS_PER_PAGE, filteredAndSortedClients.length)}</span> z <span className="text-slate-900 font-black">{filteredAndSortedClients.length}</span> klientów
+                </div>
+
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => {
+                      setCurrentPage(prev => Math.max(prev - 1, 1));
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 border border-gray-300 rounded-xl font-bold text-sm text-gray-700 bg-white hover:bg-blue-50 disabled:opacity-50 disabled:hover:bg-white transition-all shadow-sm cursor-pointer"
+                  >
+                    ← Poprzednia
+                  </button>
+
+                  <div className="flex items-center px-4 font-bold text-sm text-blue-700 bg-blue-50 rounded-xl border border-blue-100">
+                    Strona {currentPage} z {totalPages}
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setCurrentPage(prev => Math.min(prev + 1, totalPages));
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    disabled={currentPage === totalPages}
+                    className="px-4 py-2 border border-gray-300 rounded-xl font-bold text-sm text-gray-700 bg-white hover:bg-blue-50 disabled:opacity-50 disabled:hover:bg-white transition-all shadow-sm cursor-pointer"
+                  >
+                    Następna →
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <div className="text-center py-12">
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">

@@ -570,52 +570,116 @@ export const drumsAPI = {
 // ==================================
 export const companiesAPI = {
   /**
-   * Pobiera listę wszystkich firm wraz z dodatkowymi statystykami.
-   * @returns {Promise<Array>} Lista obiektów firm.
+   * Pobiera listę firm wraz z dodatkowymi statystykami (serwerowa paginacja, szukanie, filtrowanie).
+   * @param {object} options - Opcje paginacji, wyszukiwania i filtrowania.
+   * @returns {Promise<object>} Obiekt z danymi firm i metadanymi paginacji.
    */
-  async getCompanies() {
+  async getCompanies(options = {}) {
     try {
-      console.log('🔄 getCompanies - pobieranie wszystkich firm...');
-      let allData = [];
-      let pageIndex = 0;
-      const chunkSize = 1000;
+      const {
+        page = 1,
+        limit = 1000,
+        sortBy = 'name',
+        sortOrder = 'asc',
+        search = '',
+        filterStatus = 'all'
+      } = options;
 
-      while (true) {
-        const from = pageIndex * chunkSize;
-        const to = from + chunkSize - 1;
+      console.log(`🔄 getCompanies - strona ${page}, limit ${limit}, szukaj: "${search}", filtr: ${filterStatus}, sort: ${sortBy} ${sortOrder}`);
 
-        const { data, error } = await supabase
-          .from('companies')
-          .select(`*, custom_return_periods(return_period_days)`)
-          .order('name')
-          .range(from, to);
+      let query = supabase
+        .from('company_client_stats')
+        .select('*', { count: 'exact' });
 
-        if (error) throw error;
-
-        if (!data || data.length === 0) {
-          break;
-        }
-
-        allData = allData.concat(data);
-        if (data.length < chunkSize) {
-          break;
-        }
-        pageIndex++;
+      // Wyszukiwanie
+      if (search) {
+        const safeSearch = `%${search}%`;
+        query = query.or(`name.ilike.${safeSearch},nip.ilike.${safeSearch},email.ilike.${safeSearch},salesperson_name.ilike.${safeSearch},market.ilike.${safeSearch}`);
       }
 
-      console.log(`✅ getCompanies pobrał ${allData.length} firm z bazy w ${pageIndex + 1} zapytaniach`);
+      // Filtrowanie
+      if (filterStatus === 'active') {
+        query = query.gt('drumsCount', 0);
+      } else if (filterStatus === 'no-drums') {
+        query = query.eq('drumsCount', 0);
+      } else if (filterStatus === 'pending') {
+        query = query.gt('pendingRequests', 0);
+      }
 
-      // Mapowanie danych (bez zbędnych zapytań do bazy)
-      const mappedData = allData.map(company => ({
+      // Sortowanie
+      let dbSortBy = sortBy;
+      if (sortBy === 'lastActivity') {
+        dbSortBy = 'created_at';
+      }
+      query = query.order(dbSortBy, { ascending: sortOrder === 'asc' });
+
+      // Paginacja
+      const offset = (page - 1) * limit;
+      query = query.range(offset, offset + limit - 1);
+
+      const { data, error, count } = await query;
+      
+      if (error) {
+        if (error.code === '42P01') {
+          throw new Error('Widok w bazie danych "company_client_stats" nie istnieje. Uruchom skrypt SQL "create_company_client_stats_view.sql" w panelu Supabase, aby utworzyć wymagany widok.');
+        }
+        throw error;
+      }
+
+      const mappedData = (data || []).map(company => ({
         ...company,
-        returnPeriodDays: company.custom_return_periods?.[0]?.return_period_days || 120,
-        status: 'Aktywny', // Domyślny status
+        returnPeriodDays: 120, // domyślna wartość lub powiązana z custom
+        status: 'Aktywny',
         lastActivity: company.created_at || new Date().toISOString().split('T')[0]
       }));
 
-      return mappedData;
+      return {
+        data: mappedData,
+        pagination: {
+          page,
+          limit,
+          total: count || 0,
+          totalPages: Math.ceil((count || 0) / limit),
+          hasNext: page < Math.ceil((count || 0) / limit),
+          hasPrev: page > 1
+        }
+      };
     } catch (error) {
-      console.error('Błąd API firm:', error);
+      console.error('Błąd API getCompanies:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Pobiera globalne statystyki klientów (ogółem, z bębnami, z oczekującymi zwrotami, bez bębnów).
+   * Wykorzystuje ultra-lekkie zapytania count: 'exact', head: true.
+   * @returns {Promise<object>} Statystyki globalne.
+   */
+  async getGlobalStats() {
+    try {
+      console.log('🔄 getGlobalStats - pobieranie statystyk globalnych...');
+      const [totalRes, activeRes, pendingRes, noDrumsRes] = await Promise.all([
+        supabase.from('company_client_stats').select('*', { count: 'exact', head: true }),
+        supabase.from('company_client_stats').select('*', { count: 'exact', head: true }).gt('drumsCount', 0),
+        supabase.from('company_client_stats').select('*', { count: 'exact', head: true }).gt('pendingRequests', 0),
+        supabase.from('company_client_stats').select('*', { count: 'exact', head: true }).eq('drumsCount', 0)
+      ]);
+
+      if (totalRes.error) {
+        if (totalRes.error.code === '42P01') {
+          throw new Error('Widok w bazie danych "company_client_stats" nie istnieje. Uruchom skrypt SQL "create_company_client_stats_view.sql" w panelu Supabase.');
+        }
+        throw totalRes.error;
+      }
+
+      return {
+        total: totalRes.count || 0,
+        withDrums: activeRes.count || 0,
+        withPending: pendingRes.count || 0,
+        noDrums: noDrumsRes.count || 0
+      };
+    } catch (error) {
+      console.error('Błąd API getGlobalStats:', error);
       throw error;
     }
   },
