@@ -49,6 +49,7 @@ const AdminClientsList = ({ onNavigate }) => {
   const [editPhone, setEditPhone] = useState('');
   const [editSalespersonName, setEditSalespersonName] = useState('');
   const [editAddress, setEditAddress] = useState('');
+  const [editMarket, setEditMarket] = useState('');
   const [savingClient, setSavingClient] = useState(false);
   const [modalError, setModalError] = useState(null);
   const [modalSuccess, setModalSuccess] = useState(null);
@@ -58,6 +59,7 @@ const AdminClientsList = ({ onNavigate }) => {
     setEditPhone(selectedClient?.phone || '');
     setEditSalespersonName(selectedClient?.salesperson_name || '');
     setEditAddress(selectedClient?.address || '');
+    setEditMarket(selectedClient?.market || '');
     setModalError(null);
     setModalSuccess(null);
     setIsEditing(true);
@@ -143,12 +145,13 @@ const AdminClientsList = ({ onNavigate }) => {
       const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         client.nip.includes(searchTerm) ||
         (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (client.salesperson_name && client.salesperson_name.toLowerCase().includes(searchTerm.toLowerCase()));
+        (client.salesperson_name && client.salesperson_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (client.market && client.market.toLowerCase().includes(searchTerm.toLowerCase()));
 
       if (filterStatus === 'all') return matchesSearch;
-      if (filterStatus === 'high-risk' && client.riskLevel === 'high') return matchesSearch;
-      if (filterStatus === 'pending' && client.pendingRequests > 0) return matchesSearch;
       if (filterStatus === 'active' && client.drumsCount > 0) return matchesSearch;
+      if (filterStatus === 'no-drums' && client.drumsCount === 0) return matchesSearch;
+      if (filterStatus === 'pending' && client.pendingRequests > 0) return matchesSearch;
 
       return false;
     });
@@ -228,28 +231,13 @@ const AdminClientsList = ({ onNavigate }) => {
     }
   };
 
-  const getRiskBadge = (riskLevel) => {
-    const badges = {
-      high: { color: 'bg-red-100 text-red-800 border-red-200', text: 'Wysokie ryzyko' },
-      medium: { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', text: 'Średnie ryzyko' },
-      low: { color: 'bg-green-100 text-green-800 border-green-200', text: 'Niskie ryzyko' }
-    };
-
-    const badge = badges[riskLevel];
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${badge.color}`}>
-        {badge.text}
-      </span>
-    );
-  };
-
   const getStatistics = () => {
     const total = clients.length;
-    const highRisk = clients.filter(c => c.riskLevel === 'high').length;
+    const withDrums = clients.filter(c => c.drumsCount > 0).length;
     const withPending = clients.filter(c => c.pendingRequests > 0).length;
-    const lowRisk = clients.filter(c => c.riskLevel === 'low').length;
+    const noDrums = clients.filter(c => c.drumsCount === 0).length;
 
-    return { total, highRisk, withPending, lowRisk };
+    return { total, withDrums, withPending, noDrums };
   };
 
   const stats = getStatistics();
@@ -271,7 +259,11 @@ const AdminClientsList = ({ onNavigate }) => {
         </div>
 
         <div className="flex items-center space-x-2">
-          {getRiskBadge(client.riskLevel)}
+          {client.market && (
+            <span className="px-2.5 py-1 rounded-full text-xs font-bold border bg-indigo-50 text-indigo-700 border-indigo-150 shadow-sm">
+              Rynek: {client.market}
+            </span>
+          )}
           <div className="relative">
             <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors duration-200">
               <MoreVertical className="w-4 h-4" />
@@ -365,7 +357,8 @@ const AdminClientsList = ({ onNavigate }) => {
           email: editEmail.trim() || null,
           phone: editPhone.trim() || null,
           salesperson_name: editSalespersonName.trim() || null,
-          address: editAddress.trim() || null
+          address: editAddress.trim() || null,
+          market: editMarket || null
         };
 
         await companiesAPI.updateCompany(selectedClient.nip, updates);
@@ -478,13 +471,38 @@ const AdminClientsList = ({ onNavigate }) => {
                     />
                   </div>
 
+                  {/* Rynek */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                      <MapPin className="w-4 h-4 mr-1.5 text-blue-600" /> Obszar / Rynek (Województwo)
+                    </label>
+                    <select
+                      value={editMarket}
+                      onChange={(e) => setEditMarket(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50/50 focus:bg-white text-gray-950 font-bold"
+                    >
+                      <option value="">Wybierz rynek...</option>
+                      <option value="Podlaski">Podlaski</option>
+                      <option value="Mazowiecki">Mazowiecki</option>
+                      <option value="Lubelski">Lubelski</option>
+                      <option value="Wielkopolski">Wielkopolski</option>
+                      <option value="Dolnośląski">Dolnośląski</option>
+                      <option value="Małopolski">Małopolski</option>
+                      <option value="Pomorski">Pomorski</option>
+                      <option value="Zachodniopomorski">Zachodniopomorski</option>
+                      <option value="Śląski">Śląski</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
                   {/* Adres */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
                       <MapPin className="w-4 h-4 mr-1.5 text-blue-600" /> Adres firmy
                     </label>
                     <textarea
-                      rows="1"
+                      rows="2"
                       value={editAddress}
                       onChange={(e) => setEditAddress(e.target.value)}
                       placeholder="ul. Sezamkowa 4, 00-001 Warszawa"
@@ -532,6 +550,17 @@ const AdminClientsList = ({ onNavigate }) => {
                       <div>
                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">NIP</label>
                         <p className="text-gray-900 font-mono font-semibold text-sm">{selectedClient.nip}</p>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Obszar / Rynek</label>
+                        {selectedClient.market ? (
+                          <p className="text-indigo-950 font-bold flex items-center text-sm bg-indigo-50/80 px-2.5 py-1 rounded-lg border border-indigo-100 w-fit">
+                            <MapPin className="w-4 h-4 mr-1 text-indigo-600" />
+                            Rynek: {selectedClient.market}
+                          </p>
+                        ) : (
+                          <p className="text-gray-500 italic text-xs">Nie przypisano rynku</p>
+                        )}
                       </div>
                       <div>
                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Adres e-mail</label>
@@ -721,12 +750,12 @@ const AdminClientsList = ({ onNavigate }) => {
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="appearance-none bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  className="appearance-none bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-medium text-gray-800"
                 >
                   <option value="all">Wszyscy klienci</option>
-                  <option value="active">Aktywni</option>
-                  <option value="high-risk">Wysokie ryzyko</option>
-                  <option value="pending">Z oczekującymi</option>
+                  <option value="active">Z bębnami (>0)</option>
+                  <option value="no-drums">Bez bębnów (=0)</option>
+                  <option value="pending">Z oczekującymi zwrotami</option>
                 </select>
                 <Filter className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
               </div>
@@ -765,16 +794,16 @@ const AdminClientsList = ({ onNavigate }) => {
               <div className="text-sm text-gray-600">Wszyscy klienci</div>
             </div>
             <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-green-100 text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.lowRisk}</div>
-              <div className="text-sm text-gray-600">Niskie ryzyko</div>
+              <div className="text-2xl font-bold text-green-600">{stats.withDrums}</div>
+              <div className="text-sm text-gray-600">Z bębnami</div>
             </div>
             <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-yellow-100 text-center">
               <div className="text-2xl font-bold text-yellow-600">{stats.withPending}</div>
-              <div className="text-sm text-gray-600">Z oczekującymi</div>
+              <div className="text-sm text-gray-600">Z oczekującymi zwrotami</div>
             </div>
             <div className="bg-white/80 backdrop-blur-lg rounded-xl p-4 shadow-lg border border-red-100 text-center">
-              <div className="text-2xl font-bold text-red-600">{stats.highRisk}</div>
-              <div className="text-sm text-gray-600">Wysokie ryzyko</div>
+              <div className="text-2xl font-bold text-red-600">{stats.noDrums}</div>
+              <div className="text-sm text-gray-600">Bez bębnów</div>
             </div>
           </div>
         </div>
