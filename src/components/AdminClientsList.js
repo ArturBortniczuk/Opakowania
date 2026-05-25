@@ -20,7 +20,12 @@ import {
   MoreVertical,
   Edit,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  UserCheck,
+  User,
+  Save,
+  X,
+  Truck
 } from 'lucide-react';
 
 const AdminClientsList = ({ onNavigate }) => {
@@ -37,6 +42,26 @@ const AdminClientsList = ({ onNavigate }) => {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Stany edycji klienta
+  const [isEditing, setIsEditing] = useState(false);
+  const [editEmail, setEditEmail] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editSalespersonName, setEditSalespersonName] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [savingClient, setSavingClient] = useState(false);
+  const [modalError, setModalError] = useState(null);
+  const [modalSuccess, setModalSuccess] = useState(null);
+
+  const handleStartEdit = () => {
+    setEditEmail(selectedClient?.email || '');
+    setEditPhone(selectedClient?.phone || '');
+    setEditSalespersonName(selectedClient?.salesperson_name || '');
+    setEditAddress(selectedClient?.address || '');
+    setModalError(null);
+    setModalSuccess(null);
+    setIsEditing(true);
+  };
 
   // Pobierz klientów z danymi
   useEffect(() => {
@@ -103,6 +128,9 @@ const AdminClientsList = ({ onNavigate }) => {
 
   const handleCloseModal = () => {
     setShowClientDetails(false);
+    setIsEditing(false);
+    setModalError(null);
+    setModalSuccess(null);
     if (urlOpenModal) {
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('openModal');
@@ -114,7 +142,8 @@ const AdminClientsList = ({ onNavigate }) => {
     let filtered = clients.filter(client => {
       const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         client.nip.includes(searchTerm) ||
-        (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase()));
+        (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (client.salesperson_name && client.salesperson_name.toLowerCase().includes(searchTerm.toLowerCase()));
 
       if (filterStatus === 'all') return matchesSearch;
       if (filterStatus === 'high-risk' && client.riskLevel === 'high') return matchesSearch;
@@ -274,6 +303,12 @@ const AdminClientsList = ({ onNavigate }) => {
       </div>
 
       <div className="space-y-2 mb-4 text-sm">
+        {client.salesperson_name && (
+          <div className="flex items-center space-x-2 text-blue-700 font-semibold bg-blue-50/75 py-1 px-2.5 rounded-lg border border-blue-100">
+            <UserCheck className="w-4 h-4 text-blue-600" />
+            <span className="truncate">Handlowiec: {client.salesperson_name}</span>
+          </div>
+        )}
         {client.email && (
           <div className="flex items-center space-x-2 text-gray-600">
             <Mail className="w-4 h-4" />
@@ -321,102 +356,287 @@ const AdminClientsList = ({ onNavigate }) => {
   const ClientDetailsModal = () => {
     if (!showClientDetails || !selectedClient) return null;
 
+    const handleSave = async () => {
+      setSavingClient(true);
+      setModalError(null);
+      setModalSuccess(null);
+      try {
+        const updates = {
+          email: editEmail.trim() || null,
+          phone: editPhone.trim() || null,
+          salesperson_name: editSalespersonName.trim() || null,
+          address: editAddress.trim() || null
+        };
+
+        await companiesAPI.updateCompany(selectedClient.nip, updates);
+
+        // Aktualizuj listę klientów
+        setClients(prev => prev.map(c => c.nip === selectedClient.nip ? { ...c, ...updates } : c));
+        setSelectedClient(prev => ({ ...prev, ...updates }));
+
+        setModalSuccess('Dane zostały zaktualizowane pomyślnie!');
+        setTimeout(() => {
+          setIsEditing(false);
+          setModalSuccess(null);
+        }, 1200);
+      } catch (err) {
+        console.error('Błąd zapisu danych klienta:', err);
+        setModalError(err.message || 'Wystąpił błąd podczas aktualizacji danych.');
+      } finally {
+        setSavingClient(false);
+      }
+    };
+
     return (
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all duration-300 animate-fadeIn"
         onClick={handleCloseModal}
       >
         <div
-          className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-blue-50 transform transition-all scale-100 duration-300 animate-slideUp"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="p-6 border-b border-gray-200">
+          {/* Header */}
+          <div className="p-6 border-b border-gray-150 bg-gradient-to-r from-blue-50/50 to-indigo-50/30 rounded-t-3xl">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">Szczegóły klienta</h2>
+              <div>
+                <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                  {isEditing ? 'Edycja danych klienta' : 'Szczegóły klienta'}
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">Firma: <span className="font-semibold text-blue-800">{selectedClient.name}</span></p>
+              </div>
               <button
                 onClick={handleCloseModal}
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                className="p-2 text-gray-400 hover:text-gray-700 rounded-xl hover:bg-gray-100 transition-colors duration-200"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
           </div>
 
           <div className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacje podstawowe</h3>
-                <div className="space-y-3">
+            {/* Alerts */}
+            {modalError && (
+              <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 flex items-start space-x-3 text-sm animate-shake">
+                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <span>{modalError}</span>
+              </div>
+            )}
+            {modalSuccess && (
+              <div className="p-4 rounded-2xl bg-green-50 border border-green-200 text-green-700 flex items-start space-x-3 text-sm animate-pulse">
+                <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                <span>{modalSuccess}</span>
+              </div>
+            )}
+
+            {isEditing ? (
+              /* TRYB EDYCJI */
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Email */}
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Nazwa firmy</label>
-                    <p className="text-gray-900">{selectedClient.name}</p>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                      <Mail className="w-4 h-4 mr-1.5 text-blue-600" /> Adres e-mail
+                    </label>
+                    <input
+                      type="email"
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      placeholder="klient@firma.pl"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50/50 focus:bg-white text-gray-900"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Służy do rejestracji i odzyskiwania hasła</p>
                   </div>
+
+                  {/* Telefon */}
                   <div>
-                    <label className="text-sm font-medium text-gray-500">NIP</label>
-                    <p className="text-gray-900">{selectedClient.nip}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Email</label>
-                    <p className="text-gray-900">{selectedClient.email || 'Brak danych'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Telefon</label>
-                    <p className="text-gray-900">{selectedClient.phone || 'Brak danych'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Adres</label>
-                    <p className="text-gray-900">{selectedClient.address || 'Brak danych'}</p>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                      <Phone className="w-4 h-4 mr-1.5 text-blue-600" /> Telefon kontaktowy
+                    </label>
+                    <input
+                      type="text"
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      placeholder="+48 123 456 789"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50/50 focus:bg-white text-gray-900"
+                    />
                   </div>
                 </div>
-              </div>
 
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Statystyki</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Wszystkie bębny</span>
-                    <span className="font-medium">{selectedClient.drumsCount}</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Handlowiec */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                      <User className="w-4 h-4 mr-1.5 text-blue-600" /> Opiekun handlowy (Handlowiec)
+                    </label>
+                    <input
+                      type="text"
+                      value={editSalespersonName}
+                      onChange={(e) => setEditSalespersonName(e.target.value)}
+                      placeholder="Imię i Nazwisko Handlowca"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50/50 focus:bg-white text-gray-900 font-medium"
+                    />
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Przeterminowane</span>
-                    <span className="font-medium text-red-600">{selectedClient.overdueDrums}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Oczekujące zgłoszenia</span>
-                    <span className="font-medium text-yellow-600">{selectedClient.pendingRequests}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Wszystkie zgłoszenia</span>
-                    <span className="font-medium">{selectedClient.totalRequests}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Ostatnia aktywność</span>
-                    <span className="font-medium">{new Date(selectedClient.lastActivity).toLocaleDateString('pl-PL')}</span>
+
+                  {/* Adres */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                      <MapPin className="w-4 h-4 mr-1.5 text-blue-600" /> Adres firmy
+                    </label>
+                    <textarea
+                      rows="1"
+                      value={editAddress}
+                      onChange={(e) => setEditAddress(e.target.value)}
+                      placeholder="ul. Sezamkowa 4, 00-001 Warszawa"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50/50 focus:bg-white text-gray-900 resize-none"
+                    />
                   </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="flex space-x-4">
-              <button
-                onClick={() => {
-                  handleCloseModal();
-                  onNavigate('admin-drums', { clientNip: selectedClient.nip });
-                }}
-                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-xl font-medium hover:bg-blue-700 transition-colors duration-200"
-              >
-                Zobacz bębny
-              </button>
-              <button
-                onClick={() => {
-                  handleCloseModal();
-                  onNavigate('admin-returns', { clientNip: selectedClient.nip });
-                }}
-                className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-xl font-medium hover:bg-gray-700 transition-colors duration-200"
-              >
-                Zobacz zgłoszenia
-              </button>
-            </div>
+                <div className="flex space-x-3 pt-4 border-t border-gray-100">
+                  <button
+                    onClick={handleSave}
+                    disabled={savingClient}
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 px-4 rounded-xl font-bold hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg disabled:opacity-50"
+                  >
+                    {savingClient ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        <span>Zapisz zmiany</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setIsEditing(false)}
+                    disabled={savingClient}
+                    className="flex-1 bg-gray-100 border border-gray-300 text-gray-700 py-3 px-4 rounded-xl font-bold hover:bg-gray-200 transition-all duration-200"
+                  >
+                    Anuluj
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* TRYB PODGLĄDU */
+              <div className="space-y-6 animate-fadeIn">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Basic Info */}
+                  <div className="bg-blue-50/30 border border-blue-100/50 p-5 rounded-2xl space-y-4">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-blue-900 border-b border-blue-100/50 pb-2">Informacje podstawowe</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Nazwa firmy</label>
+                        <p className="text-gray-900 font-extrabold text-base leading-snug">{selectedClient.name}</p>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">NIP</label>
+                        <p className="text-gray-900 font-mono font-semibold text-sm">{selectedClient.nip}</p>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Adres e-mail</label>
+                        {selectedClient.email ? (
+                          <p className="text-gray-900 font-semibold flex items-center text-sm">
+                            <Mail className="w-3.5 h-3.5 mr-1 text-blue-600" />
+                            {selectedClient.email}
+                          </p>
+                        ) : (
+                          <p className="text-red-500 text-xs font-bold bg-red-50 px-2.5 py-1 rounded-lg border border-red-100 w-fit flex items-center">
+                            <AlertCircle className="w-3.5 h-3.5 mr-1" /> Brak adresu e-mail (Brak możliwości rejestracji!)
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Telefon kontaktowy</label>
+                        <p className="text-gray-900 font-medium text-sm flex items-center">
+                          <Phone className="w-3.5 h-3.5 mr-1 text-blue-600" />
+                          {selectedClient.phone || 'Brak danych'}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Opiekun handlowy (Handlowiec)</label>
+                        {selectedClient.salesperson_name ? (
+                          <p className="text-indigo-900 font-bold flex items-center text-sm">
+                            <UserCheck className="w-4 h-4 mr-1 text-indigo-600" />
+                            {selectedClient.salesperson_name}
+                          </p>
+                        ) : (
+                          <p className="text-gray-500 italic text-xs">Nie przypisano opiekuna</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block">Adres firmy</label>
+                        <p className="text-gray-900 text-sm leading-snug">{selectedClient.address || 'Brak danych'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="bg-gray-50/50 border border-gray-150 p-5 rounded-2xl space-y-4 flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-gray-800 border-b border-gray-200 pb-2">Statystyki bębnów i zwrotów</h3>
+                      <div className="space-y-3 mt-3">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-600 font-medium">Wszystkie bębny</span>
+                          <span className="font-bold text-gray-900 bg-gray-200/50 px-2.5 py-0.5 rounded-lg">{selectedClient.drumsCount}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-600 font-medium">Przeterminowane</span>
+                          <span className={`font-bold px-2.5 py-0.5 rounded-lg ${selectedClient.overdueDrums > 0 ? 'text-red-700 bg-red-100' : 'text-gray-600 bg-gray-200/50'}`}>
+                            {selectedClient.overdueDrums}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-600 font-medium">Oczekujące zgłoszenia</span>
+                          <span className={`font-bold px-2.5 py-0.5 rounded-lg ${selectedClient.pendingRequests > 0 ? 'text-yellow-800 bg-yellow-100' : 'text-gray-600 bg-gray-200/50'}`}>
+                            {selectedClient.pendingRequests}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-600 font-medium">Wszystkie zgłoszenia</span>
+                          <span className="font-bold text-gray-900 bg-gray-200/50 px-2.5 py-0.5 rounded-lg">{selectedClient.totalRequests}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-600 font-medium">Ostatnia aktywność</span>
+                          <span className="font-semibold text-gray-700">{new Date(selectedClient.lastActivity).toLocaleDateString('pl-PL')}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleStartEdit}
+                      className="w-full mt-4 bg-white border border-blue-200 hover:border-blue-300 text-blue-700 hover:bg-blue-50/50 py-2.5 px-4 rounded-xl font-bold transition-all duration-200 flex items-center justify-center space-x-2"
+                    >
+                      <Edit className="w-4 h-4" />
+                      <span>Edytuj dane klienta</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3 pt-4 border-t border-gray-150">
+                  <button
+                    onClick={() => {
+                      handleCloseModal();
+                      onNavigate('admin-drums', { clientNip: selectedClient.nip });
+                    }}
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 px-4 rounded-xl font-bold hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg hover:scale-[1.01]"
+                  >
+                    <Package className="w-4 h-4" />
+                    <span>Zobacz bębny</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleCloseModal();
+                      onNavigate('admin-returns', { clientNip: selectedClient.nip });
+                    }}
+                    className="flex-1 bg-gray-100 border border-gray-300 text-gray-700 py-3 px-4 rounded-xl font-bold hover:bg-gray-200 transition-all duration-200 flex items-center justify-center space-x-2"
+                  >
+                    <Truck className="w-4 h-4" />
+                    <span>Zobacz zgłoszenia</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

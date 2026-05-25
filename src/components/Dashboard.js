@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Package, Truck, Calendar, TrendingUp, AlertCircle, CheckCircle, Clock, ArrowRight, BarChart3, Activity, XCircle, ChevronRight
+  Package, Truck, Calendar, TrendingUp, AlertCircle, CheckCircle, Clock, ArrowRight, BarChart3, Activity, XCircle, ChevronRight, UserCheck, Phone, Mail
 } from 'lucide-react';
-import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
+import { drumsAPI, returnsAPI, companiesAPI } from '../utils/supabaseApi';
 
 const Dashboard = ({ user }) => {
   const navigate = useNavigate();
@@ -34,16 +34,21 @@ const Dashboard = ({ user }) => {
     reportedPercent: 0
   });
 
+  const [companyData, setCompanyData] = useState(null);
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        const [userDrums, userReturns] = await Promise.all([
+        const [userDrums, userReturns, companyDetails] = await Promise.all([
           drumsAPI.getAllDrums(user.nip),
-          returnsAPI.getReturns(user.nip)
+          returnsAPI.getReturns(user.nip),
+          companiesAPI.getCompany(user.nip)
         ]);
+
+        setCompanyData(companyDetails);
 
         // 1. Zidentyfikuj zgłoszone bębny (identycznie jak w widoku DrumsList)
         const reportedDrums = new Set();
@@ -703,29 +708,67 @@ const Dashboard = ({ user }) => {
           </div>
         </div>
 
-        {/* Quick Stats Bar */}
-        <div className="mt-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 text-white shadow-lg">
-          <div className="flex flex-col md:flex-row items-center justify-between">
-            <div className="text-center md:text-left mb-4 md:mb-0">
-              <h3 className="text-lg font-bold mb-1">Potrzebujesz pomocy?</h3>
-              <p className="text-blue-100 text-sm">Skontaktuj się z naszym zespołem wsparcia logistycznego</p>
-            </div>
-            <div className="flex space-x-4">
-              <a 
-                href="tel:+48123456789" 
-                className="px-6 py-2.5 bg-white/20 backdrop-blur-sm rounded-lg hover:bg-white/30 transition-all duration-200 font-bold text-sm"
-              >
-                📞 Zadzwoń
-              </a>
-              <a 
-                href="mailto:wsparcie@opakowania.pl" 
-                className="px-6 py-2.5 bg-white text-blue-600 rounded-xl hover:bg-blue-50 transition-all duration-200 font-bold text-sm"
-              >
-                ✉️ Email
-              </a>
+        {/* Quick Stats Bar / Opiekun handlowy */}
+        {companyData && companyData.salesperson_name ? (
+          <div className="mt-8 bg-gradient-to-r from-indigo-600 via-blue-600 to-blue-700 rounded-3xl p-6 text-white shadow-xl border border-blue-400/30 relative overflow-hidden group">
+            <div className="absolute -right-16 -top-16 w-36 h-36 bg-white/10 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500"></div>
+            <div className="flex flex-col md:flex-row items-center justify-between relative z-10 gap-4">
+              <div className="flex items-center space-x-4 text-center md:text-left flex-col md:flex-row">
+                <div className="p-4 bg-white/10 rounded-2xl border border-white/20 shadow-inner">
+                  <UserCheck className="w-8 h-8 text-white animate-pulse" />
+                </div>
+                <div className="text-left">
+                  <span className="text-[10px] font-extrabold bg-white/25 text-white px-2.5 py-0.5 rounded-full uppercase tracking-wider block w-fit mx-auto md:mx-0 mb-1">
+                    Dedykowany Opiekun
+                  </span>
+                  <h3 className="text-xl font-black mb-1">{companyData.salesperson_name}</h3>
+                  <p className="text-blue-100 text-sm font-medium">Twój osobisty doradca handlowy w Grupie Eltron</p>
+                </div>
+              </div>
+              <div className="flex space-x-4 shrink-0">
+                <a 
+                  href={`tel:${companyData.phone || '+48 123 456 789'}`} 
+                  className="px-6 py-3 bg-white/20 backdrop-blur-md border border-white/30 rounded-xl hover:bg-white/30 transition-all duration-300 font-bold text-sm flex items-center space-x-2"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span>Zadzwoń</span>
+                </a>
+                <a 
+                  href="mailto:wsparcie@opakowania.pl" 
+                  className="px-6 py-3 bg-white text-blue-600 rounded-xl hover:bg-blue-50 transition-all duration-300 font-extrabold text-sm flex items-center space-x-2 shadow-lg hover:shadow-xl"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span>Napisz e-mail</span>
+                </a>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="mt-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-3xl p-6 text-white shadow-lg border border-blue-500/20">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="text-center md:text-left">
+                <h3 className="text-lg font-bold mb-1">Potrzebujesz pomocy?</h3>
+                <p className="text-blue-100 text-sm">Skontaktuj się z naszym zespołem wsparcia logistycznego</p>
+              </div>
+              <div className="flex space-x-4 shrink-0">
+                <a 
+                  href="tel:+48123456789" 
+                  className="px-6 py-3 bg-white/25 border border-white/20 rounded-xl hover:bg-white/35 transition-all duration-200 font-bold text-sm flex items-center space-x-2"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span>Zadzwoń</span>
+                </a>
+                <a 
+                  href="mailto:wsparcie@opakowania.pl" 
+                  className="px-6 py-3 bg-white text-blue-600 rounded-xl hover:bg-blue-50 transition-all duration-200 font-extrabold text-sm flex items-center space-x-2 shadow-md"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span>Napisz e-mail</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
