@@ -203,7 +203,7 @@ const AdminClientsList = ({ onNavigate }) => {
     }
   };
 
-  const ClientCard = ({ client, index }) => (
+  const renderClientCard = (client, index) => (
     <div
       className="bg-white/90 rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]"
       style={{ animationDelay: `${index * 100}ms` }}
@@ -306,7 +306,7 @@ const AdminClientsList = ({ onNavigate }) => {
     </div>
   );
 
-  const ClientDetailsModal = () => {
+  const renderClientDetailsModal = () => {
     if (!showClientDetails || !selectedClient) return null;
 
     const handleSave = async () => {
@@ -775,7 +775,9 @@ const AdminClientsList = ({ onNavigate }) => {
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
                 {paginatedClients.map((client, index) => (
-                  <ClientCard key={client.nip} client={client} index={index} />
+                  <React.Fragment key={client.nip}>
+                    {renderClientCard(client, index)}
+                  </React.Fragment>
                 ))}
               </div>
 
@@ -836,7 +838,7 @@ const AdminClientsList = ({ onNavigate }) => {
           )}
         </div>
 
-        <ClientDetailsModal />
+        {renderClientDetailsModal()}
       </div>
     </div>
   );
