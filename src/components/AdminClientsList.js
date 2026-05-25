@@ -633,7 +633,7 @@ const AdminClientsList = ({ onNavigate }) => {
     );
   };
 
-  if (loading) {
+  if (loading && clients.length === 0) {
     return (
       <div className="min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -770,69 +770,71 @@ const AdminClientsList = ({ onNavigate }) => {
         </div>
 
         {/* Clients Grid */}
-        {paginatedClients.length > 0 ? (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
-              {paginatedClients.map((client, index) => (
-                <ClientCard key={client.nip} client={client} index={index} />
-              ))}
-            </div>
+        <div className={loading ? 'opacity-50 pointer-events-none transition-opacity duration-200' : 'transition-opacity duration-200'}>
+          {paginatedClients.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
+                {paginatedClients.map((client, index) => (
+                  <ClientCard key={client.nip} client={client} index={index} />
+                ))}
+              </div>
 
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between bg-white/80 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-blue-150 mb-8 gap-4">
-                <div className="text-sm font-semibold text-slate-700">
-                  Pokazywane <span className="text-blue-600 font-extrabold">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> - <span className="text-blue-600 font-extrabold">{Math.min(currentPage * ITEMS_PER_PAGE, filteredAndSortedClients.length)}</span> z <span className="text-slate-900 font-black">{filteredAndSortedClients.length}</span> klientów
-                </div>
-
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => {
-                      setCurrentPage(prev => Math.max(prev - 1, 1));
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    disabled={currentPage === 1}
-                    className="px-4 py-2 border border-gray-300 rounded-xl font-bold text-sm text-gray-700 bg-white hover:bg-blue-50 disabled:opacity-50 disabled:hover:bg-white transition-all shadow-sm cursor-pointer"
-                  >
-                    ← Poprzednia
-                  </button>
-
-                  <div className="flex items-center px-4 font-bold text-sm text-blue-700 bg-blue-50 rounded-xl border border-blue-100">
-                    Strona {currentPage} z {totalPages}
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between bg-white/80 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-blue-150 mb-8 gap-4">
+                  <div className="text-sm font-semibold text-slate-700">
+                    Pokazywane <span className="text-blue-600 font-extrabold">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> - <span className="text-blue-600 font-extrabold">{Math.min(currentPage * ITEMS_PER_PAGE, filteredAndSortedClients.length)}</span> z <span className="text-slate-900 font-black">{filteredAndSortedClients.length}</span> klientów
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setCurrentPage(prev => Math.min(prev + 1, totalPages));
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    disabled={currentPage === totalPages}
-                    className="px-4 py-2 border border-gray-300 rounded-xl font-bold text-sm text-gray-700 bg-white hover:bg-blue-50 disabled:opacity-50 disabled:hover:bg-white transition-all shadow-sm cursor-pointer"
-                  >
-                    Następna →
-                  </button>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => {
+                        setCurrentPage(prev => Math.max(prev - 1, 1));
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      disabled={currentPage === 1}
+                      className="px-4 py-2 border border-gray-300 rounded-xl font-bold text-sm text-gray-700 bg-white hover:bg-blue-50 disabled:opacity-50 disabled:hover:bg-white transition-all shadow-sm cursor-pointer"
+                    >
+                      ← Poprzednia
+                    </button>
+
+                    <div className="flex items-center px-4 font-bold text-sm text-blue-700 bg-blue-50 rounded-xl border border-blue-100">
+                      Strona {currentPage} z {totalPages}
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setCurrentPage(prev => Math.min(prev + 1, totalPages));
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      disabled={currentPage === totalPages}
+                      className="px-4 py-2 border border-gray-300 rounded-xl font-bold text-sm text-gray-700 bg-white hover:bg-blue-50 disabled:opacity-50 disabled:hover:bg-white transition-all shadow-sm cursor-pointer"
+                    >
+                      Następna →
+                    </button>
+                  </div>
                 </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Users className="w-12 h-12 text-gray-400" />
               </div>
-            )}
-          </>
-        ) : (
-          <div className="text-center py-12">
-            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Users className="w-12 h-12 text-gray-400" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Nie znaleziono klientów</h3>
+              <p className="text-gray-600 mb-6">Spróbuj zmienić kryteria wyszukiwania lub filtry</p>
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setFilterStatus('all');
+                }}
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200"
+              >
+                Wyczyść filtry
+              </button>
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Nie znaleziono klientów</h3>
-            <p className="text-gray-600 mb-6">Spróbuj zmienić kryteria wyszukiwania lub filtry</p>
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setFilterStatus('all');
-              }}
-              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200"
-            >
-              Wyczyść filtry
-            </button>
-          </div>
-        )}
+          )}
+        </div>
 
         <ClientDetailsModal />
       </div>

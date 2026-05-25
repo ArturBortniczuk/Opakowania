@@ -1,8 +1,9 @@
--- SQL: Tworzenie zoptymalizowanego widoku statystyk klientów
--- Uruchom ten skrypt w Supabase SQL Editor, aby naprawić obciążenie i lagowanie strony!
+-- SQL: Tworzenie zoptymalizowanego widoku statystyk klientów ORAZ naprawa polityki RLS dla firm
+-- Uruchom ten skrypt w Supabase SQL Editor, aby naprawić obciążenie, lagowanie strony i błąd zapisu danych!
 
 DROP VIEW IF EXISTS public.company_client_stats;
 
+-- 1. Tworzenie wydajnego widoku statystyk
 CREATE OR REPLACE VIEW public.company_client_stats 
 WITH (security_invoker = true) AS
 SELECT 
@@ -39,5 +40,18 @@ LEFT JOIN (
   GROUP BY user_nip
 ) r ON c.nip = r.user_nip;
 
--- Odświeżenie pamięci podręcznej PostgREST
+-- 2. Naprawa polityk bezpieczeństwa (RLS) dla tabeli companies
+-- Pozwala to klientowi React na pomyślne aktualizowanie danych firmy (email, telefon, handlowiec, rynek, adres)
+ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Zarządzanie firmami dla wszystkich" ON public.companies;
+DROP POLICY IF EXISTS "Zezwól na aktualizację firm" ON public.companies;
+
+CREATE POLICY "Zarządzanie firmami dla wszystkich" 
+ON public.companies 
+FOR ALL 
+USING (true)
+WITH CHECK (true);
+
+-- 3. Odświeżenie pamięci podręcznej PostgREST (aby nowe kolumny i widoki były widoczne w API)
 NOTIFY pgrst, 'reload schema';
