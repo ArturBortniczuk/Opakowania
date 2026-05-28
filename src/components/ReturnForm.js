@@ -65,7 +65,8 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
       cena_netto: selectedDrum.cena_netto_bebna || selectedDrum.CENA_NETTO_BEBNA
     }] : [],
     confirmType: false,
-    confirmEmpty: false
+    confirmEmpty: false,
+    confirmCondition: false
   });
   const [loading, setLoading] = useState(false);
   const [userDrums, setUserDrums] = useState([]);
@@ -199,7 +200,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
       case 3:
         return formData.selectedDrums.length > 0;
       case 4:
-        return formData.confirmType && formData.confirmEmpty;
+        return formData.confirmType && formData.confirmEmpty && formData.confirmCondition;
       default:
         return false;
     }
@@ -808,7 +809,7 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
               </div>
             </div>
 
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 space-y-3">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 space-y-4">
               <label className="flex items-start space-x-3 cursor-pointer">
                 <input
                   type="checkbox"
@@ -817,7 +818,10 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                   className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
                 <span className="text-sm text-gray-900">
-                  Potwierdzam, że zwracam bębny tego samego typu i wielkości co otrzymane
+                  <strong>Potwierdzam rodzaj i ilość zwracanych opakowań</strong>
+                  <span className="block text-xs text-gray-500 mt-0.5">
+                    (w przypadku niezgodności, Grupa Eltron zastrzega możliwość do wystawienia faktury za nieuzasadniony transport)
+                  </span>
                 </span>
               </label>
 
@@ -829,7 +833,22 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
                   className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
                 <span className="text-sm text-gray-900">
-                  Potwierdzam, że wszystkie zwracane bębny są całkowicie puste
+                  <strong>Potwierdzam, że zwracane bębny są puste</strong>
+                </span>
+              </label>
+
+              <label className="flex items-start space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.confirmCondition}
+                  onChange={(e) => setFormData(prev => ({ ...prev, confirmCondition: e.target.checked }))}
+                  className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="text-sm text-gray-900">
+                  <strong>Potwierdzam stan techniczny zwracanych opakowań</strong>
+                  <span className="block text-xs text-gray-500 mt-1">
+                    opakowania nie mogą posiadać widocznych uszkodzeń, trwałych oznaczeń (spray, farba) innych, niż te które nadały Zakłady Kablowe oraz zabrudzeń innymi substancjami. Kosztami związanymi z naprawą/utylizacją opakowania zostanie obciążony klient.
+                  </span>
                 </span>
               </label>
             </div>
