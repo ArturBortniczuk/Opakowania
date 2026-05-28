@@ -21,15 +21,18 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
-    const table = loginMode === 'admin' ? 'admin_users' : 'users';
+    const isPracownik = loginMode === 'pracownik';
+    const table = isPracownik ? 'salespeople' : (loginMode === 'admin' ? 'admin_users' : 'users');
+    const keyField = isPracownik ? 'email' : 'nip';
+    const keyValue = isPracownik ? nip.trim().toLowerCase() : nip;
     
     const { data: userData, error: userError } = await supabase
       .from(table)
       .select('*')
-      .eq('nip', nip)
+      .eq(keyField, keyValue)
       .single();
 
-    const genericError = 'Nieprawidłowy NIP lub hasło.';
+    const genericError = isPracownik ? 'Nieprawidłowy e-mail lub hasło.' : 'Nieprawidłowy NIP lub hasło.';
     const genericErrorResponse = new Response(JSON.stringify({ error: genericError }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     if (userError || !userData || !userData.password_hash) {

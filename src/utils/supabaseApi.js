@@ -3,6 +3,45 @@
 
 import { supabase, supabaseHelpers } from '../lib/supabase';
 
+// Pomocnicza funkcja pobierająca listę NIP-ów, do których zalogowany użytkownik ma dostęp
+export async function getAllowedNips(user) {
+  if (!user) return [];
+  if (user.role === 'admin' || user.role === 'supervisor') return null;
+  if (user.role === 'client') return [user.nip];
+  
+  if (['Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(user.role)) {
+    if (user.role === 'Dyrektor' && user.region === 'Wszystkie') {
+      return null;
+    }
+    
+    let q = supabase.from('companies').select('nip');
+    
+    if (user.role === 'Specjalista') {
+      q = q.eq('salesperson_name', user.name);
+    } else if (user.role === 'Wsparcie' || user.role === 'Kierownik') {
+      q = q.eq('market', user.market);
+    } else if (user.role === 'Dyrektor') {
+      const { data: sps } = await supabase
+        .from('salespeople')
+        .select('name')
+        .eq('region', user.region);
+      const spNames = sps ? sps.map(s => s.name) : [];
+      
+      if (spNames.length === 0) return [];
+      q = q.in('salesperson_name', spNames);
+    }
+    
+    const { data, error } = await q;
+    if (error) {
+      console.error('Błąd pobierania przypisanych NIP-ów:', error);
+      return [];
+    }
+    return data ? data.map(c => c.nip) : [];
+  }
+  
+  return [];
+}
+
 // ==================================
 //  API do Autoryzacji
 // ==================================
@@ -173,6 +212,32 @@ export const drumsAPI = {
         if (isClient) {
           const maxDate = new Date(Date.now() - 456 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
           query = query.or(`data_wydania.gte.${maxDate},and(data_wydania.is.null,data_przyjecia_na_stan.gte.${maxDate})`);
+        }
+      } else {
+        const allowedNips = await getAllowedNips(currentUser);
+        if (allowedNips) {
+          if (allowedNips.length === 0) {
+            return {
+              data: [],
+              pagination: {
+                page,
+                limit,
+                total: 0,
+                totalPages: 0,
+                hasNext: false,
+                hasPrev: false
+              },
+              meta: {
+                sortBy,
+                sortOrder,
+                search,
+                status,
+                dateRange,
+                nip
+              }
+            };
+          }
+          query = query.in('nip', allowedNips);
         }
       }
 
@@ -386,6 +451,8 @@ export const drumsAPI = {
       const currentUser = userStr ? JSON.parse(userStr) : null;
       const isClient = currentUser && currentUser.role === 'client';
 
+      const allowedNips = await getAllowedNips(currentUser);
+
       let allData = [];
       let pageIndex = 0;
       const chunkSize = 1000;
@@ -408,6 +475,11 @@ export const drumsAPI = {
             const maxDate = new Date(Date.now() - 456 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
             chunkQuery = chunkQuery.or(`data_wydania.gte.${maxDate},and(data_wydania.is.null,data_przyjecia_na_stan.gte.${maxDate})`);
           }
+        } else if (allowedNips) {
+          if (allowedNips.length === 0) {
+            break;
+          }
+          chunkQuery = chunkQuery.in('nip', allowedNips);
         }
 
         const { data, error } = await chunkQuery;
@@ -587,9 +659,25 @@ export const companiesAPI = {
 
       console.log(`🔄 getCompanies - strona ${page}, limit ${limit}, szukaj: "${search}", filtr: ${filterStatus}, sort: ${sortBy} ${sortOrder}`);
 
+      const userStr = localStorage.getItem('currentUser');
+      const currentUser = userStr ? JSON.parse(userStr) : null;
+
       let query = supabase
         .from('company_client_stats')
         .select('*', { count: 'exact' });
+
+      // Filtrowanie uprawnień dla handlowców
+      if (currentUser && ['Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(currentUser.role)) {
+        if (currentUser.role === 'Specjalista') {
+          query = query.eq('salesperson_name', currentUser.name);
+        } else if (currentUser.role === 'Wsparcie' || currentUser.role === 'Kierownik') {
+          query = query.eq('market', currentUser.market);
+        } else if (currentUser.role === 'Dyrektor') {
+          if (currentUser.region !== 'Wszystkie') {
+            query = query.eq('salesperson_region', currentUser.region);
+          }
+        }
+      }
 
       // Wyszukiwanie
       if (search) {
@@ -658,11 +746,30 @@ export const companiesAPI = {
   async getGlobalStats() {
     try {
       console.log('🔄 getGlobalStats - pobieranie statystyk globalnych...');
+      
+      const userStr = localStorage.getItem('currentUser');
+      const currentUser = userStr ? JSON.parse(userStr) : null;
+      
+      const applyFilters = (query) => {
+        if (currentUser && ['Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(currentUser.role)) {
+          if (currentUser.role === 'Specjalista') {
+            return query.eq('salesperson_name', currentUser.name);
+          } else if (currentUser.role === 'Wsparcie' || currentUser.role === 'Kierownik') {
+            return query.eq('market', currentUser.market);
+          } else if (currentUser.role === 'Dyrektor') {
+            if (currentUser.region !== 'Wszystkie') {
+              return query.eq('salesperson_region', currentUser.region);
+            }
+          }
+        }
+        return query;
+      };
+
       const [totalRes, activeRes, pendingRes, noDrumsRes] = await Promise.all([
-        supabase.from('company_client_stats').select('*', { count: 'exact', head: true }),
-        supabase.from('company_client_stats').select('*', { count: 'exact', head: true }).gt('drumsCount', 0),
-        supabase.from('company_client_stats').select('*', { count: 'exact', head: true }).gt('pendingRequests', 0),
-        supabase.from('company_client_stats').select('*', { count: 'exact', head: true }).eq('drumsCount', 0)
+        applyFilters(supabase.from('company_client_stats').select('*', { count: 'exact', head: true })),
+        applyFilters(supabase.from('company_client_stats').select('*', { count: 'exact', head: true }).gt('drumsCount', 0)),
+        applyFilters(supabase.from('company_client_stats').select('*', { count: 'exact', head: true }).gt('pendingRequests', 0)),
+        applyFilters(supabase.from('company_client_stats').select('*', { count: 'exact', head: true }).eq('drumsCount', 0))
       ]);
 
       if (totalRes.error) {
@@ -743,6 +850,16 @@ export const returnsAPI = {
       let query = supabase.from('return_requests').select(`*, companies:user_nip (name)`);
       if (nip) {
         query = query.eq('user_nip', nip);
+      } else {
+        const userStr = localStorage.getItem('currentUser');
+        const currentUser = userStr ? JSON.parse(userStr) : null;
+        const allowedNips = await getAllowedNips(currentUser);
+        if (allowedNips) {
+          if (allowedNips.length === 0) {
+            return [];
+          }
+          query = query.in('user_nip', allowedNips);
+        }
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -893,7 +1010,21 @@ export const statsAPI = {
       }
 
       // Statystyki dla admina - NAPRAWIONE: head: true oznacza że pobieramy TYLKO COUNT
-      console.log(`👨‍💼 Liczenie statystyk dla administratora...`);
+      console.log(`👨‍💼 Liczenie statystyk dla administratora/handlowca...`);
+
+      const userStr = localStorage.getItem('currentUser');
+      const currentUser = userStr ? JSON.parse(userStr) : null;
+      const allowedNips = await getAllowedNips(currentUser);
+
+      const applyNipFilter = (query, field = 'nip') => {
+        if (allowedNips) {
+          if (allowedNips.length === 0) {
+            return query.eq(field, '0000000000_none');
+          }
+          return query.in(field, allowedNips);
+        }
+        return query;
+      };
 
       const [
         { count: totalClients },
@@ -903,12 +1034,12 @@ export const statsAPI = {
         { count: activeRequests },
         { count: completedRequests }
       ] = await Promise.all([
-        supabase.from('companies').select('*', { count: 'exact', head: true }),
-        supabase.from('drums').select('*', { count: 'exact', head: true }), // ⭐ TO JEST KLUCZ - BEZ LIMITU!
-        supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Pending'),
-        supabase.from('drums').select('*', { count: 'exact', head: true }).lt('data_zwrotu_do_dostawcy', now),
-        supabase.from('return_requests').select('*', { count: 'exact', head: true }).in('status', ['Pending', 'Approved']),
-        supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Completed').gte('updated_at', thirtyDaysAgo)
+        applyNipFilter(supabase.from('companies').select('*', { count: 'exact', head: true })),
+        applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true })),
+        applyNipFilter(supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Pending'), 'user_nip'),
+        applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true }).lt('data_zwrotu_do_dostawcy', now)),
+        applyNipFilter(supabase.from('return_requests').select('*', { count: 'exact', head: true }).in('status', ['Pending', 'Approved']), 'user_nip'),
+        applyNipFilter(supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Completed').gte('updated_at', thirtyDaysAgo), 'user_nip')
       ]);
 
       console.log(`✅ Statystyki admina: ${totalDrums} bębnów, ${totalClients} klientów, ${pendingReturns} zwrotów`);

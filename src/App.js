@@ -6,7 +6,7 @@ import LoginForm from './components/LoginForm';
 import SetPassword from './components/SetPassword';
 import Dashboard from './components/Dashboard';
 import DrumsList from './components/DrumsList';
-import ReturnForm from './components/ReturnForm';
+import ReturnFormWrapper from './components/ReturnFormWrapper';
 import ClientReturnRequests from './components/ClientReturnRequests';
 import AdminDashboard from './components/AdminDashboard';
 import AdminClientsList from './components/AdminClientsList';
@@ -28,6 +28,8 @@ const App = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const isStaff = (role) => ['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(role);
+
   useEffect(() => {
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
@@ -36,7 +38,7 @@ const App = () => {
         setCurrentUser(user);
         // Opcjonalne: Przekierowanie jeśli jesteśmy na / i mamy usera
         if (location.pathname === '/') {
-          navigate(user.role === 'admin' || user.role === 'supervisor' ? '/admin' : '/dashboard');
+          navigate(isStaff(user.role) ? '/admin' : '/dashboard');
         }
       } catch (e) {
         console.error("Błąd parsowania danych użytkownika z localStorage", e);
@@ -48,7 +50,7 @@ const App = () => {
 
   const handleLogin = (user) => {
     setCurrentUser(user);
-    const defaultPath = user.role === 'admin' || user.role === 'supervisor' ? '/admin' : '/dashboard';
+    const defaultPath = isStaff(user.role) ? '/admin' : '/dashboard';
     navigate(defaultPath);
   };
 
@@ -59,14 +61,14 @@ const App = () => {
     navigate('/');
   };
 
-  const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'supervisor');
+  const isUserStaff = currentUser && isStaff(currentUser.role);
 
   // Helper dla chronionych tras
   const ProtectedRoute = ({ children, adminOnly = false }) => {
     if (!currentUser) {
       return <Navigate to="/" replace />;
     }
-    if (adminOnly && !isAdmin) {
+    if (adminOnly && !isUserStaff) {
       return <Navigate to="/dashboard" replace />;
     }
     return children;
@@ -87,7 +89,7 @@ const App = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
       {shouldShowNavbar && (
         <>
-          {isAdmin ? (
+          {isUserStaff ? (
             <AdminNavbar
               user={currentUser}
               sidebarOpen={sidebarOpen}
@@ -128,7 +130,7 @@ const App = () => {
           } />
           <Route path="/return" element={
             <ProtectedRoute>
-              <ReturnForm user={currentUser} />
+              <ReturnFormWrapper currentUser={currentUser} />
             </ProtectedRoute>
           } />
           <Route path="/my-returns" element={

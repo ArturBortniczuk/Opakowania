@@ -52,21 +52,43 @@ const AdminNavbar = ({
   }, []);
 
   const menuItems = [
-    { path: '/admin', label: 'Dashboard', icon: Home, description: 'Panel główny administratora' },
-    { path: '/admin/clients', label: 'Zarządzaj klientami', icon: Users, description: 'Wszyscy klienci w systemie' },
-    { path: '/admin/drums', label: 'Wszystkie bębny', icon: Package, description: 'Monitoruj wszystkie bębny' },
+    { path: '/admin', label: 'Dashboard', icon: Home, description: 'Panel główny' },
+    { path: '/admin/clients', label: 'Zarządzaj klientami', icon: Users, description: 'Klienci w systemie' },
+    { path: '/admin/drums', label: 'Wszystkie bębny', icon: Package, description: 'Monitoruj bębny' },
     { path: '/admin/returns', label: 'Zgłoszenia zwrotów', icon: Truck, description: 'Zarządzaj zwrotami' },
     { path: '/admin/return-periods', label: 'Terminy zwrotu', icon: Settings, description: 'Ustaw terminy dla klientów' },
     { path: '/admin/supplier-rules', label: 'Terminy kablowni', icon: Settings, description: 'Zasady zwrotów dostawców' },
     { path: '/admin/reports', label: 'Raporty i analizy', icon: BarChart3, description: 'Statystyki i raporty' }
   ];
 
+  const isSalesperson = ['Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(user.role);
+  const filteredMenuItems = menuItems
+    .filter(item => {
+      if (isSalesperson) {
+        return item.path !== '/admin/return-periods' && item.path !== '/admin/supplier-rules';
+      }
+      return true;
+    })
+    .map(item => {
+      if (isSalesperson && item.path === '/admin/clients') {
+        return { ...item, label: 'Moi klienci', description: 'Klienci przypisani do Twojego obszaru' };
+      }
+      if (isSalesperson && item.path === '/admin/drums') {
+        return { ...item, label: 'Bębny klientów', description: 'Bębny w posiadaniu Twoich klientów' };
+      }
+      return item;
+    });
+
   const getRoleBadge = (role) => {
     const roleConfig = {
       admin: { label: 'Administrator', icon: Crown, gradient: 'from-purple-600 to-purple-800' },
-      supervisor: { label: 'Kierownik', icon: Shield, gradient: 'from-blue-600 to-blue-800' }
+      supervisor: { label: 'Koordynator', icon: Shield, gradient: 'from-blue-600 to-blue-800' },
+      Dyrektor: { label: 'Dyrektor', icon: Crown, gradient: 'from-red-600 to-red-800' },
+      Kierownik: { label: 'Kierownik Rynku', icon: Shield, gradient: 'from-blue-500 to-indigo-700' },
+      Wsparcie: { label: 'Wsparcie Sprzedaży', icon: Users, gradient: 'from-emerald-500 to-teal-700' },
+      Specjalista: { label: 'Specjalista', icon: UserCheck, gradient: 'from-indigo-500 to-purple-700' }
     };
-    const config = roleConfig[role] || roleConfig.admin;
+    const config = roleConfig[role] || { label: role, icon: UserCheck, gradient: 'from-slate-600 to-slate-800' };
     const Icon = config.icon;
     return (
       <div className={`inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-gradient-to-r ${config.gradient} text-white text-xs font-semibold shadow-lg`}>
@@ -181,7 +203,7 @@ const AdminNavbar = ({
             <h4 className={`text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 ${isCollapsed ? 'text-center' : 'pl-4'}`}>
               {isCollapsed ? 'MENU' : 'Zarządzanie'}
             </h4>
-            {menuItems.map((item) => (
+            {filteredMenuItems.map((item) => (
               <NavItem
                 key={item.path}
                 item={item}

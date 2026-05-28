@@ -77,7 +77,7 @@ const LoginForm = ({ onLogin }) => {
     <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-blue-100 p-8">
       <div className="text-center mb-6">
         <h3 className="text-xl font-semibold text-gray-900 mb-2">
-          {loginMode === 'admin' ? 'Logowanie Administratora' : 'Logowanie Klienta'}
+          {loginMode === 'admin' ? 'Logowanie Administratora' : loginMode === 'pracownik' ? 'Logowanie Pracownika' : 'Logowanie Klienta'}
         </h3>
         <p className="text-sm text-gray-600">
           Wprowadź swoje dane, aby uzyskać dostęp.
@@ -93,15 +93,21 @@ const LoginForm = ({ onLogin }) => {
       <form onSubmit={handleLogin} className="space-y-6">
         <div>
           <label htmlFor="nip" className="block text-sm font-medium text-gray-700 mb-2">
-            Numer NIP
+            {loginMode === 'pracownik' ? 'Adres e-mail' : 'Numer NIP'}
           </label>
           <input
             id="nip"
-            type="text"
+            type={loginMode === 'pracownik' ? 'email' : 'text'}
             value={nip}
-            onChange={(e) => setNip(e.target.value.replace(/\D/g, '').slice(0, 10))}
+            onChange={(e) => {
+              if (loginMode === 'pracownik') {
+                setNip(e.target.value);
+              } else {
+                setNip(e.target.value.replace(/\D/g, '').slice(0, 10));
+              }
+            }}
             className="block w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
-            placeholder="Wpisz 10-cyfrowy NIP"
+            placeholder={loginMode === 'pracownik' ? 'Wpisz swój adres e-mail' : 'Wpisz 10-cyfrowy NIP'}
             disabled={loading}
             required
           />
@@ -131,10 +137,13 @@ const LoginForm = ({ onLogin }) => {
         <button
           type="submit"
           disabled={loading || !nip || !password}
-          className={`w-full py-3 px-4 rounded-xl font-medium flex items-center justify-center space-x-2 transition-all duration-200 ${loginMode === 'admin'
-            ? 'bg-purple-600 text-white hover:bg-purple-700 focus:ring-purple-500'
-            : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
-            } disabled:opacity-50`}
+          className={`w-full py-3 px-4 rounded-xl font-medium flex items-center justify-center space-x-2 transition-all duration-200 ${
+            loginMode === 'admin'
+              ? 'bg-purple-600 text-white hover:bg-purple-700 focus:ring-purple-500'
+              : loginMode === 'pracownik'
+              ? 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500'
+              : 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
+          } disabled:opacity-50`}
         >
           {loading ? (
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -146,14 +155,16 @@ const LoginForm = ({ onLogin }) => {
           )}
         </button>
       </form>
-      <div className="text-center mt-6">
-        <button
-          onClick={() => setView('requestReset')}
-          className="text-sm text-blue-600 hover:underline"
-        >
-          Nie pamiętasz hasła lub ustawiasz je po raz pierwszy?
-        </button>
-      </div>
+      {loginMode !== 'pracownik' && (
+        <div className="text-center mt-6">
+          <button
+            onClick={() => setView('requestReset')}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            Nie pamiętasz hasła lub ustawiasz je po raz pierwszy?
+          </button>
+        </div>
+      )}
     </div>
   );
 
@@ -231,20 +242,27 @@ const LoginForm = ({ onLogin }) => {
         </div>
 
         <div className="bg-white/60 backdrop-blur-lg rounded-2xl p-2 shadow-lg border border-blue-100">
-          <div className="flex">
+          <div className="flex space-x-1">
             <button
               onClick={() => handleModeChange('client')}
-              className={`flex-1 py-3 px-4 rounded-xl font-medium text-sm transition-all duration-200 flex items-center justify-center space-x-2 ${loginMode === 'client' ? 'bg-white text-blue-600 shadow-md' : 'text-gray-600'}`}
+              className={`flex-1 py-3 px-2 rounded-xl font-semibold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center space-x-1 ${loginMode === 'client' ? 'bg-white text-blue-600 shadow-md' : 'text-gray-600 hover:bg-white/30'}`}
             >
               <Building2 className="w-4 h-4" />
               <span>Klient</span>
             </button>
             <button
-              onClick={() => handleModeChange('admin')}
-              className={`flex-1 py-3 px-4 rounded-xl font-medium text-sm transition-all duration-200 flex items-center justify-center space-x-2 ${loginMode === 'admin' ? 'bg-white text-purple-600 shadow-md' : 'text-gray-600'}`}
+              onClick={() => handleModeChange('pracownik')}
+              className={`flex-1 py-3 px-2 rounded-xl font-semibold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center space-x-1 ${loginMode === 'pracownik' ? 'bg-white text-indigo-600 shadow-md' : 'text-gray-600 hover:bg-white/30'}`}
             >
               <UserCheck className="w-4 h-4" />
-              <span>Administrator</span>
+              <span>Pracownik</span>
+            </button>
+            <button
+              onClick={() => handleModeChange('admin')}
+              className={`flex-1 py-3 px-2 rounded-xl font-semibold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center space-x-1 ${loginMode === 'admin' ? 'bg-white text-purple-600 shadow-md' : 'text-gray-600 hover:bg-white/30'}`}
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>Admin</span>
             </button>
           </div>
         </div>

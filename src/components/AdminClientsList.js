@@ -1,6 +1,6 @@
 // src/components/AdminClientsList.js - Zaktualizowany o prawdziwe dane
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { companiesAPI } from '../utils/supabaseApi';
 import {
   Users,
@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 
 const AdminClientsList = ({ onNavigate }) => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlClientNip = searchParams.get('clientNip');
   const urlOpenModal = searchParams.get('openModal') === 'true';
@@ -603,7 +604,7 @@ const AdminClientsList = ({ onNavigate }) => {
                   </div>
                 </div>
 
-                <div className="flex space-x-3 pt-4 border-t border-gray-150">
+                <div className="flex flex-col sm:flex-row gap-2.5 pt-4 border-t border-gray-150">
                   <button
                     onClick={() => {
                       handleCloseModal();
@@ -617,11 +618,21 @@ const AdminClientsList = ({ onNavigate }) => {
                   <button
                     onClick={() => {
                       handleCloseModal();
+                      navigate(`/return?clientNip=${selectedClient.nip}`);
+                    }}
+                    className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white py-3 px-4 rounded-xl font-bold hover:from-indigo-700 hover:to-indigo-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg hover:scale-[1.01]"
+                  >
+                    <Truck className="w-4 h-4" />
+                    <span>Zrób zgłoszenie</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleCloseModal();
                       onNavigate('admin-returns', { clientNip: selectedClient.nip });
                     }}
                     className="flex-1 bg-gray-100 border border-gray-300 text-gray-700 py-3 px-4 rounded-xl font-bold hover:bg-gray-200 transition-all duration-200 flex items-center justify-center space-x-2"
                   >
-                    <Truck className="w-4 h-4" />
+                    <Clock className="w-4 h-4" />
                     <span>Zobacz zgłoszenia</span>
                   </button>
                 </div>
