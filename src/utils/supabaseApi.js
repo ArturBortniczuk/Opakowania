@@ -1226,7 +1226,7 @@ export const statsAPI = {
       console.log('🔄 Pobieranie szczegółowych statystyk bębnów...');
 
       const now = new Date().toISOString();
-      const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const fourteenDaysFromNow = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
       const [
         { count: totalDrums },
@@ -1236,14 +1236,14 @@ export const statsAPI = {
       ] = await Promise.all([
         // Wszystkie bębny
         supabase.from('drums').select('*', { count: 'exact', head: true }),
-        // Aktywne (termin zwrotu w przyszłości, więcej niż 7 dni)
-        supabase.from('drums').select('*', { count: 'exact', head: true }).gt('data_zwrotu_do_dostawcy', sevenDaysFromNow),
+        // Aktywne (termin zwrotu w przyszłości, więcej niż 14 dni)
+        supabase.from('drums').select('*', { count: 'exact', head: true }).gt('data_zwrotu_do_dostawcy', fourteenDaysFromNow),
         // Przeterminowane (termin zwrotu w przeszłości)
         supabase.from('drums').select('*', { count: 'exact', head: true }).lt('data_zwrotu_do_dostawcy', now),
-        // Zbliża się termin (między dziś a 7 dni)
+        // Zbliża się termin (między dziś a 14 dni)
         supabase.from('drums').select('*', { count: 'exact', head: true })
           .gte('data_zwrotu_do_dostawcy', now)
-          .lte('data_zwrotu_do_dostawcy', sevenDaysFromNow)
+          .lte('data_zwrotu_do_dostawcy', fourteenDaysFromNow)
       ]);
 
       console.log(`✅ Szczegółowe statystyki: ${totalDrums} łącznie, ${overdueDrums} przeterminowane, ${dueSoonDrums} zbliża się termin`);

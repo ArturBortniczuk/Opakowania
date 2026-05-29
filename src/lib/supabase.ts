@@ -38,7 +38,7 @@ export const supabaseHelpers = {
         text: 'Przeterminowany',
         daysDiff: Math.abs(daysDiff)
       };
-    } else if (daysDiff <= 7) {
+    } else if (daysDiff <= 14) {
       return {
         status: 'due-soon',
         color: 'text-yellow-600',

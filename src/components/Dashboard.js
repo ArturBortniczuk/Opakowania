@@ -574,7 +574,7 @@ const Dashboard = ({ user }) => {
                     </div>
 
                     <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl flex flex-col">
-                      <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1">Termin do 7 dni</span>
+                      <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1">Termin do 14 dni</span>
                       <span className="text-xl font-bold text-amber-700">{statusBreakdown.dueSoon}</span>
                       <span className="text-xs text-amber-500 mt-0.5">{statusBreakdown.dueSoonPercent.toFixed(0)}% sumy</span>
                     </div>
