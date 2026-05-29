@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { drumsAPI, returnsAPI, companiesAPI } from '../utils/supabaseApi';
 
-const Dashboard = ({ user }) => {
+const Dashboard = ({ user, profile }) => {
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalDrums: 0,
@@ -408,7 +408,7 @@ const Dashboard = ({ user }) => {
               <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
                 Dashboard
               </h1>
-              <p className="text-gray-600">Witaj ponownie, {user.name || user.companyName}</p>
+               <p className="text-gray-600">Witaj ponownie, {profile ? profile.name : (user.name || user.companyName)}</p>
             </div>
           </div>
 

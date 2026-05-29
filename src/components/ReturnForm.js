@@ -27,7 +27,7 @@ import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
 
 registerLocale('pl', pl);
 
-const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
+const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
 
@@ -47,12 +47,12 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
   const [formData, setFormData] = useState({
     collectionDateStart: minDate,
     collectionDateEnd: getEndDate(minDate),
-    phoneNumber: '',
+    phoneNumber: profile?.phone || '',
     companyName: user.companyName || user.name,
-    street: '',
-    postalCode: '',
-    city: '',
-    email: '',
+    street: user.street || '',
+    postalCode: user.postalCode || '',
+    city: user.city || '',
+    email: profile?.email || '',
     loadingHours: '',
     availableEquipment: '',
     notes: '',
@@ -235,7 +235,13 @@ const ReturnForm = ({ user, selectedDrum, onNavigate, onSubmit }) => {
         loading_hours: formData.loadingHours,
         available_equipment: formData.availableEquipment,
         notes: notesWithPhoneAndDates,
-        selected_drums: formData.selectedDrums // Teraz to tablica obiektów
+        selected_drums: formData.selectedDrums, // Teraz to tablica obiektów
+        
+        // Dane profilu pracownika
+        profile_id: profile?.id || null,
+        profile_name: profile?.name || null,
+        profile_email: profile?.email || null,
+        profile_phone: profile?.phone || null
       };
 
       // Wyślij zgłoszenie

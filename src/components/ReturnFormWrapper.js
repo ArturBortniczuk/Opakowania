@@ -5,7 +5,7 @@ import { companiesAPI } from '../utils/supabaseApi';
 import ReturnForm from './ReturnForm';
 import { Search, Building2, UserCheck, MapPin, Phone, Mail, ArrowLeft, Package } from 'lucide-react';
 
-const ReturnFormWrapper = ({ currentUser }) => {
+const ReturnFormWrapper = ({ currentUser, profile }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const clientNip = searchParams.get('clientNip');
@@ -101,7 +101,7 @@ const ReturnFormWrapper = ({ currentUser }) => {
 
   // 1. Zwykły klient -> Renderuje formularz bezpośrednio dla niego
   if (!isStaff) {
-    return <ReturnForm user={currentUser} />;
+    return <ReturnForm user={currentUser} profile={profile} />;
   }
 
   // 2. Pracownik i wybrano klienta -> Renderuje formularz z podłożonymi danymi wybranego klienta

@@ -1315,6 +1315,79 @@ export const rulesAPI = {
 };
 
 // ==================================
+//  API do Profili Pracowników
+// ==================================
+export const profilesAPI = {
+  /**
+   * Pobiera profile pracowników dla danej firmy.
+   * @param {string} companyNip - NIP firmy.
+   * @returns {Promise<Array>} Lista profili.
+   */
+  async getProfiles(companyNip) {
+    try {
+      const { data, error } = await supabase
+        .from('client_profiles')
+        .select('*')
+        .eq('company_nip', companyNip)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        if (error.code === '42P01') {
+          // Tabela może jeszcze nie istnieć
+          return [];
+        }
+        throw error;
+      }
+      return data || [];
+    } catch (error) {
+      console.error('Błąd podczas pobierania profili:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Tworzy nowy profil pracownika.
+   * @param {object} profileData - Dane profilu ({ company_nip, name, email, phone }).
+   * @returns {Promise<object>} Utworzony profil.
+   */
+  async createProfile(profileData) {
+    try {
+      const { data, error } = await supabase
+        .from('client_profiles')
+        .insert([profileData])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Błąd podczas tworzenia profilu:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Usuwa profil pracownika.
+   * @param {number} id - ID profilu.
+   * @returns {Promise<boolean>} Czy usunięto pomyślnie.
+   */
+  async deleteProfile(id) {
+    try {
+      const { error } = await supabase
+        .from('client_profiles')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Błąd podczas usuwania profilu:', error);
+      throw error;
+    }
+  }
+};
+
+// ==================================
 //  Funkcje pomocnicze
 // ==================================
 /**

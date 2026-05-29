@@ -417,6 +417,14 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
                     <label className="text-sm font-medium text-gray-500">Email kontaktowy</label>
                     <p className="text-gray-900">{selectedRequest.email}</p>
                   </div>
+                  {selectedRequest.profile_name && (
+                    <div className="pt-2 border-t border-gray-155">
+                      <label className="text-xs font-bold text-blue-600 uppercase tracking-wider block mb-1">Osoba zgłaszająca (profil)</label>
+                      <p className="text-sm font-extrabold text-slate-800">{selectedRequest.profile_name}</p>
+                      {selectedRequest.profile_email && <p className="text-xs text-slate-500 font-medium mt-0.5">{selectedRequest.profile_email}</p>}
+                      {selectedRequest.profile_phone && <p className="text-xs text-slate-500 font-semibold mt-0.5">Tel: {selectedRequest.profile_phone}</p>}
+                    </div>
+                  )}
                 </div>
               </div>
 
