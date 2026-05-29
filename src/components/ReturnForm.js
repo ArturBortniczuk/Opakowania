@@ -73,6 +73,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
   const [userDrums, setUserDrums] = useState([]);
   const [drumsLoading, setDrumsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('default');
   const [dateError, setDateError] = useState(false);
   // Pobierz bębny użytkownika
   useEffect(() => {
@@ -482,7 +483,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <Calendar className="inline w-4 h-4 mr-2" />
-                    Preferowany zakres dat *
+                    Preferowany zakres dat odbioru *
                   </label>
                   <div className="space-y-2 relative z-50">
                     <DatePicker
@@ -625,25 +626,85 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
               </div>
             ) : (
               <>
-                <div className="mb-4 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Wyszukaj bęben (po cesze, nazwie, kodzie)..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div className="md:col-span-2 relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Wyszukaj bęben (po cesze, nazwie, kodzie)..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                    />
+                  </div>
+                  <div>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white text-sm"
+                    >
+                      <option value="default">Sortuj: Status i termin (Domyślnie)</option>
+                      <option value="date_asc">Sortuj: Termin zwrotu (Najbliższy)</option>
+                      <option value="date_desc">Sortuj: Termin zwrotu (Najdalszy)</option>
+                      <option value="cecha_asc">Sortuj: Cecha / Nr seryjny</option>
+                      <option value="size_asc">Sortuj: Rozmiar bębna</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto">
-                  {userDrums.filter(d => 
-                    d.cecha?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                    d.nazwa?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    d.kod_bebna?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    d.numer_faktury?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    d.adres_dostawy?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    d.nazwa_punktu_dostawy?.toLowerCase().includes(searchQuery.toLowerCase())
-                  ).map((drum, index) => {
+                  {(() => {
+                    const filtered = userDrums.filter(d => 
+                      d.cecha?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                      d.nazwa?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      d.kod_bebna?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      d.numer_faktury?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      d.adres_dostawy?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      d.nazwa_punktu_dostawy?.toLowerCase().includes(searchQuery.toLowerCase())
+                    );
+                    
+                    return [...filtered].sort((a, b) => {
+                      if (a.isReported !== b.isReported) {
+                        return a.isReported ? 1 : -1;
+                      }
+
+                      if (sortBy === 'default') {
+                        const getStatusRank = (status) => {
+                          if (status === 'active' || status === 'due-soon') return 1;
+                          if (status === 'overdue') return 2;
+                          return 3;
+                        };
+                        const rankA = getStatusRank(a.status);
+                        const rankB = getStatusRank(b.status);
+                        if (rankA !== rankB) return rankA - rankB;
+                        
+                        const dateA = new Date(a.clientReturnDeadline || a.data_zwrotu_do_dostawcy || '9999-12-31');
+                        const dateB = new Date(b.clientReturnDeadline || b.data_zwrotu_do_dostawcy || '9999-12-31');
+                        return dateA - dateB;
+                      }
+
+                      if (sortBy === 'date_asc') {
+                        const dateA = new Date(a.clientReturnDeadline || a.data_zwrotu_do_dostawcy || '9999-12-31');
+                        const dateB = new Date(b.clientReturnDeadline || b.data_zwrotu_do_dostawcy || '9999-12-31');
+                        return dateA - dateB;
+                      }
+
+                      if (sortBy === 'date_desc') {
+                        const dateA = new Date(a.clientReturnDeadline || a.data_zwrotu_do_dostawcy || '1970-01-01');
+                        const dateB = new Date(b.clientReturnDeadline || b.data_zwrotu_do_dostawcy || '1970-01-01');
+                        return dateB - dateA;
+                      }
+
+                      if (sortBy === 'cecha_asc') {
+                        return (a.cecha || '').localeCompare(b.cecha || '');
+                      }
+
+                      if (sortBy === 'size_asc') {
+                        return (a.rozmiar_bebna || '').localeCompare(b.rozmiar_bebna || '');
+                      }
+
+                      return 0;
+                    });
+                  })().map((drum, index) => {
                   const drumCecha = drum.cecha; // UŻYWAMY CECHY JAKO ID
                   const returnDate = drum.clientReturnDeadline || drum.data_zwrotu_do_dostawcy;
                   const address = drum.adres_dostawy || drum.nazwa_punktu_dostawy || 'Brak informacji o adresie';

@@ -12,9 +12,11 @@ const DrumsList = ({ user }) => {
   const location = useLocation();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('kod_bebna');
+  const [sortBy, setSortBy] = useState('data_zwrotu_do_dostawcy');
   const [sortOrder, setSortOrder] = useState('asc');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStatus, setFilterStatus] = useState(() => {
+    return (location.state && location.state.filterStatus) || 'all';
+  });
   const [filterSize, setFilterSize] = useState('all');
   const [availableSizes, setAvailableSizes] = useState([]);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
@@ -38,7 +40,7 @@ const DrumsList = ({ user }) => {
 
   useEffect(() => {
     if (location.state && location.state.filterStatus) {
-      setFilterStatus(location.state.filterStatus);
+      // Wyczyść stan historii, aby odświeżenie strony nie blokowało filtra
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, navigate, location.pathname]);
@@ -412,17 +414,6 @@ const DrumsList = ({ user }) => {
               </select>
 
               <div className="flex gap-2">
-                <button
-                  onClick={() => handleSort('kod_bebna')}
-                  className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 ${sortBy === 'kod_bebna'
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
-                    }`}
-                >
-                  <span>Kod</span>
-                  <ArrowUpDown className="w-4 h-4" />
-                </button>
-
                 <button
                   onClick={() => handleSort('data_zwrotu_do_dostawcy')}
                   className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 ${sortBy === 'data_zwrotu_do_dostawcy'

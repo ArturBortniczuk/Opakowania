@@ -477,7 +477,7 @@ const Dashboard = ({ user, profile }) => {
               <h2 className="text-2xl font-bold tracking-tight text-slate-900">Wartość bębnów w Twoim posiadaniu</h2>
             </div>
             <div className="text-left lg:text-right">
-              <p className="text-xs text-slate-500 font-medium">Szacowana całkowita wartość bębnów z kaucją</p>
+              <p className="text-xs text-slate-500 font-medium">Szacowana całkowita wartość bębnów</p>
               <p className="text-3xl font-extrabold text-blue-900">
                 {financialStats.totalValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
               </p>
