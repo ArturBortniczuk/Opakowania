@@ -47,7 +47,7 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
           returnPeriodsAPI.getReturnPeriods()
         ]);
         
-        setCompanies(companiesData);
+        setCompanies(Array.isArray(companiesData) ? companiesData : (companiesData?.data || []));
         setReturnPeriods(periodsData);
         
       } catch (err) {
@@ -181,7 +181,7 @@ const AdminReturnPeriodsManager = ({ onNavigate }) => {
         returnPeriodsAPI.getReturnPeriods()
       ]);
       
-      setCompanies(companiesData);
+      setCompanies(Array.isArray(companiesData) ? companiesData : (companiesData?.data || []));
       setReturnPeriods(periodsData);
       
     } catch (err) {

@@ -56,6 +56,8 @@ const AdminReports = ({ onNavigate }) => {
           returnsAPI.getReturns()
         ]);
 
+        const companiesArray = Array.isArray(allCompanies) ? allCompanies : (allCompanies?.data || []);
+
         // Oblicz zaawansowane statystyki
         const now = new Date();
         const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -84,7 +86,7 @@ const AdminReports = ({ onNavigate }) => {
         }).length;
 
         // Klienci według aktywności
-        const activeClients = allCompanies.filter(company => {
+        const activeClients = companiesArray.filter(company => {
           const lastActivity = new Date(company.lastActivity || company.created_at);
           return lastActivity >= sevenDaysAgo;
         }).length;
