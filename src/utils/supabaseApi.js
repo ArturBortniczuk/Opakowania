@@ -264,8 +264,8 @@ export const drumsAPI = {
             .select('kod_bebna');
           
           if (!extError && extData && extData.length > 0) {
-            const codes = extData.map(e => e.kod_bebna);
-            query = query.in('kod_bebna', codes);
+            const cechas = extData.map(e => e.kod_bebna);
+            query = query.in('cecha', cechas);
           } else {
             // Brak bębnów o przedłużonym terminie - zwracamy puste wyniki paginacji
             return {
@@ -340,12 +340,12 @@ export const drumsAPI = {
       // Pobieranie niestandardowych terminów dla pobranych bębnów
       let customDeadlines = [];
       if (data && data.length > 0) {
-        const drumCodes = data.map(d => d.kod_bebna);
+        const drumCechas = data.map(d => d.cecha).filter(Boolean);
         const nips = [...new Set(data.map(d => d.nip).filter(Boolean))];
         const { data: deadlinesData } = await supabase
           .from('custom_drum_deadlines')
           .select('*')
-          .in('kod_bebna', drumCodes)
+          .in('kod_bebna', drumCechas)
           .in('nip', nips);
         if (deadlinesData) {
           customDeadlines = deadlinesData;
@@ -355,7 +355,7 @@ export const drumsAPI = {
       // Mapowanie danych do spójnego formatu używanego w komponentach
       const mappedData = data.map(drum => {
         const extension = customDeadlines.find(
-          ext => ext.kod_bebna === drum.kod_bebna && ext.nip === drum.nip
+          ext => ext.kod_bebna === drum.cecha && ext.nip === drum.nip
         );
 
         let finalReturnDate = drum.data_zwrotu_do_dostawcy;
@@ -567,12 +567,14 @@ export const drumsAPI = {
       // Pobranie niestandardowych terminów dla pobranych bębnów
       let customDeadlines = [];
       if (allData && allData.length > 0) {
+        const drumCechas = allData.map(d => d.cecha).filter(Boolean);
         let deadlinesQuery = supabase.from('custom_drum_deadlines').select('*');
         if (nip) {
           deadlinesQuery = deadlinesQuery.eq('nip', nip);
         } else if (allowedNips && allowedNips.length > 0) {
           deadlinesQuery = deadlinesQuery.in('nip', allowedNips);
         }
+        deadlinesQuery = deadlinesQuery.in('kod_bebna', drumCechas);
         const { data: deadlinesData } = await deadlinesQuery;
         if (deadlinesData) {
           customDeadlines = deadlinesData;
@@ -582,7 +584,7 @@ export const drumsAPI = {
       // Mapowanie danych (identyczne jak w getDrums)
       return allData.map(drum => {
         const extension = customDeadlines.find(
-          ext => ext.kod_bebna === drum.kod_bebna && ext.nip === drum.nip
+          ext => ext.kod_bebna === drum.cecha && ext.nip === drum.nip
         );
 
         // Obliczenie wirtualnej daty zwrotu dla bębnów 'Własnych' (120 dni od wydania)
@@ -745,13 +747,13 @@ export const drumsAPI = {
    * @param {string} username - Nazwa specjalisty wprowadzającego zmianę.
    * @returns {Promise<object>} Zapisany rekord.
    */
-  async setCustomDrumDeadline(kod_bebna, nip, custom_return_date, notes, username) {
+  async setCustomDrumDeadline(cecha, nip, custom_return_date, notes, username) {
     try {
-      console.log(`💾 Zapisywanie przedłużenia bębna ${kod_bebna} (NIP: ${nip}) do ${custom_return_date}`);
+      console.log(`💾 Zapisywanie przedłużenia bębna ${cecha} (NIP: ${nip}) do ${custom_return_date}`);
       const { data, error } = await supabase
         .from('custom_drum_deadlines')
         .upsert({
-          kod_bebna,
+          kod_bebna: cecha,
           nip,
           custom_return_date,
           notes,
@@ -773,17 +775,17 @@ export const drumsAPI = {
 
   /**
    * Usuwa indywidualne przedłużenie terminu zwrotu bębna, przywracając termin domyślny.
-   * @param {string} kod_bebna - Kod bębna.
+   * @param {string} cecha - Cecha bębna.
    * @param {string} nip - NIP klienta.
    * @returns {Promise<object>} Wynik operacji.
    */
-  async deleteCustomDrumDeadline(kod_bebna, nip) {
+  async deleteCustomDrumDeadline(cecha, nip) {
     try {
-      console.log(`🗑️ Usuwanie przedłużenia bębna ${kod_bebna} (NIP: ${nip})`);
+      console.log(`🗑️ Usuwanie przedłużenia bębna ${cecha} (NIP: ${nip})`);
       const { data, error } = await supabase
         .from('custom_drum_deadlines')
         .delete()
-        .eq('kod_bebna', kod_bebna)
+        .eq('kod_bebna', cecha)
         .eq('nip', nip);
 
       if (error) throw error;

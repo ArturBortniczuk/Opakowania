@@ -119,23 +119,14 @@ const Dashboard = ({ user, profile }) => {
           }
         });
 
-        // Bębny przyjęte w ciągu ostatnich 30 dni (nowe wydania dla klienta)
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
-        
-        const recentCount = mappedDrums.filter(d => {
-          const date = d.data_wydania || d.data_przyjecia_na_stan;
-          return date && date >= thirtyDaysAgoStr;
-        }).length;
-
+        const completedReturnsCount = userReturns.filter(r => r.status === 'Completed').length;
         const pendingReturnsCount = userReturns.filter(r => r.status === 'Pending').length;
 
         setStats({
           totalDrums: total,
           activeDrums: activeCount,
           pendingReturns: pendingReturnsCount,
-          recentReturns: recentCount
+          recentReturns: completedReturnsCount
         });
 
         setFinancialStats({
@@ -237,7 +228,7 @@ const Dashboard = ({ user, profile }) => {
       const updatedDate = new Date(req.updated_at || req.created_at);
       const drumsCount = Array.isArray(req.selected_drums) ? req.selected_drums.length : 0;
 
-      // Zgłoszenie zwrotu
+      // 1. Krok: Utworzenie zgłoszenia (zawsze widoczne)
       activities.push({
         id: `created-${req.id}`,
         type: 'return_created',
@@ -248,28 +239,36 @@ const Dashboard = ({ user, profile }) => {
         color: 'text-amber-500'
       });
 
-      // Zmiany statusów
-      if (req.status === 'Approved') {
+      // 2. Krok: Zatwierdzenie (jeśli Approved, InTransit lub Completed)
+      if (req.status === 'Approved' || req.status === 'InTransit' || req.status === 'Completed') {
+        const approvalDate = req.status === 'Approved' ? updatedDate : new Date(createdDate.getTime() + 12 * 60 * 60 * 1000); // 12h later
         activities.push({
           id: `approved-${req.id}`,
           type: 'return_approved',
           message: `Zatwierdzono transport dla zgłoszenia #${req.id}`,
-          time: formatRelativeDate(updatedDate),
-          rawDate: updatedDate,
+          time: formatRelativeDate(approvalDate),
+          rawDate: approvalDate,
           icon: Clock,
           color: 'text-indigo-600'
         });
-      } else if (req.status === 'InTransit') {
+      }
+
+      // 3. Krok: W transporcie (jeśli InTransit lub Completed)
+      if (req.status === 'InTransit' || req.status === 'Completed') {
+        const transitDate = req.transport_date ? new Date(req.transport_date) : (req.status === 'InTransit' ? updatedDate : new Date(createdDate.getTime() + 24 * 60 * 60 * 1000)); // 24h later
         activities.push({
           id: `intransit-${req.id}`,
           type: 'return_intransit',
           message: `Zgłoszenie #${req.id} jest w transporcie`,
-          time: formatRelativeDate(updatedDate),
-          rawDate: updatedDate,
+          time: formatRelativeDate(transitDate),
+          rawDate: transitDate,
           icon: Truck,
           color: 'text-sky-600'
         });
-      } else if (req.status === 'Completed') {
+      }
+
+      // 4. Krok: Zakończenie (jeśli Completed)
+      if (req.status === 'Completed') {
         activities.push({
           id: `completed-${req.id}`,
           type: 'return_completed',
@@ -284,14 +283,17 @@ const Dashboard = ({ user, profile }) => {
           activities.push({
             id: `correction-${req.id}`,
             type: 'return_correction',
-            message: `Wystawiono fakturę korygującą: ${req.correction_number}`,
+            message: `Wystawiono fakturę korygującą`,
             time: formatRelativeDate(updatedDate),
-            rawDate: updatedDate,
+            rawDate: new Date(updatedDate.getTime() + 1000), // tuż po zakończeniu
             icon: CheckCircle,
             color: 'text-green-600'
           });
         }
-      } else if (req.status === 'Rejected') {
+      }
+
+      // Odrzucenie (jeśli Rejected)
+      if (req.status === 'Rejected') {
         activities.push({
           id: `rejected-${req.id}`,
           type: 'return_rejected',
@@ -323,9 +325,9 @@ const Dashboard = ({ user, profile }) => {
     setRecentActivity(sorted);
   };
 
-  const StatCard = ({ icon: Icon, title, value, subtitle, color, path }) => (
+  const StatCard = ({ icon: Icon, title, value, subtitle, color, path, state }) => (
     <div
-      onClick={() => navigate(path)}
+      onClick={() => navigate(path, { state })}
       className={`
         bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 
         hover:shadow-xl transition-all duration-300 transform hover:scale-[1.03] cursor-pointer 
@@ -432,6 +434,7 @@ const Dashboard = ({ user, profile }) => {
             subtitle="Łączna liczba bębnów"
             color="text-blue-600"
             path="/drums"
+            state={{ filterStatus: 'all' }}
           />
 
           <StatCard
@@ -441,6 +444,7 @@ const Dashboard = ({ user, profile }) => {
             subtitle="Bębny w użyciu"
             color="text-green-600"
             path="/drums"
+            state={{ filterStatus: 'active' }}
           />
 
           <StatCard
@@ -454,11 +458,11 @@ const Dashboard = ({ user, profile }) => {
 
           <StatCard
             icon={TrendingUp}
-            title="Ostatnie 30 dni"
+            title="Zrealizowane zwroty"
             value={stats.recentReturns}
-            subtitle="Nowe przyjęcia"
+            subtitle="Zakończone zwroty"
             color="text-purple-600"
-            path="/drums"
+            path="/my-returns"
           />
         </div>
 
@@ -473,7 +477,7 @@ const Dashboard = ({ user, profile }) => {
               <h2 className="text-2xl font-bold tracking-tight text-slate-900">Wartość bębnów w Twoim posiadaniu</h2>
             </div>
             <div className="text-left lg:text-right">
-              <p className="text-xs text-slate-500 font-medium">Szacowana całkowita wartość bębnów (z kaucją)</p>
+              <p className="text-xs text-slate-500 font-medium">Szacowana całkowita wartość bębnów z kaucją</p>
               <p className="text-3xl font-extrabold text-blue-900">
                 {financialStats.totalValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
               </p>
@@ -502,7 +506,7 @@ const Dashboard = ({ user, profile }) => {
               <p className="text-2xl font-black text-amber-900 group-hover:text-amber-700 transition-colors duration-200">
                 {financialStats.overdueValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
               </p>
-              <p className="text-xs text-slate-500 mt-2">Bębny po terminie. Zwróć je pilnie, by zatrzymać amortyzację.</p>
+              <p className="text-xs text-slate-500 mt-2">Bębny po terminie możliwe do zwrotu za zmniejszoną wartość.</p>
             </div>
 
             {/* Lost Value */}
@@ -514,7 +518,7 @@ const Dashboard = ({ user, profile }) => {
               <p className="text-2xl font-black text-rose-700 group-hover:text-rose-600 transition-colors duration-200">
                 {financialStats.lostValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
               </p>
-              <p className="text-xs text-slate-500 mt-2">Środki utracone w wyniku przekroczenia dopuszczalnego wieku bębnów.</p>
+              <p className="text-xs text-slate-500 mt-2">Kwota utracona w związku z przekroczonymi terminami zwrotów.</p>
             </div>
           </div>
         </div>

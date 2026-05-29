@@ -39,7 +39,7 @@ const LoginForm = ({ onLogin }) => {
         throw new Error('Logowanie nie powiodło się. Spróbuj ponownie.');
       }
     } catch (err) {
-      setError(err.message);
+      setError('Podany NIP, adres e-mail lub hasło są nieprawidłowe.');
     } finally {
       setLoading(false);
     }
@@ -91,6 +91,18 @@ const LoginForm = ({ onLogin }) => {
       )}
 
       <form onSubmit={handleLogin} className="space-y-6">
+        {loginMode !== 'pracownik' && (
+          <div className="text-left mb-2">
+            <button
+              type="button"
+              onClick={() => setView('requestReset')}
+              className="text-xs text-blue-600 hover:underline font-semibold"
+            >
+              Ustawiasz hasło po raz pierwszy lub go nie pamiętasz?
+            </button>
+          </div>
+        )}
+
         <div>
           <label htmlFor="nip" className="block text-sm font-medium text-gray-700 mb-2">
             {loginMode === 'pracownik' ? 'Adres e-mail' : 'Numer NIP'}
@@ -155,16 +167,7 @@ const LoginForm = ({ onLogin }) => {
           )}
         </button>
       </form>
-      {loginMode !== 'pracownik' && (
-        <div className="text-center mt-6">
-          <button
-            onClick={() => setView('requestReset')}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            Nie pamiętasz hasła lub ustawiasz je po raz pierwszy?
-          </button>
-        </div>
-      )}
+
     </div>
   );
 

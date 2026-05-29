@@ -203,7 +203,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
       const username = currentUser ? (currentUser.name || currentUser.username) : 'Specjalista';
       
       await drumsAPI.setCustomDrumDeadline(
-        selectedDrum.kod_bebna,
+        selectedDrum.cecha || selectedDrum.kod_bebna,
         selectedDrum.nip,
         dateStr,
         extensionNotes,
@@ -240,7 +240,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     setSavingExtension(true);
     try {
       await drumsAPI.deleteCustomDrumDeadline(
-        selectedDrum.kod_bebna,
+        selectedDrum.cecha || selectedDrum.kod_bebna,
         selectedDrum.nip
       );
       
@@ -605,319 +605,6 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     </div>
   );
 
-  // ZACHOWANE: DrumDetailsModal z twojego kodu
-  const DrumDetailsModal = () => {
-    if (!showDrumDetails || !selectedDrum) return null;
-
-    return (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-        onClick={handleCloseModal} // DODANE: Zamykanie po kliknięciu w tło
-      >
-        <div
-          className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
-          onClick={(e) => e.stopPropagation()} // DODANE: Zapobieganie zamykaniu po kliknięciu w treść
-        >
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">Szczegóły bębna {selectedDrum.cecha || selectedDrum.kod_bebna}</h2>
-              <button
-                onClick={handleCloseModal}
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-
-          <div className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacje o bębnie</h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Kod bębna</label>
-                    <p className="text-gray-900">{selectedDrum.kod_bebna}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Nazwa</label>
-                    <p className="text-gray-900">{selectedDrum.nazwa}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Cecha</label>
-                    <p className="text-gray-900 font-medium">{selectedDrum.cecha || 'Brak'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Dostawca</label>
-                    <p className="text-gray-900">{selectedDrum.kon_dostawca}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Dokument</label>
-                    <p className="text-gray-900">{selectedDrum.nr_dokumentupz}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Lokalizacja</label>
-                    <p className="text-gray-900">
-                      {selectedDrum.adres_dostawy || 'Brak informacji o adresie'}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Numer faktury</label>
-                    <p className="text-gray-900">{selectedDrum.numer_faktury || 'Brak danych'}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacje o kliencie</h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Nazwa firmy</label>
-                    <p className="text-gray-900">{selectedDrum.company || selectedDrum.pelna_nazwa_kontrahenta}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">NIP</label>
-                    <p className="text-gray-900">{selectedDrum.nip}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Status</label>
-                    <p className="text-gray-900">{selectedDrum.db_status}</p>
-                  </div>
-                  {selectedDrum.companyEmail && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Email</label>
-                      <p className="text-gray-900">{selectedDrum.companyEmail}</p>
-                    </div>
-                  )}
-                  {selectedDrum.companyPhone && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Telefon</label>
-                      <p className="text-gray-900">{selectedDrum.companyPhone}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Timeline</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Data wydania</span>
-                  <span className="font-medium">
-                    {selectedDrum.data_wydania
-                      ? new Date(selectedDrum.data_wydania).toLocaleDateString('pl-PL')
-                      : 'Brak'
-                    }
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Data przyjęcia na stan</span>
-                  <span className="font-medium">
-                    {selectedDrum.data_przyjecia_na_stan
-                      ? new Date(selectedDrum.data_przyjecia_na_stan).toLocaleDateString('pl-PL')
-                      : 'Brak'
-                    }
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Zwrot do dostawcy</span>
-                  <span className="font-medium">
-                    {selectedDrum.data_zwrotu_do_dostawcy
-                      ? new Date(selectedDrum.data_zwrotu_do_dostawcy).toLocaleDateString('pl-PL')
-                      : <span className="text-indigo-600">Własny</span>
-                    }
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Zwrot od klienta</span>
-                  <span className="font-medium">
-                    {selectedDrum.clientReturnDeadline
-                      ? new Date(selectedDrum.clientReturnDeadline).toLocaleDateString('pl-PL')
-                      : 'Brak'
-                    }
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Dni w posiadaniu</span>
-                  <span className="font-medium">{selectedDrum.daysInPossession} dni</span>
-                </div>
-              </div>
-            </div>
-
-            {/* NOWA SEKCJA: Zarządzanie terminem zwrotu (Przedłużenia) */}
-            <div className="mt-6 pt-6 border-t border-indigo-100 bg-indigo-50/30 -mx-6 -mb-6 p-6 rounded-b-2xl">
-              <h3 className="text-lg font-bold text-indigo-900 mb-3 flex items-center space-x-2">
-                <Calendar className="w-5 h-5 text-indigo-600" />
-                <span>Indywidualne przedłużenie terminu zwrotu</span>
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Nowy termin zwrotu
-                  </label>
-                  <DatePicker
-                    selected={customReturnDate}
-                    onChange={(date) => setCustomReturnDate(date)}
-                    dateFormat="dd.MM.yyyy"
-                    locale="pl"
-                    className="w-full p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer bg-white"
-                    placeholderText="Wybierz nową datę"
-                    minDate={selectedDrum.data_wydania ? new Date(selectedDrum.data_wydania) : new Date()}
-                  />
-                </div>
-                
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Uzasadnienie / Notatka
-                  </label>
-                  <input
-                    type="text"
-                    value={extensionNotes}
-                    onChange={(e) => setExtensionNotes(e.target.value)}
-                    className="w-full p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white text-sm"
-                    placeholder="np. Ustalone z klientem, opóźnienie inwestycji do końca roku."
-                  />
-                </div>
-              </div>
-              
-              <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                  {selectedDrum.isExtended && (
-                    <p className="text-xs text-gray-500">
-                      Wprowadził: <span className="font-semibold">{selectedDrum.extensionCreatedBy || "Brak"}</span>
-                      {selectedDrum.extensionCreatedAt && ` (${new Date(selectedDrum.extensionCreatedAt).toLocaleDateString('pl-PL')})`}
-                    </p>
-                  )}
-                </div>
-                
-                <div className="flex space-x-3 justify-end">
-                  {selectedDrum.isExtended && (
-                    <button
-                      onClick={handleClearExtension}
-                      disabled={savingExtension}
-                      className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-xl font-medium hover:bg-red-100 transition-colors duration-200 text-sm disabled:opacity-50"
-                    >
-                      Przywróć domyślny termin
-                    </button>
-                  )}
-                  <button
-                    onClick={handleSaveExtension}
-                    disabled={savingExtension || !customReturnDate}
-                    className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-all duration-200 text-sm shadow-md hover:shadow-lg flex items-center space-x-2 disabled:opacity-50"
-                  >
-                    {savingExtension ? (
-                      <>
-                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                        <span>Zapisywanie...</span>
-                      </>
-                    ) : (
-                      <span>Zapisywanie</span>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // DODANE: Komponent paginacji
-  const PaginationControls = () => (
-    <div className="flex items-center justify-between px-6 py-3 bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-blue-100 mt-6">
-      <div className="flex-1 flex justify-between sm:hidden">
-        <button
-          onClick={prevPage}
-          disabled={!drumsData.pagination.hasPrev}
-          className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Poprzednia
-        </button>
-        <button
-          onClick={nextPage}
-          disabled={!drumsData.pagination.hasNext}
-          className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Następna
-        </button>
-      </div>
-      <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm text-gray-700">
-            Wyświetlane <span className="font-medium">{((drumsData.pagination.page - 1) * drumsData.pagination.limit) + 1}</span> do{' '}
-            <span className="font-medium">
-              {Math.min(drumsData.pagination.page * drumsData.pagination.limit, drumsData.pagination.total)}
-            </span>{' '}
-            z <span className="font-medium">{drumsData.pagination.total}</span> bębnów
-          </p>
-        </div>
-        <div>
-          <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-            <button
-              onClick={firstPage}
-              disabled={!drumsData.pagination.hasPrev}
-              className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronsLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={prevPage}
-              disabled={!drumsData.pagination.hasPrev}
-              className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-
-            {/* Numerowanie stron */}
-            {[...Array(Math.min(5, drumsData.pagination.totalPages))].map((_, idx) => {
-              let pageNum;
-              if (drumsData.pagination.totalPages <= 5) {
-                pageNum = idx + 1;
-              } else if (drumsData.pagination.page <= 3) {
-                pageNum = idx + 1;
-              } else if (drumsData.pagination.page >= drumsData.pagination.totalPages - 2) {
-                pageNum = drumsData.pagination.totalPages - 4 + idx;
-              } else {
-                pageNum = drumsData.pagination.page - 2 + idx;
-              }
-
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => goToPage(pageNum)}
-                  className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${drumsData.pagination.page === pageNum
-                    ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                    : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                    }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
-
-            <button
-              onClick={nextPage}
-              disabled={!drumsData.pagination.hasNext}
-              className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-            <button
-              onClick={lastPage}
-              disabled={!drumsData.pagination.hasNext}
-              className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronsRight className="h-4 w-4" />
-            </button>
-          </nav>
-        </div>
-      </div>
-    </div>
-  );
-
   // loading check removed from here to prevent unmounting
 
   if (error) {
@@ -1087,7 +774,97 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
             </div>
 
             {/* DODANE: Paginacja */}
-            {drumsData.pagination.totalPages > 1 && <PaginationControls />}
+            {drumsData.pagination.totalPages > 1 && (
+              <div className="flex items-center justify-between px-6 py-3 bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-blue-100 mt-6">
+                <div className="flex-1 flex justify-between sm:hidden">
+                  <button
+                    onClick={prevPage}
+                    disabled={!drumsData.pagination.hasPrev}
+                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Poprzednia
+                  </button>
+                  <button
+                    onClick={nextPage}
+                    disabled={!drumsData.pagination.hasNext}
+                    className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Następna
+                  </button>
+                </div>
+                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm text-gray-700">
+                      Wyświetlane <span className="font-medium">{((drumsData.pagination.page - 1) * drumsData.pagination.limit) + 1}</span> do{' '}
+                      <span className="font-medium">
+                        {Math.min(drumsData.pagination.page * drumsData.pagination.limit, drumsData.pagination.total)}
+                      </span>{' '}
+                      z <span className="font-medium">{drumsData.pagination.total}</span> bębnów
+                    </p>
+                  </div>
+                  <div>
+                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                      <button
+                        onClick={firstPage}
+                        disabled={!drumsData.pagination.hasPrev}
+                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <ChevronsLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={prevPage}
+                        disabled={!drumsData.pagination.hasPrev}
+                        className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+
+                      {/* Numerowanie stron */}
+                      {[...Array(Math.min(5, drumsData.pagination.totalPages))].map((_, idx) => {
+                        let pageNum;
+                        if (drumsData.pagination.totalPages <= 5) {
+                          pageNum = idx + 1;
+                        } else if (drumsData.pagination.page <= 3) {
+                          pageNum = idx + 1;
+                        } else if (drumsData.pagination.page >= drumsData.pagination.totalPages - 2) {
+                          pageNum = drumsData.pagination.totalPages - 4 + idx;
+                        } else {
+                          pageNum = drumsData.pagination.page - 2 + idx;
+                        }
+
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => goToPage(pageNum)}
+                            className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${drumsData.pagination.page === pageNum
+                              ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                              : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                              }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+
+                      <button
+                        onClick={nextPage}
+                        disabled={!drumsData.pagination.hasNext}
+                        className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={lastPage}
+                        disabled={!drumsData.pagination.hasNext}
+                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <ChevronsRight className="h-4 w-4" />
+                      </button>
+                    </nav>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <div className="text-center py-12">
@@ -1116,7 +893,221 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
             )}
           </div>
         )}
-        <DrumDetailsModal />
+        {/* Modal szczegółów bębna */}
+        {showDrumDetails && selectedDrum && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={handleCloseModal}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-gray-900">Szczegóły bębna {selectedDrum.cecha || selectedDrum.kod_bebna}</h2>
+                  <button
+                    onClick={handleCloseModal}
+                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacje o bębnie</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Kod bębna</label>
+                        <p className="text-gray-900">{selectedDrum.kod_bebna}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Nazwa</label>
+                        <p className="text-gray-900">{selectedDrum.nazwa}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Cecha</label>
+                        <p className="text-gray-900 font-medium">{selectedDrum.cecha || 'Brak'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Dostawca</label>
+                        <p className="text-gray-900">{selectedDrum.kon_dostawca}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Dokument</label>
+                        <p className="text-gray-900">{selectedDrum.nr_dokumentupz}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Lokalizacja</label>
+                        <p className="text-gray-900">
+                          {selectedDrum.adres_dostawy || 'Brak informacji o adresie'}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Numer faktury</label>
+                        <p className="text-gray-900">{selectedDrum.numer_faktury || 'Brak danych'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacje o kliencie</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Nazwa firmy</label>
+                        <p className="text-gray-900">{selectedDrum.company || selectedDrum.pelna_nazwa_kontrahenta}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">NIP</label>
+                        <p className="text-gray-900">{selectedDrum.nip}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Status</label>
+                        <p className="text-gray-900">{selectedDrum.db_status}</p>
+                      </div>
+                      {selectedDrum.companyEmail && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">Email</label>
+                          <p className="text-gray-900">{selectedDrum.companyEmail}</p>
+                        </div>
+                      )}
+                      {selectedDrum.companyPhone && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">Telefon</label>
+                          <p className="text-gray-900">{selectedDrum.companyPhone}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Timeline</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Data wydania</span>
+                      <span className="font-medium">
+                        {selectedDrum.data_wydania
+                          ? new Date(selectedDrum.data_wydania).toLocaleDateString('pl-PL')
+                          : 'Brak'
+                        }
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Data przyjęcia na stan</span>
+                      <span className="font-medium">
+                        {selectedDrum.data_przyjecia_na_stan
+                          ? new Date(selectedDrum.data_przyjecia_na_stan).toLocaleDateString('pl-PL')
+                          : 'Brak'
+                        }
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Zwrot do dostawcy</span>
+                      <span className="font-medium">
+                        {selectedDrum.data_zwrotu_do_dostawcy
+                          ? new Date(selectedDrum.data_zwrotu_do_dostawcy).toLocaleDateString('pl-PL')
+                          : <span className="text-indigo-600">Własny</span>
+                        }
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Zwrot od klienta</span>
+                      <span className="font-medium">
+                        {selectedDrum.clientReturnDeadline
+                          ? new Date(selectedDrum.clientReturnDeadline).toLocaleDateString('pl-PL')
+                          : 'Brak'
+                        }
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Dni w posiadaniu</span>
+                      <span className="font-medium">{selectedDrum.daysInPossession} dni</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Indywidualne przedłużenie terminu zwrotu */}
+                <div className="mt-6 pt-6 border-t border-indigo-100 bg-indigo-50/30 -mx-6 -mb-6 p-6 rounded-b-2xl">
+                  <h3 className="text-lg font-bold text-indigo-900 mb-3 flex items-center space-x-2">
+                    <Calendar className="w-5 h-5 text-indigo-600" />
+                    <span>Indywidualne przedłużenie terminu zwrotu</span>
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Nowy termin zwrotu
+                      </label>
+                      <DatePicker
+                        selected={customReturnDate}
+                        onChange={(date) => setCustomReturnDate(date)}
+                        dateFormat="dd.MM.yyyy"
+                        locale="pl"
+                        className="w-full p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer bg-white"
+                        placeholderText="Wybierz nową datę"
+                        minDate={selectedDrum.data_wydania ? new Date(selectedDrum.data_wydania) : new Date()}
+                      />
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Uzasadnienie / Notatka
+                      </label>
+                      <input
+                        type="text"
+                        value={extensionNotes}
+                        onChange={(e) => setExtensionNotes(e.target.value)}
+                        className="w-full p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white text-sm"
+                        placeholder="np. Ustalone z klientem, opóźnienie inwestycji do końca roku."
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                      {selectedDrum.isExtended && (
+                        <p className="text-xs text-gray-500">
+                          Wprowadził: <span className="font-semibold">{selectedDrum.extensionCreatedBy || "Brak"}</span>
+                          {selectedDrum.extensionCreatedAt && ` (${new Date(selectedDrum.extensionCreatedAt).toLocaleDateString('pl-PL')})`}
+                        </p>
+                      )}
+                    </div>
+                    
+                    <div className="flex space-x-3 justify-end">
+                      {selectedDrum.isExtended && (
+                        <button
+                          onClick={handleClearExtension}
+                          disabled={savingExtension}
+                          className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-xl font-medium hover:bg-red-100 transition-colors duration-200 text-sm disabled:opacity-50"
+                        >
+                          Przywróć domyślny termin
+                        </button>
+                      )}
+                      <button
+                        onClick={handleSaveExtension}
+                        disabled={savingExtension || !customReturnDate}
+                        className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-all duration-200 text-sm shadow-md hover:shadow-lg flex items-center space-x-2 disabled:opacity-50"
+                      >
+                        {savingExtension ? (
+                          <>
+                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                            <span>Zapisywanie...</span>
+                          </>
+                        ) : (
+                          <span>Zapisywanie</span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

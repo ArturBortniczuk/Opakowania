@@ -15,6 +15,9 @@ const DrumsList = ({ user }) => {
   const [sortBy, setSortBy] = useState('kod_bebna');
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterSize, setFilterSize] = useState('all');
+  const [availableSizes, setAvailableSizes] = useState([]);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
 
   // Pagination State
   const [page, setPage] = useState(1);
@@ -33,10 +36,19 @@ const DrumsList = ({ user }) => {
     overdue: 0
   });
 
+  useEffect(() => {
+    if (location.state && location.state.filterStatus) {
+      setFilterStatus(location.state.filterStatus);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, navigate, location.pathname]);
+
   const fetchDrums = async () => {
     if (!user?.nip) return;
 
-    setLoading(true);
+    if (isFirstLoad) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -74,16 +86,18 @@ const DrumsList = ({ user }) => {
         return d;
       });
 
-      // 1. Filtrowanie (Search)
+      // Wyciągamy unikalne rozmiary
+      const sizes = [...new Set(allDrums.map(d => d.rozmiar_bebna).filter(Boolean))].sort();
+      setAvailableSizes(sizes);
+
+      // 1. Filtrowanie (Search) - WYRZUCONO kod_bebna i cecha
       let filtered = mappedDrums;
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
         filtered = filtered.filter(d => 
-          (d.kod_bebna || '').toLowerCase().includes(term) ||
           (d.nazwa || '').toLowerCase().includes(term) ||
           (d.adres_dostawy || '').toLowerCase().includes(term) ||
           (d.numer_faktury || '').toLowerCase().includes(term) ||
-          (d.cecha || '').toLowerCase().includes(term) ||
           (d.rozmiar_bebna || '').toLowerCase().includes(term)
         );
       }
@@ -91,6 +105,11 @@ const DrumsList = ({ user }) => {
       // 2. Filtrowanie (Status)
       if (filterStatus !== 'all') {
         filtered = filtered.filter(d => d.status === filterStatus);
+      }
+
+      // 2b. Filtrowanie po Rozmiarze
+      if (filterSize !== 'all') {
+        filtered = filtered.filter(d => d.rozmiar_bebna === filterSize);
       }
 
       // 3. Sortowanie
@@ -140,12 +159,13 @@ const DrumsList = ({ user }) => {
       setError('Nie udało się pobrać listy bębnów.');
     } finally {
       setLoading(false);
+      setIsFirstLoad(false);
     }
   };
 
   useEffect(() => {
     fetchDrums();
-  }, [user?.nip, page, sortBy, sortOrder, filterStatus]); // Debounce search term ideally
+  }, [user?.nip, page, sortBy, sortOrder, filterStatus, filterSize]); // Debounce search term ideally
 
   // Debounce search
   useEffect(() => {
@@ -205,11 +225,38 @@ const DrumsList = ({ user }) => {
 
         <div className="space-y-3">
           {clientPrice !== null && (
-            <div className="flex justify-between items-center bg-blue-50/50 p-2.5 rounded-xl border border-blue-100/50 mb-2">
-              <span className="text-sm font-semibold text-blue-800">Wartość bębna</span>
-              <span className="text-sm font-extrabold text-blue-950">
-                {clientPrice.toFixed(2)} PLN
-              </span>
+            <div className="space-y-2 mb-2">
+              <div className="flex justify-between items-center bg-blue-50/50 p-2.5 rounded-xl border border-blue-100/50">
+                <span className="text-sm font-semibold text-blue-800">Wartość bębna</span>
+                <span className="text-sm font-extrabold text-blue-950">
+                  {clientPrice.toFixed(2)} PLN
+                </span>
+              </div>
+              {(() => {
+                const days = drum.daysInPossession;
+                let returnPercentage = 100;
+                if (days === undefined || isNaN(days) || days <= 120) returnPercentage = 100;
+                else if (days <= 150) returnPercentage = 90;
+                else if (days <= 180) returnPercentage = 75;
+                else if (days <= 240) returnPercentage = 50;
+                else if (days <= 340) returnPercentage = 25;
+                else returnPercentage = 0;
+
+                const returnValue = clientPrice * (returnPercentage / 100);
+
+                return (
+                  <div className="flex justify-between items-center bg-emerald-50/40 p-2.5 rounded-xl border border-emerald-100/50 animate-fade-in">
+                    <span className="text-sm font-semibold text-emerald-850">Wartość przy zwrocie</span>
+                    <span className="text-sm font-extrabold text-emerald-950">
+                      {returnPercentage === 0 ? (
+                        <span className="text-red-600 font-bold">0.00 PLN (Brak zwrotu)</span>
+                      ) : (
+                        <span>{returnValue.toFixed(2)} PLN ({returnPercentage}%)</span>
+                      )}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -263,7 +310,7 @@ const DrumsList = ({ user }) => {
     );
   };
 
-  if (loading && page === 1 && !drums.length) {
+  if (loading && isFirstLoad) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -344,13 +391,24 @@ const DrumsList = ({ user }) => {
               <select
                 value={filterStatus}
                 onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
               >
                 <option value="all">Wszystkie statusy</option>
                 <option value="active">Aktywne</option>
                 <option value="due-soon">Zbliża się termin</option>
                 <option value="overdue">Przeterminowane</option>
                 <option value="reported">Zgłoszone do zwrotu</option>
+              </select>
+
+              <select
+                value={filterSize}
+                onChange={(e) => { setFilterSize(e.target.value); setPage(1); }}
+                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              >
+                <option value="all">Wszystkie rozmiary</option>
+                {availableSizes.map(sz => (
+                  <option key={sz} value={sz}>{sz}</option>
+                ))}
               </select>
 
               <div className="flex gap-2">

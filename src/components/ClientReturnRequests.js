@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { returnsAPI } from '../utils/supabaseApi';
-import { Truck, Clock, CheckCircle, XCircle, Calendar, Package, MapPin, Plus, RefreshCw } from 'lucide-react';
+import { Truck, Clock, CheckCircle, XCircle, Calendar, Package, MapPin, Plus, RefreshCw, ChevronDown, ChevronUp, User } from 'lucide-react';
 
 const ClientReturnRequests = ({ user }) => {
   const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [expandedRequests, setExpandedRequests] = useState({});
 
   const fetchRequests = useCallback(async () => {
     if (!user?.nip) return;
@@ -27,6 +28,13 @@ const ClientReturnRequests = ({ user }) => {
   useEffect(() => {
     fetchRequests();
   }, [fetchRequests]);
+
+  const toggleExpand = (reqId) => {
+    setExpandedRequests(prev => ({
+      ...prev,
+      [reqId]: !prev[reqId]
+    }));
+  };
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -78,7 +86,7 @@ const ClientReturnRequests = ({ user }) => {
       <div className="min-h-screen flex items-center justify-center bg-gray-50/50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-500 text-sm font-medium">Ładowanie zgłoszeń...</p>
+          <p className="text-gray-550 text-sm font-medium">Ładowanie zgłoszeń...</p>
         </div>
       </div>
     );
@@ -98,14 +106,14 @@ const ClientReturnRequests = ({ user }) => {
               <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
                 Moje Zgłoszenia
               </h1>
-              <p className="text-gray-600">Historia wysłanych zgłoszeń zwrotu bębnów</p>
+              <p className="text-gray-650">Historia wysłanych zgłoszeń zwrotu bębnów</p>
             </div>
           </div>
           
           <div className="flex space-x-3 w-full sm:w-auto">
             <button
               onClick={fetchRequests}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 flex items-center justify-center space-x-2 transition-colors shadow-sm"
+              className="px-4 py-2 bg-white border border-gray-300 rounded-xl text-gray-750 hover:bg-gray-50 flex items-center justify-center space-x-2 transition-colors shadow-sm"
             >
               <RefreshCw className="w-4 h-4 text-gray-500" />
               <span className="hidden sm:inline">Odśwież</span>
@@ -177,7 +185,7 @@ const ClientReturnRequests = ({ user }) => {
               <Truck className="w-10 h-10 text-gray-300" />
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Brak zgłoszeń</h3>
-            <p className="text-gray-500 mb-6">Nie wysłałeś jeszcze żadnego zgłoszenia zwrotu.</p>
+            <p className="text-gray-550 mb-6">Nie wysłałeś jeszcze żadnego zgłoszenia zwrotu.</p>
             <button
               onClick={() => navigate('/return')}
               className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium shadow-md"
@@ -190,12 +198,13 @@ const ClientReturnRequests = ({ user }) => {
             {requests.map((req) => {
               const drumsCount = Array.isArray(req.selected_drums) ? req.selected_drums.length : 0;
               const collectionDate = new Date(req.collection_date);
+              const isExpanded = !!expandedRequests[req.id];
               
               return (
                 <div key={req.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 transition-all duration-300 hover:shadow-md hover:border-gray-200/80 relative flex flex-col h-full">
                   
-                  {/* Card Header */}
-                  <div className="flex justify-between items-start mb-6 pb-4 border-b border-gray-100">
+                  {/* Card Header (Zawsze widoczny) */}
+                  <div className="flex justify-between items-start mb-4 pb-4 border-b border-gray-100">
                     <div>
                       <span className="text-[9px] font-bold bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg uppercase tracking-wider">ZGŁOSZENIE #{req.id}</span>
                       <div className="flex flex-col mt-2">
@@ -208,112 +217,172 @@ const ClientReturnRequests = ({ user }) => {
                     </div>
                   </div>
 
-                  {/* Dates & loading hours grid */}
-                  <div className="mb-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50/50">
-                      <div>
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">SUGEROWANY TERMIN ODBIORU</span>
-                        <div className="text-sm font-semibold text-gray-800 flex items-center space-x-1">
-                          <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                          <span>
-                            {collectionDate.toLocaleDateString('pl-PL')} – {new Date(collectionDate.getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('pl-PL')}
-                          </span>
-                        </div>
-                      </div>
+                  {/* Główne informacje (Zawsze widoczne) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 flex-grow">
+                    {/* Zaplanowany transport */}
+                    <div className="flex flex-col justify-center p-3 rounded-xl border border-gray-100 bg-gray-50/30">
+                      <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1">ZAPLANOWANY TRANSPORT</span>
+                      <span className="text-xs font-bold text-indigo-700 flex items-center gap-1">
+                        <Truck className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                        {req.transport_date ? new Date(req.transport_date).toLocaleDateString('pl-PL') : 'Oczekuje na zaplanowanie'}
+                      </span>
+                    </div>
 
-                      <div>
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">GODZINY ZAŁADUNKU</span>
-                        <div className="text-sm font-semibold text-gray-800 flex items-center space-x-1">
-                          <Clock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                          <span>{req.loading_hours || 'Brak informacji'}</span>
-                        </div>
-                      </div>
+                    {/* Ilość zgłoszonych bębnów */}
+                    <div className="flex flex-col justify-center p-3 rounded-xl border border-gray-100 bg-gray-50/30">
+                      <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1">ILOŚĆ BĘBNÓW</span>
+                      <span className="text-xs font-bold text-gray-800 flex items-center gap-1">
+                        <Package className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        {drumsCount} {drumsCount === 1 ? 'bęben' : drumsCount < 5 ? 'bębny' : 'bębnów'}
+                      </span>
+                    </div>
 
-                      <div className="sm:col-span-2 pt-3 border-t border-gray-200/60 flex justify-between items-center">
-                        <div className="flex items-center space-x-1.5">
-                          <Truck className="w-4 h-4 text-indigo-500 shrink-0" />
-                          <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">ZAPLANOWANY TRANSPORT</span>
-                        </div>
-                        <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-lg">
-                          {req.transport_date ? new Date(req.transport_date).toLocaleDateString('pl-PL') : 'Oczekuje na zaplanowanie'}
+                    {/* Status wystawienia korekt (Bez numerów!) */}
+                    <div className="flex flex-col justify-center p-3 rounded-xl border border-gray-100 bg-gray-50/30">
+                      <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1">STATUS KOREKTY</span>
+                      {req.correction_number ? (
+                        <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          Wystawiono korektę
                         </span>
-                      </div>
+                      ) : (
+                        <span className="text-xs font-bold text-amber-600 flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          W toku
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Osoba zgłaszająca */}
+                    <div className="flex flex-col justify-center p-3 rounded-xl border border-gray-100 bg-gray-50/30">
+                      <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1">OSOBA ZGŁASZAJĄCA</span>
+                      <span className="text-xs font-bold text-gray-700 flex items-center gap-1 truncate">
+                        <User className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        {req.profile_name || 'Główny profil firmy'}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Correction invoices block */}
-                  <div className="mb-6">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Faktura Korygująca</span>
-                    {req.correction_number ? (
-                      <div className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl flex items-center justify-between">
-                        <div className="flex flex-wrap gap-1.5">
-                          {req.correction_number.split(',').map((num, i) => (
-                            <span key={i} className="px-2.5 py-1 bg-white border border-emerald-200 text-emerald-700 text-xs font-bold rounded-lg shadow-sm">
-                              {num.trim()}
+                  {/* Przycisk Pokaż / Ukryj szczegóły */}
+                  <div className="mb-2 mt-auto">
+                    <button
+                      onClick={() => toggleExpand(req.id)}
+                      className="w-full py-2.5 px-4 bg-gray-50 border border-gray-200/60 hover:bg-gray-100/80 rounded-xl text-xs font-bold text-blue-600 flex items-center justify-center space-x-2 transition-all shadow-sm"
+                    >
+                      <span>{isExpanded ? 'Ukryj szczegóły' : 'Pokaż szczegóły'}</span>
+                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {/* Collapsible Section (Widoczne tylko po kliknięciu) */}
+                  {isExpanded && (
+                    <div className="mt-4 pt-4 border-t border-dashed border-gray-200 space-y-4 animate-fadeIn">
+                      
+                      {/* Adres i kontakt */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1">Adres Odbioru</span>
+                          <div className="text-xs text-gray-700 leading-normal flex items-start space-x-1.5">
+                            <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                            <span>
+                              {req.street}<br />
+                              {req.postal_code} {req.city}
                             </span>
-                          ))}
+                          </div>
                         </div>
-                        <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1 shrink-0">
-                          <CheckCircle className="w-3.5 h-3.5" /> Wystawiona
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="p-3 bg-gray-50/50 border border-gray-200/60 rounded-xl flex items-center justify-between">
-                        <span className="text-xs text-gray-500 font-medium italic">Oczekuje na wystawienie korekty</span>
-                        <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md font-semibold shrink-0">W toku</span>
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Drums list block */}
-                  <div className="mb-6 flex-grow">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Zgłoszone Bębny ({drumsCount})</span>
-                    <div className="max-h-[140px] overflow-y-auto pr-1 border border-gray-100/50 rounded-xl p-3 bg-gray-50/30">
-                      <div className="flex flex-wrap gap-2">
-                        {Array.isArray(req.selected_drums) && req.selected_drums.map((drum, idx) => {
-                          const label = getDrumLabel(drum);
-                          const damaged = isDrumDamaged(drum);
-                          return (
-                            <div 
-                              key={idx} 
-                              className={`
-                                px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border flex items-center space-x-1.5 shadow-sm transition-all duration-200 hover:shadow-md
-                                ${damaged 
-                                  ? 'bg-rose-50/80 text-rose-700 border-rose-200 hover:bg-rose-100' 
-                                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                                }
-                              `}
-                            >
-                              <Package className={`w-3.5 h-3.5 shrink-0 ${damaged ? 'text-rose-500' : 'text-gray-400'}`} />
-                              <span>{label}</span>
-                              {damaged && (
-                                <span className="text-[8px] uppercase font-extrabold bg-rose-200 text-rose-800 px-1 py-0.2 rounded shrink-0">
-                                  Uszkodzony
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
+                        <div>
+                          <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1">Kontakt do załadunku</span>
+                          <div className="text-xs text-gray-700 space-y-1">
+                            {req.email && <p className="truncate"><strong>Email:</strong> {req.email}</p>}
+                            {(req.profile_phone || req.phoneNumber) && <p><strong>Tel:</strong> {req.profile_phone || req.phoneNumber}</p>}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Address and details */}
-                  <div className="mt-auto pt-4 border-t border-gray-100 space-y-3">
-                    <div className="flex items-start space-x-2 text-sm text-gray-700">
-                      <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-                      <div className="font-medium text-xs text-gray-600 leading-snug">
-                        <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1">Adres Odbioru</span>
-                        {req.street}, {req.postal_code} {req.city}
+                      {/* Sugerowany termin i godziny */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
+                        <div>
+                          <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1">Preferowany zakres dat</span>
+                          <div className="text-xs font-semibold text-gray-800 flex items-center space-x-1">
+                            <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            <span>
+                              {collectionDate.toLocaleDateString('pl-PL')} – {new Date(collectionDate.getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('pl-PL')}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1">Godziny załadunku</span>
+                          <div className="text-xs font-semibold text-gray-800 flex items-center space-x-1">
+                            <Clock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                            <span>{req.loading_hours || 'Brak informacji'}</span>
+                          </div>
+                        </div>
                       </div>
+
+                      {/* Dostępny sprzęt i uwagi */}
+                      {req.available_equipment && (
+                        <div>
+                          <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1">Sprzęt załadunkowy</span>
+                          <p className="text-xs text-gray-750 font-medium">{req.available_equipment}</p>
+                        </div>
+                      )}
+
+                      {req.notes && (
+                        <div className="bg-amber-50/40 p-3 rounded-xl border border-amber-100/50">
+                          <span className="text-[9px] font-extrabold text-amber-800 uppercase block mb-1">Uwagi do odbioru:</span>
+                          <p className="text-gray-750 text-xs italic leading-relaxed">"{req.notes}"</p>
+                        </div>
+                      )}
+
+                      {/* Numery faktur korygujących (tutaj w szczegółach są w pełni widoczne) */}
+                      {req.correction_number && (
+                        <div>
+                          <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider block mb-2">Numery korekt</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {req.correction_number.split(',').map((num, i) => (
+                              <span key={i} className="px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold rounded shadow-sm">
+                                {num.trim()}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Pełna lista bębnów z uszkodzeniami */}
+                      <div>
+                        <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider block mb-2">Zgłoszone bębny w tym zleceniu</span>
+                        <div className="flex flex-wrap gap-2">
+                          {Array.isArray(req.selected_drums) && req.selected_drums.map((drum, idx) => {
+                            const label = getDrumLabel(drum);
+                            const damaged = isDrumDamaged(drum);
+                            return (
+                              <div 
+                                key={idx} 
+                                className={`
+                                  px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border flex items-center space-x-1.5 shadow-sm transition-all duration-200 hover:shadow-md
+                                  ${damaged 
+                                    ? 'bg-rose-50/80 text-rose-700 border-rose-200 hover:bg-rose-100' 
+                                    : 'bg-white text-gray-750 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                                  }
+                                `}
+                              >
+                                <Package className={`w-3.5 h-3.5 shrink-0 ${damaged ? 'text-rose-500' : 'text-gray-400'}`} />
+                                <span>{label}</span>
+                                {damaged && (
+                                  <span className="text-[8px] uppercase font-extrabold bg-rose-200 text-rose-800 px-1 py-0.2 rounded shrink-0">
+                                    Uszkodzony
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
                     </div>
-                    {req.notes && (
-                      <div className="bg-amber-50/40 p-3 rounded-xl border border-amber-100/50">
-                        <span className="text-[10px] font-bold text-amber-800 uppercase block mb-1">Uwagi do odbioru:</span>
-                        <p className="text-gray-700 text-xs italic leading-relaxed">"{req.notes}"</p>
-                      </div>
-                    )}
-                  </div>
+                  )}
                   
                 </div>
               );

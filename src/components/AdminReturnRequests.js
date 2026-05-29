@@ -293,23 +293,21 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
           </div>
         </div>
 
-        <div className="mb-6 p-4 bg-emerald-50 rounded-xl border border-emerald-100 min-h-[80px]">
-          <div className="flex items-center gap-2 mb-2">
-            <Edit className="w-4 h-4 text-emerald-500" />
-            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Numery korekt</span>
-          </div>
-          {request.correction_number ? (
-            <div className="flex flex-wrap gap-2">
-              {request.correction_number.split(',').map((num, i) => (
-                <span key={i} className="px-2 py-1 bg-white border border-emerald-200 text-emerald-700 text-[11px] font-bold rounded-lg shadow-sm">
-                  {num.trim()}
-                </span>
-              ))}
+        {request.correction_number ? (
+          <div className="mb-6 p-4 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-emerald-600" />
+              <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Wystawiono korektę</span>
             </div>
-          ) : (
-            <span className="text-[11px] text-emerald-300 font-medium italic">Brak numerów korekt</span>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-gray-400" />
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Brak korekty</span>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-3 mb-6 flex-grow">
           <div className="flex items-start space-x-3 text-sm">

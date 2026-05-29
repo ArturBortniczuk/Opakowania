@@ -53,7 +53,8 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
     postalCode: user.postalCode || '',
     city: user.city || '',
     email: profile?.email || '',
-    loadingHours: '',
+    loadingHoursStart: '08:00',
+    loadingHoursEnd: '16:00',
     availableEquipment: '',
     notes: '',
     // ZMIANA: selectedDrums to teraz tablica obiektów { cecha, isDamaged, description, rozmiar, cena_netto }
@@ -118,10 +119,28 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
             ...d,
             isReported: reportedDrums.has(d.cecha)
           }));
-          // Sortujemy tak, żeby zgłoszone były na samym dole
+          // Sortujemy: reported na sam dół, aktywne/pilne na górę, przeterminowane niżej, wewnątrz grup po dacie
           const sortedDrums = drumsWithReportedFlag.sort((a, b) => {
-            if (a.isReported === b.isReported) return 0;
-            return a.isReported ? 1 : -1;
+            if (a.isReported !== b.isReported) {
+              return a.isReported ? 1 : -1;
+            }
+            
+            const getStatusRank = (status) => {
+              if (status === 'active' || status === 'due-soon') return 1;
+              if (status === 'overdue') return 2;
+              return 3;
+            };
+            
+            const rankA = getStatusRank(a.status);
+            const rankB = getStatusRank(b.status);
+            
+            if (rankA !== rankB) {
+              return rankA - rankB;
+            }
+            
+            const dateA = new Date(a.clientReturnDeadline || a.data_zwrotu_do_dostawcy || '9999-12-31');
+            const dateB = new Date(b.clientReturnDeadline || b.data_zwrotu_do_dostawcy || '9999-12-31');
+            return dateA - dateB;
           });
           console.log(`✅ ReturnForm: Załadowano ${sortedDrums.length} bębnów`);
           setUserDrums(sortedDrums);
@@ -196,7 +215,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
       case 1:
         return formData.street.trim() && formData.postalCode.trim() && formData.city.trim();
       case 2:
-        return formData.email.trim() && formData.phoneNumber.trim() && formData.loadingHours.trim() && formData.collectionDateStart && formData.collectionDateEnd && formData.availableEquipment.trim();
+        return formData.email.trim() && formData.phoneNumber.trim() && formData.loadingHoursStart.trim() && formData.loadingHoursEnd.trim() && formData.collectionDateStart && formData.collectionDateEnd && formData.availableEquipment.trim();
       case 3:
         return formData.selectedDrums.length > 0;
       case 4:
@@ -223,6 +242,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
     try {
       // Przygotuj dane do wysłania
       const notesWithPhoneAndDates = `Sugerowany termin zwrotu: od ${formData.collectionDateStart} do ${formData.collectionDateEnd}\nTelefon kontaktowy: ${formData.phoneNumber}\n\n${formData.notes || ''}`;
+      const loadingHoursStr = `${formData.loadingHoursStart} - ${formData.loadingHoursEnd}`;
 
       const returnData = {
         user_nip: user.nip,
@@ -232,7 +252,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
         postal_code: formData.postalCode,
         city: formData.city,
         email: formData.email,
-        loading_hours: formData.loadingHours,
+        loading_hours: loadingHoursStr,
         available_equipment: formData.availableEquipment,
         notes: notesWithPhoneAndDates,
         selected_drums: formData.selectedDrums, // Teraz to tablica obiektów
@@ -318,7 +338,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
           else if (daysInPossession <= 180) returnPercentage = 75;
           else if (daysInPossession <= 240) returnPercentage = 50;
           else if (daysInPossession <= 340) returnPercentage = 25;
-          else returnPercentage = 1;
+          else returnPercentage = 0;
 
           totalRefund += val * (returnPercentage / 100);
         }
@@ -454,16 +474,15 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
             <div className="text-center mb-6">
               <MessageSquare className="w-16 h-16 mx-auto text-blue-600 mb-4" />
               <h2 className="text-2xl font-bold text-gray-900">Szczegóły odbioru</h2>
-              <p className="text-gray-600">Określ datę odbioru oraz informacje o kontakcie i logistyce</p>
+              <p className="text-gray-600">Podaj szczegóły dotyczące załadunku</p>
             </div>
-
             <div className="space-y-6">
               {/* Pierwszy wiersz: Data i Godziny */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <Calendar className="inline w-4 h-4 mr-2" />
-                    Wybierz zakres dat odbioru (od - do) *
+                    Preferowany zakres dat *
                   </label>
                   <div className="space-y-2 relative z-50">
                     <DatePicker
@@ -495,13 +514,23 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
                     <Clock className="inline w-4 h-4 mr-2" />
                     Godziny załadunku *
                   </label>
-                  <input
-                    type="text"
-                    value={formData.loadingHours}
-                    onChange={(e) => setFormData(prev => ({ ...prev, loadingHours: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
-                    placeholder="np. 8:00 - 16:00"
-                  />
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="time"
+                      value={formData.loadingHoursStart}
+                      onChange={(e) => setFormData(prev => ({ ...prev, loadingHoursStart: e.target.value }))}
+                      className="flex-grow px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm"
+                      required
+                    />
+                    <span className="text-gray-550 font-bold">—</span>
+                    <input
+                      type="time"
+                      value={formData.loadingHoursEnd}
+                      onChange={(e) => setFormData(prev => ({ ...prev, loadingHoursEnd: e.target.value }))}
+                      className="flex-grow px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -646,7 +675,10 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
                   else if (daysInPossession <= 180) returnPercentage = 75;
                   else if (daysInPossession <= 240) returnPercentage = 50;
                   else if (daysInPossession <= 340) returnPercentage = 25;
-                  else returnPercentage = 1;
+                  else returnPercentage = 0;
+
+                  const drumPrice = (parseFloat(drum.cena_netto_bebna) || 0) * 1.2;
+                  const refundValue = drumPrice * (returnPercentage / 100);
 
                   return (
                     <div
@@ -683,11 +715,15 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
                       {/* Informacje Finansowe i Zwrot */}
                       <div className="flex flex-wrap gap-1.5 mb-2">
                         <div className="inline-block px-2 py-1 bg-indigo-50 border border-indigo-100 rounded text-xs font-semibold text-indigo-700">
-                          Możliwy zwrot wartości: {returnPercentage}%
+                          {returnPercentage === 0 ? (
+                            <span>Zwrot niemożliwy (0%)</span>
+                          ) : (
+                            <span>Możliwy zwrot wartości: {returnPercentage}% ({refundValue.toFixed(2)} PLN)</span>
+                          )}
                         </div>
                         {drum.cena_netto_bebna && (
                           <div className="inline-block px-2 py-1 bg-blue-50 border border-blue-100 rounded text-xs font-semibold text-blue-700">
-                            Wartość bębna: {((parseFloat(drum.cena_netto_bebna) || 0) * 1.2).toFixed(2)} PLN
+                            Wartość bębna: {drumPrice.toFixed(2)} PLN
                           </div>
                         )}
                       </div>
@@ -734,7 +770,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
                                   rows={2}
                                 />
                                 <p className="text-xs text-red-600 mt-1 italic">
-                                  ⚠ W przypadku uszkodzenia zastrzegamy sobie prawo do wystawienia faktury o wartości bębna.
+                                  ⚠ W przypadku uszkodzenia zastrzegamy sobie prawo do wystawienia faktury obciążającej o wartości bębna.
                                 </p>
                               </div>
                             )}
