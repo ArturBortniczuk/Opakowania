@@ -16,6 +16,7 @@ import AdminDrumsList from './components/AdminDrumsList';
 import AdminReturnRequests from './components/AdminReturnRequests';
 import AdminReports from './components/AdminReports';
 import AdminSupplierRules from './components/AdminSupplierRules';
+import HelpGuide from './components/HelpGuide';
 import './App.css';
 
 
@@ -171,6 +172,11 @@ const App = () => {
               <Route path="/my-returns" element={
                 <ProtectedRoute>
                   <ClientReturnRequests user={currentUser} />
+                </ProtectedRoute>
+              } />
+              <Route path="/help" element={
+                <ProtectedRoute>
+                  <HelpGuide />
                 </ProtectedRoute>
               } />
 
