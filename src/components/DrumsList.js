@@ -258,25 +258,7 @@ const DrumsList = ({ user }) => {
           </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          {drum.isReported ? (
-            <button
-              disabled
-              className="w-full bg-gray-100 text-gray-500 py-2 px-4 rounded-xl font-medium cursor-not-allowed flex items-center justify-center space-x-2"
-            >
-              <CheckCircle className="w-4 h-4" />
-              <span>Oczekuje na odbiór</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => navigate('/return', { state: { drum } })}
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2 px-4 rounded-xl font-medium hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2"
-            >
-              <Truck className="w-4 h-4" />
-              <span>Zgłoś zwrot</span>
-            </button>
-          )}
-        </div>
+
       </div>
     );
   };
@@ -327,13 +309,23 @@ const DrumsList = ({ user }) => {
               </div>
             </div>
 
-            <button
-              onClick={fetchDrums}
-              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              <span>Odśwież</span>
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => navigate('/return')}
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center space-x-2 shadow-md hover:shadow-lg font-semibold"
+              >
+                <Truck className="w-4 h-4" />
+                <span>Zgłoś zwrot</span>
+              </button>
+
+              <button
+                onClick={fetchDrums}
+                className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-200 flex items-center space-x-2 shadow-sm font-semibold"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <span>Odśwież</span>
+              </button>
+            </div>
           </div>
 
           <div className="bg-white/80 backdrop-blur-lg rounded-xl p-6 shadow-lg border border-gray-200">
