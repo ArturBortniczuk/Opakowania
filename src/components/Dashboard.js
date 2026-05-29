@@ -162,17 +162,15 @@ const Dashboard = ({ user }) => {
           reportedPercent
         });
 
-        // 4. Wybierz najbardziej pilne bębny (overdue oraz due-soon), które nie zostały jeszcze zgłoszone
+        // 4. Wybierz bębny w terminie (nieprzeterminowane i niezgłoszone), które są najbliżej daty zwrotu (maksymalnie 6)
         const urgent = mappedDrums
-          .filter(d => (d.status === 'overdue' || d.status === 'due-soon') && !d.isReported)
+          .filter(d => (d.status === 'active' || d.status === 'due-soon') && !d.isReported)
           .sort((a, b) => {
-            if (a.status === 'overdue' && b.status !== 'overdue') return -1;
-            if (a.status !== 'overdue' && b.status === 'overdue') return 1;
             const dateA = new Date(a.clientReturnDeadline || a.data_zwrotu_do_dostawcy || '9999-12-31');
             const dateB = new Date(b.clientReturnDeadline || b.data_zwrotu_do_dostawcy || '9999-12-31');
             return dateA - dateB;
           })
-          .slice(0, 4);
+          .slice(0, 6);
 
         setUrgentDrumsList(urgent);
 
@@ -602,33 +600,32 @@ const Dashboard = ({ user }) => {
             {/* Urgent Deadlines Card */}
             <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-blue-100 p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <AlertCircle className="w-5 h-5 mr-2 text-red-500" />
-                Wymagające zwrotu
+                <Clock className="w-5 h-5 mr-2 text-blue-600" />
+                Najbliższe terminy zwrotu
               </h2>
               <p className="text-gray-500 text-sm mb-6 leading-relaxed">
-                Poniższe bębny przekroczyły termin lub zbliżają się do daty zwrotu. Zgłoś ich zwrot jednym kliknięciem, aby uniknąć dodatkowych opłat.
+                Poniższe bębny mieszczą się jeszcze w terminie zwrotu, ale zbliżają się do jego końca. Zwróć je odpowiednio wcześnie, aby zachować pełną kaucję.
               </p>
 
               {urgentDrumsList.length > 0 ? (
                 <div className="space-y-3">
                   {urgentDrumsList.map((drum) => {
                     const returnDate = drum.clientReturnDeadline || drum.data_zwrotu_do_dostawcy;
-                    const daysStr = drum.status === 'overdue' 
-                      ? `Przeterminowany o ${drum.daysDiff} dni`
-                      : `Pozostało ${drum.daysDiff} dni`;
+                    const daysStr = `Pozostało ${drum.daysDiff} dni`;
+                    const isDueSoon = drum.status === 'due-soon';
 
                     return (
                       <div 
                         key={drum.id || drum.cecha} 
                         className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-xl border transition-all duration-200 hover:shadow-md ${
-                          drum.status === 'overdue' 
-                            ? 'bg-red-50/30 border-red-100 hover:border-red-200' 
-                            : 'bg-amber-50/20 border-amber-100 hover:border-amber-200'
+                          isDueSoon 
+                            ? 'bg-amber-50/20 border-amber-100 hover:border-amber-200' 
+                            : 'bg-blue-50/10 border-blue-100/60 hover:border-blue-200'
                         }`}
                       >
                         <div className="flex items-center space-x-3 mb-3 sm:mb-0">
                           <div className={`p-2.5 rounded-lg shrink-0 ${
-                            drum.status === 'overdue' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'
+                            isDueSoon ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'
                           }`}>
                             <Package className="w-5 h-5" />
                           </div>
@@ -640,30 +637,18 @@ const Dashboard = ({ user }) => {
                           </div>
                         </div>
 
-                        <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-4">
-                          <div className="text-left sm:text-right">
+                        <div className="flex flex-col items-end justify-center w-full sm:w-auto">
+                          <div className="text-right">
                             <span className={`text-xs font-bold block ${
-                              drum.status === 'overdue' ? 'text-red-600' : 'text-amber-600'
+                              isDueSoon ? 'text-amber-600' : 'text-blue-600'
                             }`}>{daysStr}</span>
                             {drum.cena_netto_bebna && (
                               <span className="text-[10px] font-bold text-gray-600 block mt-0.5">
                                 Wartość: {((parseFloat(drum.cena_netto_bebna) || 0) * 1.2).toFixed(2)} PLN
                               </span>
                             )}
-                            <span className="text-[10px] text-gray-400 block font-medium">Termin: {returnDate ? new Date(returnDate).toLocaleDateString('pl-PL') : 'Brak'}</span>
+                            <span className="text-[10px] text-gray-400 block font-medium mt-0.5">Termin: {returnDate ? new Date(returnDate).toLocaleDateString('pl-PL') : 'Brak'}</span>
                           </div>
-
-                          <button
-                            onClick={() => navigate('/return', { state: { drum } })}
-                            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all duration-200 hover:scale-105 shrink-0 ${
-                              drum.status === 'overdue' 
-                                ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700' 
-                                : 'bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700'
-                            }`}
-                          >
-                            <Truck className="w-3.5 h-3.5" />
-                            <span>Zgłoś zwrot</span>
-                          </button>
                         </div>
                       </div>
                     );
