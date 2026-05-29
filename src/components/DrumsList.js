@@ -215,8 +215,24 @@ const DrumsList = ({ user }) => {
 
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Termin zwrotu</span>
-            <span className="text-sm font-medium text-gray-900">
-              {returnDate ? new Date(returnDate).toLocaleDateString('pl-PL') : 'Brak danych'}
+            <span className="text-sm font-medium text-gray-900 flex items-center space-x-1">
+              {returnDate ? (
+                <>
+                  <span className={drum.isExtended ? "text-indigo-600 font-semibold" : ""}>
+                    {new Date(returnDate).toLocaleDateString('pl-PL')}
+                  </span>
+                  {drum.isExtended && (
+                    <span 
+                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 border border-indigo-200 text-indigo-700 cursor-help"
+                      title={drum.extensionNotes || "Indywidualny termin zwrotu uzgodniony z działem logistyki"}
+                    >
+                      Uzgodniony termin
+                    </span>
+                  )}
+                </>
+              ) : (
+                'Brak danych'
+              )}
             </span>
           </div>
 

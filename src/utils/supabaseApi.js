@@ -258,24 +258,56 @@ export const drumsAPI = {
 
       // 2. Filtrowanie po Terminie (dateRange)
       if (dateRange !== 'all') {
-        // Tylko dla bębnów 'wydanych' ma sens filtr terminu w głównej mierze
-        query = query.neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%');
+        if (dateRange === 'extended') {
+          const { data: extData, error: extError } = await supabase
+            .from('custom_drum_deadlines')
+            .select('kod_bebna');
+          
+          if (!extError && extData && extData.length > 0) {
+            const codes = extData.map(e => e.kod_bebna);
+            query = query.in('kod_bebna', codes);
+          } else {
+            // Brak bębnów o przedłużonym terminie - zwracamy puste wyniki paginacji
+            return {
+              data: [],
+              pagination: {
+                page,
+                limit,
+                total: 0,
+                totalPages: 0,
+                hasNext: false,
+                hasPrev: false
+              },
+              meta: {
+                sortBy,
+                sortOrder,
+                search,
+                status,
+                dateRange,
+                nip
+              }
+            };
+          }
+        } else {
+          // Tylko dla bębnów 'wydanych' ma sens filtr terminu w głównej mierze
+          query = query.neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%');
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const todayStr = today.toISOString().split('T')[0];
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const todayStr = today.toISOString().split('T')[0];
 
-        const nextWeek = new Date(today);
-        nextWeek.setDate(today.getDate() + 7);
-        const nextWeekStr = nextWeek.toISOString().split('T')[0];
+          const nextWeek = new Date(today);
+          nextWeek.setDate(today.getDate() + 7);
+          const nextWeekStr = nextWeek.toISOString().split('T')[0];
 
-        if (dateRange === 'overdue') {
-          query = query.lt('data_zwrotu_do_dostawcy', todayStr);
-        } else if (dateRange === 'due-soon') {
-          query = query.gte('data_zwrotu_do_dostawcy', todayStr).lte('data_zwrotu_do_dostawcy', nextWeekStr);
-        } else if (dateRange === 'active') {
-          // Aktywne = data zwrotu jest > za tydzień LUB jest to bęben własny (brak daty zwrotu)
-          query = query.or(`data_zwrotu_do_dostawcy.gt.${nextWeekStr},data_zwrotu_do_dostawcy.is.null`);
+          if (dateRange === 'overdue') {
+            query = query.lt('data_zwrotu_do_dostawcy', todayStr);
+          } else if (dateRange === 'due-soon') {
+            query = query.gte('data_zwrotu_do_dostawcy', todayStr).lte('data_zwrotu_do_dostawcy', nextWeekStr);
+          } else if (dateRange === 'active') {
+            // Aktywne = data zwrotu jest > za tydzień LUB jest to bęben własny (brak daty zwrotu)
+            query = query.or(`data_zwrotu_do_dostawcy.gt.${nextWeekStr},data_zwrotu_do_dostawcy.is.null`);
+          }
         }
       }
 
@@ -305,8 +337,27 @@ export const drumsAPI = {
 
       console.log(`✅ Pobrano ${data?.length || 0} rekordów z ${count || 0} łącznie`);
 
+      // Pobieranie niestandardowych terminów dla pobranych bębnów
+      let customDeadlines = [];
+      if (data && data.length > 0) {
+        const drumCodes = data.map(d => d.kod_bebna);
+        const nips = [...new Set(data.map(d => d.nip).filter(Boolean))];
+        const { data: deadlinesData } = await supabase
+          .from('custom_drum_deadlines')
+          .select('*')
+          .in('kod_bebna', drumCodes)
+          .in('nip', nips);
+        if (deadlinesData) {
+          customDeadlines = deadlinesData;
+        }
+      }
+
       // Mapowanie danych do spójnego formatu używanego w komponentach
       const mappedData = data.map(drum => {
+        const extension = customDeadlines.find(
+          ext => ext.kod_bebna === drum.kod_bebna && ext.nip === drum.nip
+        );
+
         let finalReturnDate = drum.data_zwrotu_do_dostawcy;
         if (!finalReturnDate && drum.data_wydania) {
           const d = new Date(drum.data_wydania);
@@ -318,14 +369,22 @@ export const drumsAPI = {
         const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
         const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
 
-        const clientReturnDeadline = new Date(issueDate);
-        if (!isNaN(clientReturnDeadline.getTime())) {
-          clientReturnDeadline.setDate(clientReturnDeadline.getDate() + returnPeriodDays);
+        let clientReturnDeadline = null;
+        if (extension) {
+          clientReturnDeadline = extension.custom_return_date;
+        } else {
+          const clientReturnDeadlineDate = new Date(issueDate);
+          if (!isNaN(clientReturnDeadlineDate.getTime())) {
+            clientReturnDeadlineDate.setDate(clientReturnDeadlineDate.getDate() + returnPeriodDays);
+            clientReturnDeadline = clientReturnDeadlineDate.toISOString().split('T')[0];
+          }
         }
 
-        const dateForStatus = isClient && !isNaN(clientReturnDeadline.getTime())
-          ? clientReturnDeadline.toISOString().split('T')[0]
-          : finalReturnDate;
+        const dateForStatus = extension
+          ? extension.custom_return_date
+          : (isClient && clientReturnDeadline
+              ? clientReturnDeadline
+              : finalReturnDate);
 
         const statusObj = supabaseHelpers.getDrumStatus(dateForStatus);
 
@@ -333,6 +392,13 @@ export const drumsAPI = {
           ...drum,
           db_data_zwrotu_do_dostawcy: drum.data_zwrotu_do_dostawcy, // Zachowaj surową wartość przed nadpisaniem
           data_zwrotu_do_dostawcy: finalReturnDate, // Nadpisujemy dla bębnów własnych
+          
+          // Indywidualne przedłużenie
+          isExtended: !!extension,
+          extensionNotes: extension ? extension.notes : null,
+          extensionCreatedBy: extension ? extension.created_by : null,
+          extensionCreatedAt: extension ? extension.created_at : null,
+          
           // Zachowaj oryginalne nazwy kolumn z bazy
           kod_bebna: drum.kod_bebna,
           nazwa: drum.nazwa,
@@ -353,7 +419,7 @@ export const drumsAPI = {
 
           // Obliczone pola
           returnPeriodDays,
-          clientReturnDeadline: !isNaN(clientReturnDeadline.getTime()) ? clientReturnDeadline.toISOString() : null,
+          clientReturnDeadline: clientReturnDeadline,
 
           // DODATKOWO: Zachowaj kompatybilność z WIELKIMI LITERAMI (stary kod)
           KOD_BEBNA: drum.kod_bebna,
@@ -498,8 +564,27 @@ export const drumsAPI = {
 
       console.log(`✅ getAllDrums pobrał ${allData.length} bębnów z bazy w ${pageIndex + 1} zapytaniach`);
 
+      // Pobranie niestandardowych terminów dla pobranych bębnów
+      let customDeadlines = [];
+      if (allData && allData.length > 0) {
+        let deadlinesQuery = supabase.from('custom_drum_deadlines').select('*');
+        if (nip) {
+          deadlinesQuery = deadlinesQuery.eq('nip', nip);
+        } else if (allowedNips && allowedNips.length > 0) {
+          deadlinesQuery = deadlinesQuery.in('nip', allowedNips);
+        }
+        const { data: deadlinesData } = await deadlinesQuery;
+        if (deadlinesData) {
+          customDeadlines = deadlinesData;
+        }
+      }
+
       // Mapowanie danych (identyczne jak w getDrums)
       return allData.map(drum => {
+        const extension = customDeadlines.find(
+          ext => ext.kod_bebna === drum.kod_bebna && ext.nip === drum.nip
+        );
+
         // Obliczenie wirtualnej daty zwrotu dla bębnów 'Własnych' (120 dni od wydania)
         let finalReturnDate = drum.data_zwrotu_do_dostawcy;
         if (!finalReturnDate && drum.data_wydania) {
@@ -515,14 +600,22 @@ export const drumsAPI = {
         const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
         const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
 
-        const clientReturnDeadline = new Date(issueDate);
-        if (!isNaN(clientReturnDeadline.getTime())) {
-          clientReturnDeadline.setDate(clientReturnDeadline.getDate() + returnPeriodDays);
+        let clientReturnDeadline = null;
+        if (extension) {
+          clientReturnDeadline = extension.custom_return_date;
+        } else {
+          const clientReturnDeadlineDate = new Date(issueDate);
+          if (!isNaN(clientReturnDeadlineDate.getTime())) {
+            clientReturnDeadlineDate.setDate(clientReturnDeadlineDate.getDate() + returnPeriodDays);
+            clientReturnDeadline = clientReturnDeadlineDate.toISOString().split('T')[0];
+          }
         }
 
-        const dateForStatus = isClient && !isNaN(clientReturnDeadline.getTime())
-          ? clientReturnDeadline.toISOString().split('T')[0]
-          : finalReturnDate;
+        const dateForStatus = extension
+          ? extension.custom_return_date
+          : (isClient && clientReturnDeadline
+              ? clientReturnDeadline
+              : finalReturnDate);
 
         const statusObj = supabaseHelpers.getDrumStatus(dateForStatus);
 
@@ -530,7 +623,14 @@ export const drumsAPI = {
           ...drum,
           db_data_zwrotu_do_dostawcy: drum.data_zwrotu_do_dostawcy, // Zachowaj surową wartość przed nadpisaniem
           data_zwrotu_do_dostawcy: finalReturnDate, // Nadpisujemy
-          clientReturnDeadline: !isNaN(clientReturnDeadline.getTime()) ? clientReturnDeadline.toISOString() : null,
+          
+          // Indywidualne przedłużenie
+          isExtended: !!extension,
+          extensionNotes: extension ? extension.notes : null,
+          extensionCreatedBy: extension ? extension.created_by : null,
+          extensionCreatedAt: extension ? extension.created_at : null,
+          
+          clientReturnDeadline: clientReturnDeadline,
           returnPeriodDays,
           
           // Ujednolicony dostęp do formatu dającego "active", "due-soon", "overdue"
@@ -633,6 +733,64 @@ export const drumsAPI = {
     } catch (error) {
       console.error('Błąd pobierania unikalnych dostawców:', error);
       return [];
+    }
+  },
+
+  /**
+   * Zapisuje lub aktualizuje indywidualne przedłużenie terminu zwrotu bębna.
+   * @param {string} kod_bebna - Kod bębna.
+   * @param {string} nip - NIP klienta.
+   * @param {string} custom_return_date - Nowa data zwrotu (YYYY-MM-DD).
+   * @param {string} notes - Uzasadnienie przedłużenia.
+   * @param {string} username - Nazwa specjalisty wprowadzającego zmianę.
+   * @returns {Promise<object>} Zapisany rekord.
+   */
+  async setCustomDrumDeadline(kod_bebna, nip, custom_return_date, notes, username) {
+    try {
+      console.log(`💾 Zapisywanie przedłużenia bębna ${kod_bebna} (NIP: ${nip}) do ${custom_return_date}`);
+      const { data, error } = await supabase
+        .from('custom_drum_deadlines')
+        .upsert({
+          kod_bebna,
+          nip,
+          custom_return_date,
+          notes,
+          created_by: username,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'kod_bebna,nip'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('❌ Błąd zapisu niestandardowego terminu zwrotu:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Usuwa indywidualne przedłużenie terminu zwrotu bębna, przywracając termin domyślny.
+   * @param {string} kod_bebna - Kod bębna.
+   * @param {string} nip - NIP klienta.
+   * @returns {Promise<object>} Wynik operacji.
+   */
+  async deleteCustomDrumDeadline(kod_bebna, nip) {
+    try {
+      console.log(`🗑️ Usuwanie przedłużenia bębna ${kod_bebna} (NIP: ${nip})`);
+      const { data, error } = await supabase
+        .from('custom_drum_deadlines')
+        .delete()
+        .eq('kod_bebna', kod_bebna)
+        .eq('nip', nip);
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('❌ Błąd usuwania niestandardowego terminu zwrotu:', error);
+      throw error;
     }
   }
 };

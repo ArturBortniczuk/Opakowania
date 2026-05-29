@@ -1,6 +1,10 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { drumsAPI, companiesAPI } from '../utils/supabaseApi';
+import DatePicker, { registerLocale } from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { pl } from 'date-fns/locale/pl';
+
 import {
   Package,
   Search,
@@ -25,6 +29,8 @@ import {
   Loader
 } from 'lucide-react';
 
+registerLocale('pl', pl);
+
 const AdminDrumsList = ({ initialFilter = {} }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -46,6 +52,11 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
   const [filterDateRange, setFilterDateRange] = useState('all');
   const [selectedDrum, setSelectedDrum] = useState(null);
   const [showDrumDetails, setShowDrumDetails] = useState(false);
+
+  // NOWE: Stany formularza przedłużania terminu zwrotu
+  const [customReturnDate, setCustomReturnDate] = useState(null);
+  const [extensionNotes, setExtensionNotes] = useState('');
+  const [savingExtension, setSavingExtension] = useState(false);
 
   // DODANE: Stan paginacji
   const [drumsData, setDrumsData] = useState({
@@ -173,7 +184,97 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
 
   const handleViewDrum = (drum) => {
     setSelectedDrum(drum);
+    setCustomReturnDate(drum.isExtended && drum.clientReturnDeadline ? new Date(drum.clientReturnDeadline) : null);
+    setExtensionNotes(drum.isExtended ? (drum.extensionNotes || '') : '');
     setShowDrumDetails(true);
+  };
+
+  const handleSaveExtension = async () => {
+    if (!customReturnDate) {
+      alert('Proszę wybrać datę zwrotu.');
+      return;
+    }
+    
+    setSavingExtension(true);
+    try {
+      const dateStr = customReturnDate.toISOString().split('T')[0];
+      const userStr = localStorage.getItem('currentUser');
+      const currentUser = userStr ? JSON.parse(userStr) : null;
+      const username = currentUser ? (currentUser.name || currentUser.username) : 'Specjalista';
+      
+      await drumsAPI.setCustomDrumDeadline(
+        selectedDrum.kod_bebna,
+        selectedDrum.nip,
+        dateStr,
+        extensionNotes,
+        username
+      );
+      
+      alert('Zapisano pomyślnie nowy termin zwrotu!');
+      
+      // Odśwież dane na liście
+      await fetchDrums();
+      
+      // Zaktualizuj selectedDrum
+      setSelectedDrum(prev => ({
+        ...prev,
+        isExtended: true,
+        clientReturnDeadline: dateStr,
+        extensionNotes: extensionNotes,
+        extensionCreatedBy: username,
+        extensionCreatedAt: new Date().toISOString()
+      }));
+    } catch (err) {
+      console.error('Błąd zapisu przedłużenia:', err);
+      alert('Nie udało się zapisać zmian: ' + err.message);
+    } finally {
+      setSavingExtension(false);
+    }
+  };
+
+  const handleClearExtension = async () => {
+    if (!window.confirm('Czy na pewno chcesz usunąć to przedłużenie i przywrócić domyślny termin?')) {
+      return;
+    }
+    
+    setSavingExtension(true);
+    try {
+      await drumsAPI.deleteCustomDrumDeadline(
+        selectedDrum.kod_bebna,
+        selectedDrum.nip
+      );
+      
+      alert('Usunięto przedłużenie i przywrócono domyślny termin.');
+      
+      // Odśwież dane na liście
+      await fetchDrums();
+      
+      // Zaktualizuj selectedDrum
+      setSelectedDrum(prev => {
+        const issueDate = new Date(prev.data_wydania || prev.data_przyjecia_na_stan);
+        const returnPeriodDays = prev.companies?.custom_return_periods?.[0]?.return_period_days || 120;
+        const d = new Date(issueDate);
+        d.setDate(d.getDate() + returnPeriodDays);
+        const clientReturnDeadline = !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : null;
+        
+        return {
+          ...prev,
+          isExtended: false,
+          clientReturnDeadline: clientReturnDeadline,
+          extensionNotes: null,
+          extensionCreatedBy: null,
+          extensionCreatedAt: null
+        };
+      });
+      
+      setCustomReturnDate(null);
+      setExtensionNotes('');
+    } catch (err) {
+      console.error('Błąd usuwania przedłużenia:', err);
+      alert('Nie udało się przywrócić terminu domyślnego: ' + err.message);
+    } finally {
+      setSavingExtension(false);
+    }
   };
 
   const handleRefresh = async () => {
@@ -364,14 +465,14 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     input.click();
   };
 
-  // ZACHOWANE: Statystyki z twojego kodu
   const getStatistics = () => {
     const total = drumsData.data.length;
     const overdue = drumsData.data.filter(d => d.status === 'overdue').length;
     const dueSoon = drumsData.data.filter(d => d.status === 'due-soon').length;
     const active = drumsData.data.filter(d => d.status === 'active').length;
+    const extended = drumsData.data.filter(d => d.isExtended).length;
 
-    return { total, overdue, dueSoon, active };
+    return { total, overdue, dueSoon, active, extended };
   };
 
   const stats = getStatistics();
@@ -446,11 +547,24 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
 
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-500">Zwrot od klienta</span>
-          <span className="text-sm font-medium text-gray-900">
-            {drum.clientReturnDeadline ?
-              new Date(drum.clientReturnDeadline).toLocaleDateString('pl-PL') :
+          <span className="text-sm font-medium text-gray-900 flex items-center space-x-1">
+            {drum.clientReturnDeadline ? (
+              <>
+                <span className={drum.isExtended ? "text-indigo-600 font-semibold" : ""}>
+                  {new Date(drum.clientReturnDeadline).toLocaleDateString('pl-PL')}
+                </span>
+                {drum.isExtended && (
+                  <span 
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 border border-indigo-200 text-indigo-700 cursor-help"
+                    title={drum.extensionNotes || "Indywidualny termin zwrotu"}
+                  >
+                    Przedłużony
+                  </span>
+                )}
+              </>
+            ) : (
               'Brak'
-            }
+            )}
           </span>
         </div>
 
@@ -630,6 +744,81 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                 </div>
               </div>
             </div>
+
+            {/* NOWA SEKCJA: Zarządzanie terminem zwrotu (Przedłużenia) */}
+            <div className="mt-6 pt-6 border-t border-indigo-100 bg-indigo-50/30 -mx-6 -mb-6 p-6 rounded-b-2xl">
+              <h3 className="text-lg font-bold text-indigo-900 mb-3 flex items-center space-x-2">
+                <Calendar className="w-5 h-5 text-indigo-600" />
+                <span>Indywidualne przedłużenie terminu zwrotu</span>
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Nowy termin zwrotu
+                  </label>
+                  <DatePicker
+                    selected={customReturnDate}
+                    onChange={(date) => setCustomReturnDate(date)}
+                    dateFormat="dd.MM.yyyy"
+                    locale="pl"
+                    className="w-full p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer bg-white"
+                    placeholderText="Wybierz nową datę"
+                    minDate={selectedDrum.data_wydania ? new Date(selectedDrum.data_wydania) : new Date()}
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Uzasadnienie / Notatka
+                  </label>
+                  <input
+                    type="text"
+                    value={extensionNotes}
+                    onChange={(e) => setExtensionNotes(e.target.value)}
+                    className="w-full p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white text-sm"
+                    placeholder="np. Ustalone z klientem, opóźnienie inwestycji do końca roku."
+                  />
+                </div>
+              </div>
+              
+              <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  {selectedDrum.isExtended && (
+                    <p className="text-xs text-gray-500">
+                      Wprowadził: <span className="font-semibold">{selectedDrum.extensionCreatedBy || "Brak"}</span>
+                      {selectedDrum.extensionCreatedAt && ` (${new Date(selectedDrum.extensionCreatedAt).toLocaleDateString('pl-PL')})`}
+                    </p>
+                  )}
+                </div>
+                
+                <div className="flex space-x-3 justify-end">
+                  {selectedDrum.isExtended && (
+                    <button
+                      onClick={handleClearExtension}
+                      disabled={savingExtension}
+                      className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-xl font-medium hover:bg-red-100 transition-colors duration-200 text-sm disabled:opacity-50"
+                    >
+                      Przywróć domyślny termin
+                    </button>
+                  )}
+                  <button
+                    onClick={handleSaveExtension}
+                    disabled={savingExtension || !customReturnDate}
+                    className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-all duration-200 text-sm shadow-md hover:shadow-lg flex items-center space-x-2 disabled:opacity-50"
+                  >
+                    {savingExtension ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        <span>Zapisywanie...</span>
+                      </>
+                    ) : (
+                      <span>Zapisywanie</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -796,7 +985,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
           </div>
 
           {/* Stats Cards - POPRAWIONE: używa pagination.total zamiast filteredAndSortedDrums.length */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
             <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100">
               <div className="flex items-center">
                 <Package className="w-8 h-8 text-blue-600" />
@@ -836,6 +1025,16 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                 </div>
               </div>
             </div>
+
+            <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-indigo-100">
+              <div className="flex items-center">
+                <Calendar className="w-8 h-8 text-indigo-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Przedłużone</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.extended}</p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Search and Filters */}
@@ -872,6 +1071,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                 <option value="active">Bez przekroczeń (Aktywne)</option>
                 <option value="due-soon">Zbliża się termin</option>
                 <option value="overdue">Przeterminowane</option>
+                <option value="extended">Przedłużone terminy</option>
               </select>
             </div>
           </div>
