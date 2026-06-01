@@ -68,11 +68,43 @@ export default async function handler(req, res) {
       `
     };
 
-    // Wysyłamy e-mail
+    // 1. Wysyłamy e-mail do administratorów
     await transporter.sendMail(mailOptions);
-    console.log(`Powiadomienie e-mail o rejestracji ${companyName} zostało wysłane pomyślnie.`);
+    console.log(`Powiadomienie e-mail o rejestracji ${companyName} zostało wysłane do administratora.`);
 
-    return res.status(200).json({ success: true, message: 'Email wysłany pomyślnie.' });
+    // 2. Przygotowujemy i wysyłamy powiadomienie do samego klienta
+    const clientMailOptions = {
+      from: `"Rejestracja - Grupa Eltron" <${senderEmail}>`,
+      to: email, // Adres klienta z formularza
+      subject: `Potwierdzenie wniosku o dostęp - Grupa Eltron`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+          <div style="background-color: #2563eb; padding: 20px; color: white; text-align: center;">
+            <h2 style="margin: 0;">Twój wniosek został przyjęty</h2>
+          </div>
+          <div style="padding: 20px; background-color: #f8fafc; color: #334155;">
+            <p>Dzień dobry ${name},</p>
+            <p>Dziękujemy za rejestrację konta dla firmy <strong>${companyName}</strong> w Systemie Zarządzania Bębnami Grupy Eltron.</p>
+            
+            <p>Twój wniosek o dostęp został przekazany do naszego zespołu i <strong>oczekuje na weryfikację</strong>. Weryfikacja jest niezbędna w celu przypisania Ci odpowiednich uprawnień dostępu do danych historycznych Twojej firmy.</p>
+            
+            <div style="margin-top: 30px; padding: 15px; background-color: #fff; border-left: 4px solid #3b82f6; border-radius: 4px;">
+              <p style="margin: 0; font-size: 14px;">O pomyślnej aktywacji konta poinformujemy Cię w osobnej wiadomości e-mail. Proces ten trwa zazwyczaj do 24 godzin w dni robocze.</p>
+            </div>
+            
+            <p style="margin-top: 20px;">W razie pytań, zapraszamy do kontaktu na adres: <a href="mailto:opakowania@grupaeltron.pl">opakowania@grupaeltron.pl</a>.</p>
+          </div>
+          <div style="background-color: #f1f5f9; padding: 15px; text-align: center; font-size: 12px; color: #64748b;">
+            Pozdrawiamy,<br>Zespół Grupy Eltron
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(clientMailOptions);
+    console.log(`Powiadomienie e-mail zostało wysłane do klienta (${email}).`);
+
+    return res.status(200).json({ success: true, message: 'E-maile wysłane pomyślnie.' });
   } catch (error) {
     console.error('Błąd podczas wysyłania e-maila:', error);
     return res.status(500).json({ message: 'Błąd podczas wysyłania e-maila.', error: error.message });
