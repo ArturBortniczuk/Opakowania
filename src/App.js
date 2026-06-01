@@ -38,15 +38,16 @@ const App = () => {
 
   useEffect(() => {
     let isMounted = true;
+    let subscription = null;
 
     const initializeAuth = async () => {
       try {
         console.log("🔄 Inicjalizacja autoryzacji...");
         
-        // 1. Pobieramy sesję z timeoutem (1500 ms), aby zapobiec zawieszeniu w przypadku deadlocka Supabase
+        // 1. Pobieramy sesję z bezpiecznym timeoutem (3000 ms), bez konkurencyjnych zapytań
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Timeout")), 1500)
+          setTimeout(() => reject(new Error("Timeout")), 3000)
         );
 
         let session = null;
@@ -138,66 +139,71 @@ const App = () => {
       } finally {
         if (isMounted) {
           setIsInitialized(true);
+
+          // ⚠️ REJESTRUJEMY NASŁUCHIWACZ REAL-TIME DOPIERO PO ZAKOŃCZENIU INICJALIZACJI!
+          // Całkowicie zapobiega to jakimkolwiek wyścigom lub deadlockom na poziomie Supabase Client!
+          try {
+            const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+              console.log(`🔑 Zmiana stanu autoryzacji w tle: ${event}`);
+              
+              if (event === 'SIGNED_OUT') {
+                if (isMounted) {
+                  setCurrentUser(null);
+                  setCurrentProfile(null);
+                  localStorage.removeItem('currentUser');
+                  localStorage.removeItem('currentProfile');
+                  
+                  const isResetPath = location.pathname.startsWith('/set-password');
+                  if (location.pathname !== '/' && !isResetPath) {
+                    navigate('/', { replace: true });
+                  }
+                }
+              } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+                if (session && session.user) {
+                  try {
+                    const profile = await authAPI.getUserProfile(session.user.id);
+                    if (!isMounted) return;
+
+                    const finalUser = {
+                      id: session.user.id,
+                      nip: profile.nip,
+                      username: profile.email,
+                      name: profile.name,
+                      email: profile.email,
+                      role: profile.role,
+                      status: profile.status,
+                      companyName: profile.company_name || profile.name,
+                    };
+
+                    setCurrentUser(finalUser);
+                    localStorage.setItem('currentUser', JSON.stringify(finalUser));
+                    
+                    if (location.pathname === '/') {
+                      navigate(isStaff(profile.role) ? '/admin' : '/dashboard', { replace: true });
+                    }
+                  } catch (e) {
+                    console.error("Błąd ładowania profilu po zmianie autoryzacji:", e);
+                  }
+                }
+              }
+            });
+            subscription = data.subscription;
+          } catch (listenerError) {
+            console.error("Błąd podczas rejestracji nasłuchiwacza auth:", listenerError);
+          }
         }
       }
     };
 
     initializeAuth();
 
-    // Nasłuchuj zmian stanu autoryzacji w czasie rzeczywistym
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`🔑 Zmiana stanu autoryzacji: ${event}`);
-      
-      if (event === 'SIGNED_OUT') {
-        if (isMounted) {
-          setCurrentUser(null);
-          setCurrentProfile(null);
-          localStorage.removeItem('currentUser');
-          localStorage.removeItem('currentProfile');
-          setIsInitialized(true);
-          
-          const isResetPath = location.pathname.startsWith('/set-password');
-          if (location.pathname !== '/' && !isResetPath) {
-            navigate('/', { replace: true });
-          }
-        }
-      } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-        if (session && session.user) {
-          try {
-            const profile = await authAPI.getUserProfile(session.user.id);
-            if (!isMounted) return;
-
-            const finalUser = {
-              id: session.user.id,
-              nip: profile.nip,
-              username: profile.email,
-              name: profile.name,
-              email: profile.email,
-              role: profile.role,
-              status: profile.status,
-              companyName: profile.company_name || profile.name,
-            };
-
-            setCurrentUser(finalUser);
-            localStorage.setItem('currentUser', JSON.stringify(finalUser));
-            
-            if (location.pathname === '/') {
-              navigate(isStaff(profile.role) ? '/admin' : '/dashboard', { replace: true });
-            }
-          } catch (e) {
-            console.error("Błąd ładowania profilu po zmianie autoryzacji:", e);
-          } finally {
-            if (isMounted) {
-              setIsInitialized(true);
-            }
-          }
-        }
-      }
-    });
-
     return () => {
       isMounted = false;
-      subscription.unsubscribe();
+      if (subscription) {
+        try {
+          subscription.unsubscribe();
+        } catch (_) {}
+      }
     };
   }, [location.pathname, navigate]);
 
