@@ -43,13 +43,22 @@ const App = () => {
       try {
         console.log("🔄 Inicjalizacja autoryzacji...");
         
-        // 1. Pobierz bieżącą sesję bezpośrednio na starcie
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) throw sessionError;
+        // 1. Pobieramy sesję z timeoutem (1500 ms), aby zapobiec zawieszeniu w przypadku deadlocka Supabase
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Timeout")), 1500)
+        );
+
+        let session = null;
+        try {
+          const result = await Promise.race([sessionPromise, timeoutPromise]);
+          session = result.data?.session;
+        } catch (timeoutErr) {
+          console.warn("⚠️ supabase.auth.getSession() przekroczył limit czasu (timeout). Próba przywrócenia z localStorage...");
+        }
 
         if (session && session.user) {
-          console.log("👤 Znaleziono aktywną sesję:", session.user.email);
+          console.log("👤 Znaleziono aktywną sesję Supabase:", session.user.email);
           const profile = await authAPI.getUserProfile(session.user.id);
           
           if (!isMounted) return;
@@ -77,17 +86,50 @@ const App = () => {
             navigate(isStaff(profile.role) ? '/admin' : '/dashboard', { replace: true });
           }
         } else {
-          console.log("ℹ️ Brak aktywnej sesji.");
-          if (isMounted) {
-            setCurrentUser(null);
-            setCurrentProfile(null);
-            localStorage.removeItem('currentUser');
-            localStorage.removeItem('currentProfile');
+          // Fallback: jeśli Supabase nie odpowiada, ale mamy lokalnego użytkownika z poprzedniej sesji
+          const localUserStr = localStorage.getItem('currentUser');
+          if (localUserStr) {
+            try {
+              const localUser = JSON.parse(localUserStr);
+              console.log("💾 Przywrócono sesję lokalną z localStorage (Fallback):", localUser.email);
+              if (isMounted) {
+                setCurrentUser(localUser);
+                const savedProfile = localStorage.getItem('currentProfile');
+                if (savedProfile) {
+                  setCurrentProfile(JSON.parse(savedProfile));
+                }
+                
+                if (location.pathname === '/') {
+                  navigate(isStaff(localUser.role) ? '/admin' : '/dashboard', { replace: true });
+                }
+              }
+            } catch (parseErr) {
+              console.error("Błąd parsowania lokalnego użytkownika:", parseErr);
+            }
+          } else {
+            console.log("ℹ️ Brak aktywnej sesji (brak fallbacku w localStorage).");
+            if (isMounted) {
+              setCurrentUser(null);
+              setCurrentProfile(null);
+              localStorage.removeItem('currentUser');
+              localStorage.removeItem('currentProfile');
+            }
           }
         }
       } catch (e) {
         console.error("❌ Błąd podczas inicjalizacji sesji:", e);
-        if (isMounted) {
+        // Próba ratunkowego przywrócenia z localStorage
+        const localUserStr = localStorage.getItem('currentUser');
+        if (localUserStr && isMounted) {
+          try {
+            const localUser = JSON.parse(localUserStr);
+            setCurrentUser(localUser);
+            const savedProfile = localStorage.getItem('currentProfile');
+            if (savedProfile) {
+              setCurrentProfile(JSON.parse(savedProfile));
+            }
+          } catch (_) {}
+        } else if (isMounted) {
           setCurrentUser(null);
           setCurrentProfile(null);
           localStorage.removeItem('currentUser');
@@ -164,16 +206,22 @@ const App = () => {
   };
 
   const handleLogout = async () => {
+    console.log("🚪 Błyskawiczne wylogowywanie...");
+    
+    // 1. Natychmiastowe i synchroniczne czyszczenie lokalnego stanu, aby uniknąć zamrożenia UI
+    setCurrentUser(null);
+    setCurrentProfile(null);
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('currentProfile');
+    
+    // Natychmiastowe przekierowanie na stronę logowania
+    navigate('/', { replace: true });
+    
+    // 2. Asynchroniczne wywołanie signOut w tle (nie blokuje interfejsu w razie braku sieci / zawieszenia Supabase)
     try {
-      await authAPI.logout();
+      supabase.auth.signOut().catch(err => console.warn("Ignorowany błąd signOut:", err));
     } catch (e) {
-      console.error(e);
-      // Fallback
-      localStorage.removeItem('currentUser');
-      localStorage.removeItem('currentProfile');
-      setCurrentUser(null);
-      setCurrentProfile(null);
-      navigate('/');
+      console.warn("Wyjątek podczas signOut:", e);
     }
   };
 
