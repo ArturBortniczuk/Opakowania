@@ -68,7 +68,9 @@ const AdminNavbar = ({
   const filteredMenuItems = menuItems
     .filter(item => {
       if (isSalesperson) {
-        return item.path !== '/admin/return-periods' && item.path !== '/admin/supplier-rules';
+        return item.path !== '/admin/return-periods' && 
+               item.path !== '/admin/supplier-rules' &&
+               item.path !== '/admin/registrations';
       }
       return true;
     })

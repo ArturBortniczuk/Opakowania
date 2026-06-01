@@ -170,12 +170,15 @@ const App = () => {
   }
 
   // Helper dla chronionych tras
-  const ProtectedRoute = ({ children, adminOnly = false }) => {
+  const ProtectedRoute = ({ children, adminOnly = false, allowedRoles = null }) => {
     if (!currentUser) {
       return <Navigate to="/" replace />;
     }
     if (adminOnly && !isUserStaff) {
       return <Navigate to="/dashboard" replace />;
+    }
+    if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
+      return <Navigate to={isUserStaff ? "/admin" : "/dashboard"} replace />;
     }
     return children;
   };
@@ -317,7 +320,7 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/admin/registrations" element={
-                <ProtectedRoute adminOnly>
+                <ProtectedRoute adminOnly allowedRoles={['admin', 'supervisor']}>
                   <AdminRegistrationManager />
                 </ProtectedRoute>
               } />
@@ -337,12 +340,12 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/admin/return-periods" element={
-                <ProtectedRoute adminOnly>
+                <ProtectedRoute adminOnly allowedRoles={['admin', 'supervisor']}>
                   <AdminReturnPeriodsManager user={currentUser} />
                 </ProtectedRoute>
               } />
               <Route path="/admin/supplier-rules" element={
-                <ProtectedRoute adminOnly>
+                <ProtectedRoute adminOnly allowedRoles={['admin', 'supervisor']}>
                   <AdminSupplierRules user={currentUser} />
                 </ProtectedRoute>
               } />

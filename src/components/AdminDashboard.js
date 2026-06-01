@@ -20,7 +20,9 @@ import {
   Settings
 } from 'lucide-react';
 
-const AdminDashboard = ({ onNavigate }) => {
+const AdminDashboard = ({ user, onNavigate }) => {
+  const isSalesperson = user && ['Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(user.role);
+
   const [stats, setStats] = useState({
     totalClients: 0,
     totalDrums: 0,
@@ -581,21 +583,23 @@ const AdminDashboard = ({ onNavigate }) => {
                   </div>
                 </div>
                 
-                <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                     onClick={() => onNavigate('admin-return-periods')}>
-                  <div className="flex items-start space-x-4">
-                    <div className="p-3 rounded-xl bg-indigo-100 group-hover:bg-indigo-200 transition-colors duration-300">
-                      <Settings className="w-8 h-8 text-indigo-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Terminy zwrotu</h3>
-                      <p className="text-gray-600 text-sm mb-4">Ustaw indywidualne terminy zwrotu dla klientów</p>
-                      <button className="text-indigo-600 font-medium text-sm hover:text-indigo-800 transition-colors duration-200">
-                        Zarządzaj terminami →
-                      </button>
+                {!isSalesperson && (
+                  <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                       onClick={() => onNavigate('admin-return-periods')}>
+                    <div className="flex items-start space-x-4">
+                      <div className="p-3 rounded-xl bg-indigo-100 group-hover:bg-indigo-200 transition-colors duration-300">
+                        <Settings className="w-8 h-8 text-indigo-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Terminy zwrotu</h3>
+                        <p className="text-gray-600 text-sm mb-4">Ustaw indywidualne terminy zwrotu dla klientów</p>
+                        <button className="text-indigo-600 font-medium text-sm hover:text-indigo-800 transition-colors duration-200">
+                          Zarządzaj terminami →
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
                 
                 <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
                      onClick={() => onNavigate('admin-reports')}>
@@ -612,22 +616,24 @@ const AdminDashboard = ({ onNavigate }) => {
                     </div>
                   </div>
                 </div>
-
-                <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                     onClick={() => onNavigate('admin-supplier-rules')}>
-                  <div className="flex items-start space-x-4">
-                    <div className="p-3 rounded-xl bg-orange-100 group-hover:bg-orange-200 transition-colors duration-300">
-                      <Settings className="w-8 h-8 text-orange-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Terminy kablowni</h3>
-                      <p className="text-gray-600 text-sm mb-4">Zarządzaj stawkami procentowymi zwrotów bębnów od różnych dostawców</p>
-                      <button className="text-orange-600 font-medium text-sm hover:text-orange-800 transition-colors duration-200">
-                        Zarządzaj terminami →
-                      </button>
+ 
+                {!isSalesperson && (
+                  <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                       onClick={() => onNavigate('admin-supplier-rules')}>
+                    <div className="flex items-start space-x-4">
+                      <div className="p-3 rounded-xl bg-orange-100 group-hover:bg-orange-200 transition-colors duration-300">
+                        <Settings className="w-8 h-8 text-orange-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Terminy kablowni</h3>
+                        <p className="text-gray-600 text-sm mb-4">Zarządzaj stawkami procentowymi zwrotów bębnów od różnych dostawców</p>
+                        <button className="text-orange-600 font-medium text-sm hover:text-orange-800 transition-colors duration-200">
+                          Zarządzaj terminami →
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
