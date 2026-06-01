@@ -638,10 +638,17 @@ export const drumsAPI = {
         let deadlinesQuery = supabase.from('custom_drum_deadlines').select('*');
         if (nip) {
           deadlinesQuery = deadlinesQuery.eq('nip', nip);
+          if (drumCechas.length < 200) {
+            deadlinesQuery = deadlinesQuery.in('kod_bebna', drumCechas);
+          }
         } else if (allowedNips && allowedNips.length > 0) {
           deadlinesQuery = deadlinesQuery.in('nip', allowedNips);
+          if (drumCechas.length < 200) {
+            deadlinesQuery = deadlinesQuery.in('kod_bebna', drumCechas);
+          }
         }
-        deadlinesQuery = deadlinesQuery.in('kod_bebna', drumCechas);
+        // Dla adminów (allowedNips === null) pobieramy po prostu wszystkie niestandardowe terminy,
+        // bez nakładania gigantycznego filtra IN, co całkowicie zapobiega błędom przekroczenia długości URL.
         const { data: deadlinesData } = await deadlinesQuery;
         if (deadlinesData) {
           customDeadlines = deadlinesData;

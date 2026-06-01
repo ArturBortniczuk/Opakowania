@@ -37,12 +37,18 @@ const App = () => {
   const isStaff = (role) => ['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(role);
 
   useEffect(() => {
-    // 1. Sprawdź i załaduj aktywną sesję na starcie
-    const initAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session && session.user) {
+    let isMounted = true;
+
+    // Nasłuchuj zmian stanu autoryzacji w czasie rzeczywistym
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`🔑 Stan autoryzacji: ${event}`);
+      
+      if (session && session.user) {
+        try {
           const profile = await authAPI.getUserProfile(session.user.id);
+          
+          if (!isMounted) return;
+
           const finalUser = {
             id: session.user.id,
             nip: profile.nip,
@@ -53,63 +59,52 @@ const App = () => {
             status: profile.status,
             companyName: profile.company_name || profile.name,
           };
+
           setCurrentUser(finalUser);
           localStorage.setItem('currentUser', JSON.stringify(finalUser));
           
-          // Opcjonalne: Przewodnik profilu pracownika
+          // Załaduj zapisany profil pracownika (dla klientów B2B)
           const savedProfile = localStorage.getItem('currentProfile');
           if (savedProfile) {
             setCurrentProfile(JSON.parse(savedProfile));
           }
 
           if (location.pathname === '/') {
-            navigate(isStaff(profile.role) ? '/admin' : '/dashboard');
+            navigate(isStaff(profile.role) ? '/admin' : '/dashboard', { replace: true });
+          }
+        } catch (e) {
+          console.error("Błąd ładowania profilu użytkownika:", e);
+          if (isMounted) {
+            setCurrentUser(null);
+            localStorage.removeItem('currentUser');
+          }
+        } finally {
+          if (isMounted) {
+            setIsInitialized(true);
           }
         }
-      } catch (e) {
-        console.error("Błąd inicjalizacji sesji:", e);
-        localStorage.removeItem('currentUser');
-      } finally {
-        setIsInitialized(true);
-      }
-    };
-
-    initAuth();
-
-    // 2. Nasłuchuj zmian stanu autoryzacji w czasie rzeczywistym
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        try {
-          const profile = await authAPI.getUserProfile(session.user.id);
-          const finalUser = {
-            id: session.user.id,
-            nip: profile.nip,
-            username: profile.email,
-            name: profile.name,
-            email: profile.email,
-            role: profile.role,
-            status: profile.status,
-            companyName: profile.company_name || profile.name,
-          };
-          setCurrentUser(finalUser);
-          localStorage.setItem('currentUser', JSON.stringify(finalUser));
-          navigate(isStaff(profile.role) ? '/admin' : '/dashboard');
-        } catch (e) {
-          console.error("Błąd ładowania profilu po zalogowaniu:", e);
+      } else {
+        if (isMounted) {
+          setCurrentUser(null);
+          setCurrentProfile(null);
+          localStorage.removeItem('currentUser');
+          localStorage.removeItem('currentProfile');
+          setIsInitialized(true);
+          
+          // Przekieruj na główną stronę logowania jeśli użytkownik nie jest zalogowany
+          const isResetPath = location.pathname.startsWith('/set-password');
+          if (location.pathname !== '/' && !isResetPath) {
+            navigate('/', { replace: true });
+          }
         }
-      } else if (event === 'SIGNED_OUT') {
-        setCurrentUser(null);
-        setCurrentProfile(null);
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('currentProfile');
-        navigate('/');
       }
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [location.pathname, navigate]);
 
   const handleLogin = (user) => {
     // Sesja obsługiwana jest przez onAuthStateChange
