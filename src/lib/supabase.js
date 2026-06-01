@@ -6,11 +6,25 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!supabaseUrl || !supabaseAnonKey || supabaseAnonKey === 'undefined') {
+  console.error('Brak klucza Supabase! URL:', !!supabaseUrl, 'Key:', !!supabaseAnonKey);
   throw new Error('Błąd krytyczny: Brak zmiennych środowiskowych Supabase. Sprawdź plik .env.local lub konfigurację Vercel.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+console.log('🔧 Inicjalizacja Supabase...');
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+  global: {
+    headers: {
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${supabaseAnonKey}`
+    }
+  }
+});
 
 // Helper functions
 export const supabaseHelpers = {
