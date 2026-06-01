@@ -35,8 +35,9 @@ export default async function handler(req, res) {
     });
 
     // Przygotowujemy ładną treść wiadomości HTML
+    const senderEmail = SMTP_USER.includes('@') ? SMTP_USER : 'opakowania@grupaeltron.pl';
     const mailOptions = {
-      from: `"Rejestracja - Grupa Eltron" <${SMTP_USER}>`,
+      from: `"Rejestracja - Grupa Eltron" <${senderEmail}>`,
       to: 'opakowania@grupaeltron.pl', // Adres docelowy (administratorzy)
       subject: `Nowy wniosek o dostęp do portalu: ${companyName}`,
       html: `
