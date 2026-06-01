@@ -204,8 +204,9 @@ export const authAPI = {
     // endpoincie w niektórych konfiguracjach domen i CORS.
     const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
     const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+    const redirectUrl = `${window.location.origin}/set-password`;
 
-    const response = await fetch(`${supabaseUrl}/auth/v1/recover`, {
+    const response = await fetch(`${supabaseUrl}/auth/v1/recover?redirect_to=${encodeURIComponent(redirectUrl)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
