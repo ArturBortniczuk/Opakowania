@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { drumsAPI, companiesAPI } from '../utils/supabaseApi';
+import { drumsAPI, companiesAPI, getCurrentUserFromCache } from '../utils/supabaseApi';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { pl } from 'date-fns/locale/pl';
@@ -198,8 +198,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     setSavingExtension(true);
     try {
       const dateStr = customReturnDate.toISOString().split('T')[0];
-      const userStr = localStorage.getItem('currentUser');
-      const currentUser = userStr ? JSON.parse(userStr) : null;
+      const currentUser = getCurrentUserFromCache();
       const username = currentUser ? (currentUser.name || currentUser.username) : 'Specjalista';
       
       await drumsAPI.setCustomDrumDeadline(

@@ -3,6 +3,24 @@
 
 import { supabase, supabaseHelpers } from '../lib/supabase';
 
+// ============================================================
+// BEZPIECZNY CACHE UŻYTKOWNIKA
+// Ustawiany WYŁĄCZNIE przez App.js po weryfikacji sesji Supabase.
+// NIE pochodzi z localStorage — użytkownik nie może go sfałszować
+// przez edycję w DevTools.
+// ============================================================
+let _currentUserCache = null;
+
+/** Ustawia cache zalogowanego użytkownika (wywołuj tylko z App.js po auth.getSession/onAuthStateChange) */
+export function setCurrentUserCache(user) {
+  _currentUserCache = user || null;
+}
+
+/** Pobiera zalogowanego użytkownika z bezpiecznego cache (nie z localStorage) */
+export function getCurrentUserFromCache() {
+  return _currentUserCache;
+}
+
 // Pomocnicza funkcja pobierająca listę NIP-ów, do których zalogowany użytkownik ma dostęp
 export async function getAllowedNips(user) {
   if (!user) return [];
@@ -266,9 +284,8 @@ export const drumsAPI = {
         .from('drums')
         .select(`*, companies (name, email, phone, address, custom_return_periods(return_period_days))`, { count: 'exact' });
 
-      // Filtrowanie po NIP
-      const userStr = localStorage.getItem('currentUser');
-      const currentUser = userStr ? JSON.parse(userStr) : null;
+      // Filtrowanie po NIP — używamy bezpiecznego cache, NIE localStorage
+      const currentUser = _currentUserCache;
       const isClient = currentUser && currentUser.role === 'client';
 
       if (nip) {
@@ -580,8 +597,7 @@ export const drumsAPI = {
     try {
       console.log('🔄 getAllDrums - pobieranie WSZYSTKICH bębnów...');
 
-      const userStr = localStorage.getItem('currentUser');
-      const currentUser = userStr ? JSON.parse(userStr) : null;
+      const currentUser = _currentUserCache;
       const isClient = currentUser && currentUser.role === 'client';
 
       const allowedNips = await getAllowedNips(currentUser);
@@ -893,8 +909,7 @@ export const companiesAPI = {
 
       console.log(`🔄 getCompanies - strona ${page}, limit ${limit}, szukaj: "${search}", filtr: ${filterStatus}, sort: ${sortBy} ${sortOrder}`);
 
-      const userStr = localStorage.getItem('currentUser');
-      const currentUser = userStr ? JSON.parse(userStr) : null;
+      const currentUser = _currentUserCache;
 
       let query = supabase
         .from('company_client_stats')
@@ -981,8 +996,7 @@ export const companiesAPI = {
     try {
       console.log('🔄 getGlobalStats - pobieranie statystyk globalnych...');
       
-      const userStr = localStorage.getItem('currentUser');
-      const currentUser = userStr ? JSON.parse(userStr) : null;
+      const currentUser = _currentUserCache;
       
       const applyFilters = (query) => {
         if (currentUser && ['Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(currentUser.role)) {
@@ -1085,8 +1099,7 @@ export const returnsAPI = {
       if (nip) {
         query = query.eq('user_nip', nip);
       } else {
-        const userStr = localStorage.getItem('currentUser');
-        const currentUser = userStr ? JSON.parse(userStr) : null;
+        const currentUser = _currentUserCache;
         const allowedNips = await getAllowedNips(currentUser);
         if (allowedNips) {
           if (allowedNips.length === 0) {
@@ -1246,8 +1259,7 @@ export const statsAPI = {
       // Statystyki dla admina - NAPRAWIONE: head: true oznacza że pobieramy TYLKO COUNT
       console.log(`👨‍💼 Liczenie statystyk dla administratora/handlowca...`);
 
-      const userStr = localStorage.getItem('currentUser');
-      const currentUser = userStr ? JSON.parse(userStr) : null;
+      const currentUser = _currentUserCache;
       const allowedNips = await getAllowedNips(currentUser);
 
       const applyNipFilter = (query, field = 'nip') => {

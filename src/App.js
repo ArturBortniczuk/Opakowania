@@ -21,7 +21,7 @@ import HelpGuide from './components/HelpGuide';
 import './App.css';
 
 import { supabase } from './lib/supabase';
-import { authAPI } from './utils/supabaseApi';
+import { authAPI, setCurrentUserCache } from './utils/supabaseApi';
 import { Clock, LogOut } from 'lucide-react';
 
 const App = () => {
@@ -76,6 +76,7 @@ const App = () => {
           };
 
           setCurrentUser(finalUser);
+          setCurrentUserCache(finalUser); // Bezpieczny cache — nie z localStorage
           localStorage.setItem('currentUser', JSON.stringify(finalUser));
           
           const savedProfile = localStorage.getItem('currentProfile');
@@ -176,6 +177,7 @@ const App = () => {
                     };
 
                     setCurrentUser(finalUser);
+                    setCurrentUserCache(finalUser); // Bezpieczny cache
                     localStorage.setItem('currentUser', JSON.stringify(finalUser));
                     
                     if (location.pathname === '/') {
@@ -217,6 +219,7 @@ const App = () => {
     // 1. Natychmiastowe i synchroniczne czyszczenie lokalnego stanu, aby uniknąć zamrożenia UI
     setCurrentUser(null);
     setCurrentProfile(null);
+    setCurrentUserCache(null); // Wyczyść bezpieczny cache
     localStorage.removeItem('currentUser');
     localStorage.removeItem('currentProfile');
     
