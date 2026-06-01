@@ -17,22 +17,12 @@ const SetPassword = ({ onPasswordSet }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [sessionReady, setSessionReady] = useState(false);
 
   useEffect(() => {
-    // Supabase automatycznie wykrywa token z URL hash i emituje PASSWORD_RECOVERY
+    // Supabase przetwarza hash automatycznie w tle.
+    // Aby uniknąć zawieszania ekranu, nasłuchujemy na błędy, ale od razu pokazujemy formularz.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        console.log('🔑 Sesja odzyskiwania hasła aktywna');
-        setSessionReady(true);
-      }
-    });
-
-    // Sprawdź czy sesja już istnieje (np. po odświeżeniu strony)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setSessionReady(true);
-      }
+      console.log('🔄 Stan autoryzacji:', event);
     });
 
     return () => subscription.unsubscribe();
@@ -84,30 +74,8 @@ const SetPassword = ({ onPasswordSet }) => {
     );
   }
 
-  if (!sessionReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="max-w-md w-full text-center p-8 bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-blue-100">
-          <AlertCircle className="w-16 h-16 mx-auto text-yellow-500 mb-6" />
-          <h2 className="text-2xl font-bold text-gray-900">Weryfikacja linku...</h2>
-          <p className="mt-2 text-gray-600">
-            Sprawdzamy ważność linku resetującego. Jeśli ta strona się nie załaduje,
-            wróć do maila i kliknij link ponownie lub poproś o nowy.
-          </p>
-          <div className="mt-4 flex justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
-          <button
-            onClick={() => navigate('/')}
-            className="mt-6 text-sm text-blue-600 hover:underline"
-          >
-            Wróć do logowania
-          </button>
-        </div>
-      </div>
-    );
-  }
-
+  // Od razu pokazujemy formularz — jeśli token z linku był zły,
+  // Supabase odrzuci próbę zmiany hasła w funkcji handleSubmit.
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="max-w-md w-full space-y-8">
