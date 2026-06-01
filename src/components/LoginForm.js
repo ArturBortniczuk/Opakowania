@@ -84,6 +84,22 @@ const LoginForm = ({ onLogin }) => {
         nip,
         rodoAccepted
       });
+
+      // Powiadomienie administratorów o nowym wniosku
+      try {
+        await fetch('/api/notifyRegistration', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, name, companyName, nip, phone })
+        });
+        console.log('Wysłano powiadomienie e-mail do administratora.');
+      } catch (notifyErr) {
+        console.error('Nie udało się wysłać powiadomienia e-mail:', notifyErr);
+        // Nie blokujemy użytkownika jeśli wysłanie maila zawiedzie (konto i tak zostało założone)
+      }
+
       setSuccessMessage('Konto zostało zarejestrowane! Oczekuje na weryfikację przez specjalistę ds. opakowań Grupy Eltron. O aktywacji powiadomimy Cię mailowo.');
       setView('login');
       // Wyczyszczenie formularza rejestracji
