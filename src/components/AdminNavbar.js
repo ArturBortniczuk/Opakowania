@@ -51,9 +51,12 @@ const AdminNavbar = ({
     return () => clearInterval(interval);
   }, []);
 
+
+
   const menuItems = [
     { path: '/admin', label: 'Dashboard', icon: Home, description: 'Panel główny' },
     { path: '/admin/clients', label: 'Zarządzaj klientami', icon: Users, description: 'Klienci w systemie' },
+    { path: '/admin/registrations', label: 'Weryfikacja kont', icon: UserCheck, description: 'Zatwierdzaj nowych użytkowników' },
     { path: '/admin/drums', label: 'Wszystkie bębny', icon: Package, description: 'Monitoruj bębny' },
     { path: '/admin/returns', label: 'Zgłoszenia zwrotów', icon: Truck, description: 'Zarządzaj zwrotami' },
     { path: '/admin/return-periods', label: 'Terminy zwrotu', icon: Settings, description: 'Ustaw terminy dla klientów' },

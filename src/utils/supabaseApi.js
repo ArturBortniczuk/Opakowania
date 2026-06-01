@@ -47,106 +47,173 @@ export async function getAllowedNips(user) {
 // ==================================
 export const authAPI = {
   /**
-   * Loguje użytkownika lub administratora.
-   * @param {string} nip - NIP użytkownika.
+   * Rejestruje nowego klienta w systemie.
+   * @param {string} email - Adres e-mail.
    * @param {string} password - Hasło.
-   * @param {string} loginMode - 'client' lub 'admin'.
-   * @returns {Promise<object>} Obiekt z danymi zalogowanego użytkownika.
+   * @param {object} metadata - Metadane użytkownika (name, phone, companyName, nip, rodoAccepted).
    */
-  async signIn(nip, password, loginMode) {
-    const { data, error } = await supabase.functions.invoke('sign-in', {
-      body: { nip, password, loginMode },
+  async signUp(email, password, metadata) {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name: metadata.name,
+          phone: metadata.phone,
+          companyName: metadata.companyName,
+          nip: metadata.nip,
+          rodoAccepted: metadata.rodoAccepted,
+          role: 'client',
+          status: 'pending'
+        }
+      }
     });
 
     if (error) {
-      const errorMessage = error.context?.data?.error || error.message || 'Wystąpił nieznany błąd logowania.';
-      throw new Error(errorMessage);
+      throw new Error(error.message || 'Wystąpił błąd podczas rejestracji.');
     }
-
-    if (data.error) {
-      throw new Error(data.error);
-    }
-
-    const user = data.user;
-    let companyName = 'Brak nazwy firmy';
-
-    // Pobierz nazwę firmy dla klienta lub nazwę dla admina/supervisora
-    if (loginMode === 'admin' || user.role === 'supervisor') {
-      companyName = user.name || 'Administrator';
-    } else {
-      const { data: companyData } = await supabase.from('companies').select('name').eq('nip', nip).single();
-      if (companyData) {
-        companyName = companyData.name;
-      }
-    }
-
-    // Stwórz spójny obiekt użytkownika do przechowywania w aplikacji
-    const finalUser = {
-      id: user.id,
-      nip: user.nip,
-      username: user.username || user.nip,
-      name: user.name || companyName,
-      email: user.email,
-      role: user.role || loginMode,
-      is_first_login: user.is_first_login,
-      companyName: companyName,
-    };
-
-    localStorage.setItem('currentUser', JSON.stringify(finalUser));
-    return { user: finalUser };
+    return data;
   },
 
   /**
-   * Wysyła prośbę o link do ustawienia hasła.
-   * @param {string} nip - NIP firmy.
-   * @returns {Promise<object>} Odpowiedź z serwera.
+   * Loguje użytkownika na adres e-mail i hasło.
+   * @param {string} email - E-mail.
+   * @param {string} password - Hasło.
    */
-  async requestPasswordSetup(nip) {
-    const { data, error } = await supabase.functions.invoke('request-password-setup', {
-      body: { nip },
+  async signIn(email, password) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
     });
 
     if (error) {
-      const errorMessage = error.context?.data?.error || error.message || 'Wystąpił błąd.';
-      throw new Error(errorMessage);
+      throw new Error(error.message || 'Błędny e-mail lub hasło.');
+    }
+
+    // Pobierz profil zalogowanego użytkownika
+    const profile = await this.getUserProfile(data.user.id);
+    
+    const finalUser = {
+      id: data.user.id,
+      nip: profile.nip,
+      username: profile.email,
+      name: profile.name,
+      email: profile.email,
+      role: profile.role,
+      status: profile.status,
+      companyName: profile.company_name || profile.name,
+    };
+
+    localStorage.setItem('currentUser', JSON.stringify(finalUser));
+    return { user: finalUser, session: data.session };
+  },
+
+  /**
+   * Pobiera publiczny profil użytkownika z bazy danych.
+   * @param {string} userId - ID użytkownika z auth.users.
+   */
+  async getUserProfile(userId) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      throw new Error('Nie udało się załadować profilu użytkownika.');
+    }
+    return data;
+  },
+
+  /**
+   * Pobiera oczekujące wnioski rejestracyjne dla administratora.
+   */
+  async getPendingRegistrations() {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  },
+
+  /**
+   * Akceptuje i aktywuje konto klienta przypisując mu NIP.
+   */
+  async approveRegistration(profileId, nip, companyName) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({
+        status: 'approved',
+        nip: nip,
+        company_name: companyName,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', profileId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  /**
+   * Odrzuca wniosek rejestracyjny.
+   */
+  async rejectRegistration(profileId) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({
+        status: 'rejected',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', profileId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  /**
+   * Wysyła prośbę o link do resetowania hasła na e-mail.
+   */
+  async requestPasswordSetup(email) {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/set-password`,
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Błąd wysyłania linku resetującego.');
+    }
+
+    return { message: 'Link do resetowania hasła został wysłany na Twój adres e-mail.' };
+  },
+
+  /**
+   * Ustawia nowe hasło dla użytkownika.
+   */
+  async setNewPassword(password) {
+    const { data, error } = await supabase.auth.updateUser({
+      password: password
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Nie udało się zaktualizować hasła.');
     }
 
     return data;
   },
 
   /**
-   * Ustawia nowe hasło dla użytkownika na podstawie tokenu.
-   * @param {string} token - Token z linku e-mail.
-   * @param {string} password - Nowe hasło.
-   * @returns {Promise<object>} Obiekt z danymi zalogowanego użytkownika.
-   */
-  async setNewPassword(token, password) {
-    if (!password || password.length < 6) {
-      throw new Error('Hasło musi mieć co najmniej 6 znaków.');
-    }
-
-    const { data, error } = await supabase.functions.invoke('set-new-password', {
-      body: { token, password },
-    });
-
-    if (error) {
-      const errorMessage = error.context?.data?.error || error.message || 'Nie udało się ustawić hasła. Link mógł wygasnąć.';
-      throw new Error(errorMessage);
-    }
-
-    if (data.error) {
-      throw new Error(data.error);
-    }
-
-    // Po udanym ustawieniu hasła, od razu logujemy użytkownika
-    return this.signIn(data.user.nip, password, 'client');
-  },
-
-  /**
    * Wylogowuje użytkownika.
    */
-  logout() {
+  async logout() {
     localStorage.removeItem('currentUser');
+    localStorage.removeItem('currentProfile');
+    await supabase.auth.signOut();
   }
 };
 

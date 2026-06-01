@@ -16,17 +16,20 @@ import AdminDrumsList from './components/AdminDrumsList';
 import AdminReturnRequests from './components/AdminReturnRequests';
 import AdminReports from './components/AdminReports';
 import AdminSupplierRules from './components/AdminSupplierRules';
+import AdminRegistrationManager from './components/AdminRegistrationManager';
 import HelpGuide from './components/HelpGuide';
 import './App.css';
 
-
+import { supabase } from './lib/supabase';
+import { authAPI } from './utils/supabaseApi';
+import { Clock, LogOut } from 'lucide-react';
 
 const App = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [currentProfile, setCurrentProfile] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false); // DODANE: Stan inicjalizacji
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -34,45 +37,96 @@ const App = () => {
   const isStaff = (role) => ['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(role);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
+    // 1. Sprawdź i załaduj aktywną sesję na starcie
+    const initAuth = async () => {
       try {
-        const user = JSON.parse(savedUser);
-        setCurrentUser(user);
-        
-        // Wczytywanie profilu pracownika
-        const savedProfile = localStorage.getItem('currentProfile');
-        if (savedProfile) {
-          setCurrentProfile(JSON.parse(savedProfile));
-        }
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && session.user) {
+          const profile = await authAPI.getUserProfile(session.user.id);
+          const finalUser = {
+            id: session.user.id,
+            nip: profile.nip,
+            username: profile.email,
+            name: profile.name,
+            email: profile.email,
+            role: profile.role,
+            status: profile.status,
+            companyName: profile.company_name || profile.name,
+          };
+          setCurrentUser(finalUser);
+          localStorage.setItem('currentUser', JSON.stringify(finalUser));
+          
+          // Opcjonalne: Przewodnik profilu pracownika
+          const savedProfile = localStorage.getItem('currentProfile');
+          if (savedProfile) {
+            setCurrentProfile(JSON.parse(savedProfile));
+          }
 
-        // Opcjonalne: Przekierowanie jeśli jesteśmy na / i mamy usera
-        if (location.pathname === '/') {
-          navigate(isStaff(user.role) ? '/admin' : '/dashboard');
+          if (location.pathname === '/') {
+            navigate(isStaff(profile.role) ? '/admin' : '/dashboard');
+          }
         }
       } catch (e) {
-        console.error("Błąd parsowania danych użytkownika z localStorage", e);
+        console.error("Błąd inicjalizacji sesji:", e);
         localStorage.removeItem('currentUser');
+      } finally {
+        setIsInitialized(true);
       }
-    }
-    setIsInitialized(true); // Oznaczamy, że sprawdziliśmy localStorage
+    };
+
+    initAuth();
+
+    // 2. Nasłuchuj zmian stanu autoryzacji w czasie rzeczywistym
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        try {
+          const profile = await authAPI.getUserProfile(session.user.id);
+          const finalUser = {
+            id: session.user.id,
+            nip: profile.nip,
+            username: profile.email,
+            name: profile.name,
+            email: profile.email,
+            role: profile.role,
+            status: profile.status,
+            companyName: profile.company_name || profile.name,
+          };
+          setCurrentUser(finalUser);
+          localStorage.setItem('currentUser', JSON.stringify(finalUser));
+          navigate(isStaff(profile.role) ? '/admin' : '/dashboard');
+        } catch (e) {
+          console.error("Błąd ładowania profilu po zalogowaniu:", e);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setCurrentProfile(null);
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('currentProfile');
+        navigate('/');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleLogin = (user) => {
-    setCurrentUser(user);
-    localStorage.removeItem('currentProfile');
-    setCurrentProfile(null);
-    const defaultPath = isStaff(user.role) ? '/admin' : '/dashboard';
-    navigate(defaultPath);
+    // Sesja obsługiwana jest przez onAuthStateChange
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('currentProfile');
-    setCurrentUser(null);
-    setCurrentProfile(null);
-    setSidebarOpen(false);
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+    } catch (e) {
+      console.error(e);
+      // Fallback
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('currentProfile');
+      setCurrentUser(null);
+      setCurrentProfile(null);
+      navigate('/');
+    }
   };
 
   const handleSelectProfile = (profile) => {
@@ -84,10 +138,41 @@ const App = () => {
   const handleClearProfile = () => {
     localStorage.removeItem('currentProfile');
     setCurrentProfile(null);
-    navigate('/dashboard'); // Zabezpieczenie przejścia
+    navigate('/dashboard');
   };
 
   const isUserStaff = currentUser && isStaff(currentUser.role);
+
+  // Bloker dla kont oczekujących na weryfikację RODO/NIP
+  if (currentUser && currentUser.status === 'pending' && !isStaff(currentUser.role)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-100 px-4">
+        <div className="max-w-md w-full bg-white/80 backdrop-blur-lg rounded-2xl shadow-2xl border border-blue-100 p-8 text-center space-y-6">
+          <div className="mb-4 flex justify-center">
+            <img src="/logo40.png" alt="Grupa Eltron" className="h-16 w-auto object-contain" />
+          </div>
+          <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+            <Clock className="w-8 h-8" />
+          </div>
+          <h3 className="text-2xl font-bold text-gray-900">Konto w weryfikacji</h3>
+          <p className="text-sm text-gray-600 leading-relaxed">
+            Witaj, <strong>{currentUser.name}</strong>!<br />
+            Twoje zgłoszenie rejestracji dla firmy <strong>{currentUser.companyName}</strong> (NIP: {currentUser.nip}) oczekuje na weryfikację przez specjalistę ds. opakowań Grupy Eltron.
+          </p>
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-xs text-blue-800 text-left">
+            O aktywacji konta i przydzieleniu dostępu do statystyk bębnów zostaniesz powiadomiony wiadomością e-mail na adres: <strong>{currentUser.email}</strong>. Zazwyczaj weryfikacja trwa do 24 godzin w dni robocze.
+          </div>
+          <button
+            onClick={handleLogout}
+            className="w-full py-3 px-4 rounded-xl font-medium flex items-center justify-center space-x-2 transition-all duration-200 bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Wyloguj się</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Helper dla chronionych tras
   const ProtectedRoute = ({ children, adminOnly = false }) => {
@@ -102,7 +187,6 @@ const App = () => {
 
   const shouldShowNavbar = currentUser && location.pathname !== '/' && location.pathname !== '/set-password' && (isUserStaff || currentProfile);
 
-  // DODANE: Loading screen podczas inicjalizacji
   if (!isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -235,6 +319,11 @@ const App = () => {
                       }
                     }}
                   />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/registrations" element={
+                <ProtectedRoute adminOnly>
+                  <AdminRegistrationManager />
                 </ProtectedRoute>
               } />
               <Route path="/admin/drums" element={
