@@ -44,7 +44,12 @@ const SetPassword = ({ onPasswordSet }) => {
     setError('');
 
     try {
-      const { error: updateError } = await supabase.auth.updateUser({ password });
+      const updatePromise = supabase.auth.updateUser({ password });
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('TIMEOUT')), 10000)
+      );
+
+      const { error: updateError } = await Promise.race([updatePromise, timeoutPromise]);
       if (updateError) throw updateError;
 
       setSuccess(true);
@@ -54,7 +59,11 @@ const SetPassword = ({ onPasswordSet }) => {
         navigate('/', { replace: true });
       }, 3000);
     } catch (err) {
-      setError(err.message || 'Wystąpił błąd. Link mógł wygasnąć lub jest nieprawidłowy.');
+      if (err.message === 'TIMEOUT') {
+        setError('Zbyt długi czas oczekiwania serwera. Odśwież stronę (F5) i spróbuj ponownie.');
+      } else {
+        setError(err.message || 'Wystąpił błąd. Link mógł wygasnąć lub jest nieprawidłowy.');
+      }
     } finally {
       setLoading(false);
     }
