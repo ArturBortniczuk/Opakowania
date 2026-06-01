@@ -199,19 +199,25 @@ export const authAPI = {
    * Wysyła prośbę o link do resetowania hasła na e-mail.
    */
   async requestPasswordSetup(email) {
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    
-    // Jeśli jesteśmy w produkcji, lepiej nie wysyłać redirectTo,
-    // aby Supabase użył "Site URL" z Dashboardu (czyli www.opakowania.grupaeltron.pl)
-    // To zapobiega błędom CORS i brakowi apikey na Vercel przy redirectach.
-    const resetOptions = isLocalhost 
-      ? { redirectTo: `${window.location.origin}/set-password` } 
-      : {};
+    // 🛠️ Używamy bezpośredniego zapytania fetch(), by zagwarantować obecność
+    // nagłówka apikey. Biblioteka supabase-js czasem go gubi przy tym konkretnym
+    // endpoincie w niektórych konfiguracjach domen i CORS.
+    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+    const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email, resetOptions);
+    const response = await fetch(`${supabaseUrl}/auth/v1/recover`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`
+      },
+      body: JSON.stringify({ email })
+    });
 
-    if (error) {
-      throw new Error(error.message || 'Błąd wysyłania linku resetującego.');
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || errorData.error_description || 'Błąd wysyłania linku resetującego.');
     }
 
     return { message: 'Link do resetowania hasła został wysłany na Twój adres e-mail.' };
