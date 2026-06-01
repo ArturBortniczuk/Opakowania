@@ -44,33 +44,38 @@ const SetPassword = ({ onPasswordSet }) => {
     setError('');
 
     try {
-      const updatePromise = supabase.auth.updateUser({ password });
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('TIMEOUT')), 10000)
-      );
+      // Pobieramy aktualny token sesji (odzyskany z linku email)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Brak aktywnej sesji. Skorzystaj ponownie z linku w e-mailu.');
 
-      const { error: updateError } = await Promise.race([updatePromise, timeoutPromise]);
-      if (updateError) throw updateError;
+      // 🛠️ FIX ROOT CAUSE: Zamiast używać supabase.auth.updateUser, które w tej wersji biblioteki
+      // ma wyciek blokady (lock leak) po błędzie 422, uderzamy bezpośrednio do API Supabase.
+      // Dzięki temu omijamy wbudowany system blokad przeglądarki i zawieszanie znika na zawsze.
+      const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+      const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+
+      const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ password })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.msg || errorData.message || 'Błąd podczas zmiany hasła.');
+      }
 
       setSuccess(true);
-      // Po 3 sekundach wyloguj i przekieruj na logowanie
       setTimeout(() => {
         supabase.auth.signOut();
         navigate('/', { replace: true });
       }, 3000);
     } catch (err) {
-      if (err.message === 'TIMEOUT') {
-        // 🛠️ WORKAROUND: Jeśli backend przetworzył hasło, ale biblioteka frontu zawiesiła się 
-        // czekając na blokadę przeglądarki (znany bug supabase-js), traktujemy to jako SUKCES.
-        console.warn('Wykryto zawieszenie Supabase. Wymuszanie sukcesu, ponieważ backend zapisał hasło.');
-        setSuccess(true);
-        setTimeout(() => {
-          supabase.auth.signOut();
-          navigate('/', { replace: true });
-        }, 3000);
-      } else {
-        setError(err.message || 'Wystąpił błąd. Link mógł wygasnąć lub jest nieprawidłowy.');
-      }
+      setError(err.message || 'Wystąpił błąd. Link mógł wygasnąć lub jest nieprawidłowy.');
     } finally {
       setLoading(false);
     }
