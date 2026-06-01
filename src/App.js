@@ -44,18 +44,15 @@ const App = () => {
       try {
         console.log("🔄 Inicjalizacja autoryzacji...");
         
-        // 1. Pobieramy sesję z bezpiecznym timeoutem (3000 ms), bez konkurencyjnych zapytań
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Timeout")), 3000)
-        );
-
+        // 1. Pobieramy sesję bez sztucznego timeoutu. Wymuszanie przerwania
+        // poprzez Promise.race powodowało deadlocki w wbudowanym mechaniźmie
+        // blokad (navigator.locks) paczki supabase-js, co zawieszało np. zmianę hasła.
         let session = null;
         try {
-          const result = await Promise.race([sessionPromise, timeoutPromise]);
-          session = result.data?.session;
-        } catch (timeoutErr) {
-          console.warn("⚠️ supabase.auth.getSession() przekroczył limit czasu (timeout). Próba przywrócenia z localStorage...");
+          const { data } = await supabase.auth.getSession();
+          session = data?.session;
+        } catch (err) {
+          console.error("⚠️ Błąd pobierania sesji:", err);
         }
 
         if (session && session.user) {
