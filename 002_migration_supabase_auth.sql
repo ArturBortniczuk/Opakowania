@@ -76,15 +76,17 @@ SELECT
   gen_random_uuid(),
   'authenticated',
   'authenticated',
-  email,
-  password_hash, -- Zachowujemy istniejący hash bcrypt
+  s.email,
+  s.password_hash, -- Zachowujemy istniejący hash bcrypt
   CURRENT_TIMESTAMP,
   jsonb_build_object('provider', 'email', 'providers', array['email']),
-  jsonb_build_object('name', name, 'role', role, 'status', 'approved', 'phone', COALESCE(phone, '')),
-  created_at,
+  jsonb_build_object('name', s.name, 'role', s.role, 'status', 'approved', 'phone', COALESCE(s.phone, '')),
+  s.created_at,
   CURRENT_TIMESTAMP
-FROM public.salespeople
-ON CONFLICT (email) DO NOTHING;
+FROM public.salespeople s
+WHERE NOT EXISTS (
+  SELECT 1 FROM auth.users u WHERE u.email = s.email
+);
 
 -- 4. Migracja istniejących administratorów (admin_users) do auth.users
 INSERT INTO auth.users (
@@ -103,15 +105,17 @@ SELECT
   gen_random_uuid(),
   'authenticated',
   'authenticated',
-  email,
-  password_hash,
+  a.email,
+  a.password_hash,
   CURRENT_TIMESTAMP,
   jsonb_build_object('provider', 'email', 'providers', array['email']),
-  jsonb_build_object('name', name, 'role', role, 'status', 'approved'),
-  created_at,
+  jsonb_build_object('name', a.name, 'role', a.role, 'status', 'approved'),
+  a.created_at,
   CURRENT_TIMESTAMP
-FROM public.admin_users
-ON CONFLICT (email) DO NOTHING;
+FROM public.admin_users a
+WHERE NOT EXISTS (
+  SELECT 1 FROM auth.users u WHERE u.email = a.email
+);
 
 -- 5. Włączenie RLS (Row Level Security) na wszystkich tabelach
 ALTER TABLE public.drums ENABLE ROW LEVEL SECURITY;
