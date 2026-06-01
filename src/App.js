@@ -39,12 +39,17 @@ const App = () => {
   useEffect(() => {
     let isMounted = true;
 
-    // Nasłuchuj zmian stanu autoryzacji w czasie rzeczywistym
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`🔑 Stan autoryzacji: ${event}`);
-      
-      if (session && session.user) {
-        try {
+    const initializeAuth = async () => {
+      try {
+        console.log("🔄 Inicjalizacja autoryzacji...");
+        
+        // 1. Pobierz bieżącą sesję bezpośrednio na starcie
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) throw sessionError;
+
+        if (session && session.user) {
+          console.log("👤 Znaleziono aktywną sesję:", session.user.email);
           const profile = await authAPI.getUserProfile(session.user.id);
           
           if (!isMounted) return;
@@ -63,7 +68,6 @@ const App = () => {
           setCurrentUser(finalUser);
           localStorage.setItem('currentUser', JSON.stringify(finalUser));
           
-          // Załaduj zapisany profil pracownika (dla klientów B2B)
           const savedProfile = localStorage.getItem('currentProfile');
           if (savedProfile) {
             setCurrentProfile(JSON.parse(savedProfile));
@@ -72,18 +76,37 @@ const App = () => {
           if (location.pathname === '/') {
             navigate(isStaff(profile.role) ? '/admin' : '/dashboard', { replace: true });
           }
-        } catch (e) {
-          console.error("Błąd ładowania profilu użytkownika:", e);
+        } else {
+          console.log("ℹ️ Brak aktywnej sesji.");
           if (isMounted) {
             setCurrentUser(null);
+            setCurrentProfile(null);
             localStorage.removeItem('currentUser');
-          }
-        } finally {
-          if (isMounted) {
-            setIsInitialized(true);
+            localStorage.removeItem('currentProfile');
           }
         }
-      } else {
+      } catch (e) {
+        console.error("❌ Błąd podczas inicjalizacji sesji:", e);
+        if (isMounted) {
+          setCurrentUser(null);
+          setCurrentProfile(null);
+          localStorage.removeItem('currentUser');
+          localStorage.removeItem('currentProfile');
+        }
+      } finally {
+        if (isMounted) {
+          setIsInitialized(true);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    // Nasłuchuj zmian stanu autoryzacji w czasie rzeczywistym
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`🔑 Zmiana stanu autoryzacji: ${event}`);
+      
+      if (event === 'SIGNED_OUT') {
         if (isMounted) {
           setCurrentUser(null);
           setCurrentProfile(null);
@@ -91,10 +114,40 @@ const App = () => {
           localStorage.removeItem('currentProfile');
           setIsInitialized(true);
           
-          // Przekieruj na główną stronę logowania jeśli użytkownik nie jest zalogowany
           const isResetPath = location.pathname.startsWith('/set-password');
           if (location.pathname !== '/' && !isResetPath) {
             navigate('/', { replace: true });
+          }
+        }
+      } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        if (session && session.user) {
+          try {
+            const profile = await authAPI.getUserProfile(session.user.id);
+            if (!isMounted) return;
+
+            const finalUser = {
+              id: session.user.id,
+              nip: profile.nip,
+              username: profile.email,
+              name: profile.name,
+              email: profile.email,
+              role: profile.role,
+              status: profile.status,
+              companyName: profile.company_name || profile.name,
+            };
+
+            setCurrentUser(finalUser);
+            localStorage.setItem('currentUser', JSON.stringify(finalUser));
+            
+            if (location.pathname === '/') {
+              navigate(isStaff(profile.role) ? '/admin' : '/dashboard', { replace: true });
+            }
+          } catch (e) {
+            console.error("Błąd ładowania profilu po zmianie autoryzacji:", e);
+          } finally {
+            if (isMounted) {
+              setIsInitialized(true);
+            }
           }
         }
       }
