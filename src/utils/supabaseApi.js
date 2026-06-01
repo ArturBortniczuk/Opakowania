@@ -195,30 +195,15 @@ export const authAPI = {
     return data;
   },
 
-  /**
-   * Wysyła prośbę o link do resetowania hasła na e-mail.
-   */
   async requestPasswordSetup(email) {
-    // 🛠️ Używamy bezpośredniego zapytania fetch(), by zagwarantować obecność
-    // nagłówka apikey. Biblioteka supabase-js czasem go gubi przy tym konkretnym
-    // endpoincie w niektórych konfiguracjach domen i CORS.
-    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-    const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
     const redirectUrl = `${window.location.origin}/set-password`;
 
-    const response = await fetch(`${supabaseUrl}/auth/v1/recover?redirect_to=${encodeURIComponent(redirectUrl)}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`
-      },
-      body: JSON.stringify({ email })
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectUrl,
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || errorData.error_description || 'Błąd wysyłania linku resetującego.');
+    if (error) {
+      throw new Error(error.message || 'Błąd wysyłania linku resetującego.');
     }
 
     return { message: 'Link do resetowania hasła został wysłany na Twój adres e-mail.' };
