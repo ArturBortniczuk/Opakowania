@@ -114,8 +114,8 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
           console.error('❌ ReturnForm: Dane nie są tablicą!', drums);
           setUserDrums([]);
         } else {
-          // Filtrujemy tylko zagubione. Bębny już zgłoszone otrzymują flagę isReported.
-          const visibleDrums = drums.filter(d => d.status !== 'Lost');
+          // Filtrujemy zagubione i zatrzymane. Bębny już zgłoszone otrzymują flagę isReported.
+          const visibleDrums = drums.filter(d => d.status !== 'Lost' && d.status !== 'Zagubiony' && d.status !== 'Zatrzymany');
           const drumsWithReportedFlag = visibleDrums.map(d => ({
             ...d,
             isReported: reportedDrums.has(d.cecha)

@@ -15,7 +15,8 @@ const DrumsList = ({ user }) => {
   const [sortBy, setSortBy] = useState('data_zwrotu_do_dostawcy');
   const [sortOrder, setSortOrder] = useState('asc');
   const [filterStatus, setFilterStatus] = useState(() => {
-    return (location.state && location.state.filterStatus) || 'all';
+    const initial = (location.state && location.state.filterStatus) || [];
+    return Array.isArray(initial) ? initial : (initial === 'all' ? [] : [initial]);
   });
   const [filterSize, setFilterSize] = useState('all');
   const [availableSizes, setAvailableSizes] = useState([]);
@@ -105,8 +106,8 @@ const DrumsList = ({ user }) => {
       }
 
       // 2. Filtrowanie (Status)
-      if (filterStatus !== 'all') {
-        filtered = filtered.filter(d => d.status === filterStatus);
+      if (filterStatus.length > 0) {
+        filtered = filtered.filter(d => filterStatus.includes(d.status));
       }
 
       // 2b. Filtrowanie po Rozmiarze
@@ -390,17 +391,26 @@ const DrumsList = ({ user }) => {
                 />
               </div>
 
-              <select
-                value={filterStatus}
-                onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              >
-                <option value="all">Wszystkie statusy</option>
-                <option value="active">Aktywne</option>
-                <option value="due-soon">Zbliża się termin</option>
-                <option value="overdue">Przeterminowane</option>
-                <option value="reported">Zgłoszone do zwrotu</option>
-              </select>
+              <div className="flex flex-col gap-1">
+                <select
+                  multiple
+                  value={filterStatus}
+                  onChange={(e) => { 
+                    const values = Array.from(e.target.selectedOptions, option => option.value);
+                    setFilterStatus(values); 
+                    setPage(1); 
+                  }}
+                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm h-32"
+                >
+                  <option value="active">Aktywne</option>
+                  <option value="due-soon">Zbliża się termin</option>
+                  <option value="overdue">Przeterminowane</option>
+                  <option value="reported">Zgłoszone do zwrotu</option>
+                  <option value="Zagubiony">Zagubione</option>
+                  <option value="Zatrzymany">Zatrzymane</option>
+                </select>
+                <span className="text-xs text-gray-500 ml-1">Przytrzymaj Ctrl, aby zaznaczyć wiele. Puste = wszystkie.</span>
+              </div>
 
               <select
                 value={filterSize}

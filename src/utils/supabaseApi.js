@@ -447,9 +447,7 @@ export const drumsAPI = {
       }
 
       // Mapowanie danych do spójnego formatu używanego w komponentach
-      const mappedData = data
-        .filter(drum => !exceptions.some(e => e.kod_bebna === drum.cecha && e.nip === drum.nip))
-        .map(drum => {
+      const mappedData = data.map(drum => {
         const extension = customDeadlines.find(
           ext => ext.kod_bebna === drum.cecha && ext.nip === drum.nip
         );
@@ -482,7 +480,17 @@ export const drumsAPI = {
               ? clientReturnDeadline
               : finalReturnDate);
 
-        const statusObj = supabaseHelpers.getDrumStatus(dateForStatus);
+        let statusObj = supabaseHelpers.getDrumStatus(dateForStatus);
+
+        // Nadpisanie statusu jeśli bęben jest w wyjątkach
+        const exception = exceptions.find(e => e.kod_bebna === drum.cecha && e.nip === drum.nip);
+        if (exception) {
+          if (exception.exception_type === 'lost') {
+            statusObj = { status: 'Zagubiony', color: 'bg-red-100 text-red-800' };
+          } else if (exception.exception_type === 'kept') {
+            statusObj = { status: 'Zatrzymany', color: 'bg-blue-100 text-blue-800' };
+          }
+        }
 
         return {
           ...drum,
@@ -728,10 +736,8 @@ export const drumsAPI = {
         }
       }
 
-      // Mapowanie danych (z filtrowaniem wyjątków)
-      return allData
-        .filter(drum => !exceptions.some(e => e.kod_bebna === drum.cecha && e.nip === drum.nip))
-        .map(drum => {
+      // Mapowanie danych (z mapowaniem wyjątków)
+      return allData.map(drum => {
         const extension = customDeadlines.find(
           ext => ext.kod_bebna === drum.cecha && ext.nip === drum.nip
         );
@@ -768,7 +774,17 @@ export const drumsAPI = {
               ? clientReturnDeadline
               : finalReturnDate);
 
-        const statusObj = supabaseHelpers.getDrumStatus(dateForStatus);
+        let statusObj = supabaseHelpers.getDrumStatus(dateForStatus);
+
+        // Nadpisanie statusu jeśli bęben jest w wyjątkach
+        const exception = exceptions.find(e => e.kod_bebna === drum.cecha && e.nip === drum.nip);
+        if (exception) {
+          if (exception.exception_type === 'lost') {
+            statusObj = { status: 'Zagubiony', color: 'bg-red-100 text-red-800' };
+          } else if (exception.exception_type === 'kept') {
+            statusObj = { status: 'Zatrzymany', color: 'bg-blue-100 text-blue-800' };
+          }
+        }
 
         return {
           ...drum,
