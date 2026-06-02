@@ -139,7 +139,9 @@ const DrumsList = ({ user }) => {
       });
 
       // Wyciągamy unikalne rozmiary
-      const sizes = [...new Set(allDrums.map(d => d.rozmiar_bebna).filter(Boolean))].sort();
+      const sizes = [...new Set(allDrums.map(d => d.rozmiar_bebna).filter(Boolean))].sort((a, b) => 
+        String(a).localeCompare(String(b), undefined, { numeric: true })
+      );
       setAvailableSizes(sizes);
 
       // 1. Filtrowanie (Search) - WYRZUCONO kod_bebna i cecha
