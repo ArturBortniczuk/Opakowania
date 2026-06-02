@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Menu, X, Home, Users, Package, Truck, BarChart3, LogOut, Building2,
-  UserCheck, ChevronRight, Shield, Settings, Bell, Crown, Pin, PinOff
+  UserCheck, ChevronRight, Shield, Settings, Bell, Crown, Pin, PinOff, Map
 } from 'lucide-react';
 import { statsAPI } from '../utils/supabaseApi';
 
@@ -59,6 +59,7 @@ const AdminNavbar = ({
     { path: '/admin/registrations', label: 'Weryfikacja kont', icon: UserCheck, description: 'Zatwierdzaj nowych użytkowników' },
     { path: '/admin/drums', label: 'Wszystkie bębny', icon: Package, description: 'Monitoruj bębny' },
     { path: '/admin/returns', label: 'Zgłoszenia zwrotów', icon: Truck, description: 'Zarządzaj zwrotami' },
+    { path: '/admin/map', label: 'Mapa logistyczna', icon: Map, description: 'Planowanie tras i odbiory' },
     { path: '/admin/return-periods', label: 'Terminy zwrotu', icon: Settings, description: 'Ustaw terminy dla klientów' },
     { path: '/admin/supplier-rules', label: 'Terminy kablowni', icon: Settings, description: 'Zasady zwrotów dostawców' },
     { path: '/admin/reports', label: 'Raporty i analizy', icon: BarChart3, description: 'Statystyki i raporty' }

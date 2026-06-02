@@ -18,6 +18,7 @@ import AdminReports from './components/AdminReports';
 import AdminSupplierRules from './components/AdminSupplierRules';
 import AdminRegistrationManager from './components/AdminRegistrationManager';
 import HelpGuide from './components/HelpGuide';
+import LogisticsMap from './components/LogisticsMap';
 import './App.css';
 
 import { supabase } from './lib/supabase';
@@ -449,6 +450,11 @@ const App = () => {
               <Route path="/admin/returns" element={
                 <ProtectedRoute adminOnly>
                   <AdminReturnRequests user={currentUser} />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/map" element={
+                <ProtectedRoute adminOnly>
+                  <LogisticsMap user={currentUser} />
                 </ProtectedRoute>
               } />
               <Route path="/admin/reports" element={
