@@ -5,13 +5,12 @@
  * Używa Google Maps Geocoding API.
  * 
  * @param {string} address - Pełny adres (np. "ul. Prosta 1, 00-001 Warszawa")
- * @returns {Promise<{lat: number, lng: number} | null>} Obiekt ze współrzędnymi lub null, jeśli nie znaleziono.
+ * @returns {Promise<{lat: number, lng: number} | {error: string, status: string}>}
  */
 export async function geocodeAddress(address) {
   const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
-    console.error("Brak klucza API Google Maps (REACT_APP_GOOGLE_MAPS_API_KEY).");
-    return null;
+    return { error: "Brak klucza API (REACT_APP_GOOGLE_MAPS_API_KEY)", status: "MISSING_KEY" };
   }
 
   try {
@@ -26,12 +25,10 @@ export async function geocodeAddress(address) {
         lng: location.lng
       };
     } else {
-      console.warn(`Geokodowanie nie powiodło się dla adresu: ${address}. Status: ${data.status}`);
-      return null;
+      return { error: data.error_message || "Nie znaleziono", status: data.status };
     }
   } catch (error) {
-    console.error("Błąd podczas geokodowania:", error);
-    return null;
+    return { error: error.message, status: "NETWORK_ERROR" };
   }
 }
 

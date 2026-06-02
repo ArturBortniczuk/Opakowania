@@ -60,7 +60,7 @@ const GeocodeMigration = () => {
         
         const coords = await geocodeAddress(address);
 
-        if (coords) {
+        if (coords && !coords.error) {
           // Zaktualizuj wszystkie bębny pod tym adresem
           // Aktualizujemy partiami jeśli bębnów jest dużo (Supabase in() limit)
           const chunkSize = 200;
@@ -82,7 +82,7 @@ const GeocodeMigration = () => {
               addLog(`Sukces: zaktualizowano ${drumIds.length} bębnów dla adresu ${address}`);
           }
         } else {
-          addLog(`Nie znaleziono współrzędnych dla: ${address}`);
+          addLog(`Błąd dla: ${address} | Powód: ${coords?.status} - ${coords?.error}`);
           failedCount++;
         }
 
