@@ -37,20 +37,25 @@ const LoginForm = ({ onLogin }) => {
     e.preventDefault();
     if (loading || !email || !password) return;
 
+    console.log('Rozpoczynam logowanie dla:', email);
     setLoading(true);
     setError('');
     setSuccessMessage('');
 
     try {
+      console.log('Wywołuję authAPI.signIn...');
       const result = await authAPI.signIn(email, password);
+      console.log('Wynik authAPI.signIn:', result);
       if (result && result.user) {
         onLogin(result.user);
       } else {
         throw new Error('Logowanie nie powiodło się. Spróbuj ponownie.');
       }
     } catch (err) {
+      console.error('Złapano błąd w handleLogin:', err);
       setError(err.message || 'Podany adres e-mail lub hasło są nieprawidłowe.');
     } finally {
+      console.log('Wykonuję finally - setLoading(false)');
       setLoading(false);
     }
   };

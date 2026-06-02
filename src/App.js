@@ -141,7 +141,7 @@ const App = () => {
           // ⚠️ REJESTRUJEMY NASŁUCHIWACZ REAL-TIME DOPIERO PO ZAKOŃCZENIU INICJALIZACJI!
           // Całkowicie zapobiega to jakimkolwiek wyścigom lub deadlockom na poziomie Supabase Client!
           try {
-            const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+            const { data } = supabase.auth.onAuthStateChange((event, session) => {
               console.log(`🔑 Zmiana stanu autoryzacji w tle: ${event}`);
               
               if (event === 'SIGNED_OUT') {
@@ -158,31 +158,32 @@ const App = () => {
                 }
               } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
                 if (session && session.user) {
-                  try {
-                    const profile = await authAPI.getUserProfile(session.user.id);
-                    if (!isMounted) return;
+                  authAPI.getUserProfile(session.user.id)
+                    .then(profile => {
+                      if (!isMounted) return;
 
-                    const finalUser = {
-                      id: session.user.id,
-                      nip: profile.nip,
-                      username: profile.email,
-                      name: profile.name,
-                      email: profile.email,
-                      role: profile.role,
-                      status: profile.status,
-                      companyName: profile.company_name || profile.name,
-                    };
+                      const finalUser = {
+                        id: session.user.id,
+                        nip: profile.nip,
+                        username: profile.email,
+                        name: profile.name,
+                        email: profile.email,
+                        role: profile.role,
+                        status: profile.status,
+                        companyName: profile.company_name || profile.name,
+                      };
 
-                    setCurrentUser(finalUser);
-                    setCurrentUserCache(finalUser); // Bezpieczny cache
-                    localStorage.setItem('currentUser', JSON.stringify(finalUser));
-                    
-                    if (location.pathname === '/') {
-                      navigate(isStaff(profile.role) ? '/admin' : '/dashboard', { replace: true });
-                    }
-                  } catch (e) {
-                    console.error("Błąd ładowania profilu po zmianie autoryzacji:", e);
-                  }
+                      setCurrentUser(finalUser);
+                      setCurrentUserCache(finalUser); // Bezpieczny cache
+                      localStorage.setItem('currentUser', JSON.stringify(finalUser));
+                      
+                      if (location.pathname === '/') {
+                        navigate(isStaff(profile.role) ? '/admin' : '/dashboard', { replace: true });
+                      }
+                    })
+                    .catch(e => {
+                      console.error("Błąd ładowania profilu po zmianie autoryzacji:", e);
+                    });
                 }
               }
             });
