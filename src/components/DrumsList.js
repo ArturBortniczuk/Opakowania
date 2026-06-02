@@ -18,18 +18,24 @@ const DrumsList = ({ user }) => {
     const initial = (location.state && location.state.filterStatus) || [];
     return Array.isArray(initial) ? initial : (initial === 'all' ? [] : [initial]);
   });
-  const [filterSize, setFilterSize] = useState('all');
+  const [filterSize, setFilterSize] = useState([]);
   const [availableSizes, setAvailableSizes] = useState([]);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
 
-  // Status Dropdown State
+  // Dropdown States
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const statusDropdownRef = useRef(null);
+
+  const [isSizeDropdownOpen, setIsSizeDropdownOpen] = useState(false);
+  const sizeDropdownRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target)) {
         setIsStatusDropdownOpen(false);
+      }
+      if (sizeDropdownRef.current && !sizeDropdownRef.current.contains(event.target)) {
+        setIsSizeDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -43,6 +49,16 @@ const DrumsList = ({ user }) => {
         : [...prev, value];
       setPage(1);
       return newStatus;
+    });
+  };
+
+  const handleSizeToggle = (value) => {
+    setFilterSize(prev => {
+      const newSize = prev.includes(value) 
+        ? prev.filter(s => s !== value)
+        : [...prev, value];
+      setPage(1);
+      return newSize;
     });
   };
 
@@ -144,8 +160,8 @@ const DrumsList = ({ user }) => {
       }
 
       // 2b. Filtrowanie po Rozmiarze
-      if (filterSize !== 'all') {
-        filtered = filtered.filter(d => d.rozmiar_bebna === filterSize);
+      if (filterSize.length > 0) {
+        filtered = filtered.filter(d => filterSize.includes(d.rozmiar_bebna));
       }
 
       // 3. Sortowanie
@@ -469,16 +485,50 @@ const DrumsList = ({ user }) => {
                 )}
               </div>
 
-              <select
-                value={filterSize}
-                onChange={(e) => { setFilterSize(e.target.value); setPage(1); }}
-                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              >
-                <option value="all">Wszystkie rozmiary</option>
-                {availableSizes.map(sz => (
-                  <option key={sz} value={sz}>{sz}</option>
-                ))}
-              </select>
+              <div className="relative min-w-[200px]" ref={sizeDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsSizeDropdownOpen(!isSizeDropdownOpen)}
+                  className="w-full p-3 border border-gray-300 rounded-xl bg-white flex justify-between items-center focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm h-[46px]"
+                >
+                  <span className="truncate mr-2">
+                    {filterSize.length === 0 
+                      ? 'Wszystkie rozmiary' 
+                      : `Wybrano: ${filterSize.length} rozmiar(y)`}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                </button>
+
+                {isSizeDropdownOpen && (
+                  <div className="absolute z-20 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-72 overflow-auto">
+                    {availableSizes.map(sz => (
+                      <label 
+                        key={sz} 
+                        className="flex items-center px-4 py-3 hover:bg-blue-50 cursor-pointer transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={filterSize.includes(sz)}
+                          onChange={() => handleSizeToggle(sz)}
+                          className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                        />
+                        <span className="ml-3 text-sm text-gray-700">{sz}</span>
+                      </label>
+                    ))}
+                    {filterSize.length > 0 && (
+                      <div className="border-t border-gray-100 p-2">
+                        <button
+                          type="button"
+                          onClick={() => { setFilterSize([]); setPage(1); setIsSizeDropdownOpen(false); }}
+                          className="w-full text-center text-sm font-medium text-gray-500 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors"
+                        >
+                          Wyczyść filtry
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="flex gap-2">
                 <button
