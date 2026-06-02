@@ -464,17 +464,40 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     input.click();
   };
 
-  const getStatistics = () => {
-    const total = drumsData.data.length;
-    const overdue = drumsData.data.filter(d => d.status === 'overdue').length;
-    const dueSoon = drumsData.data.filter(d => d.status === 'due-soon').length;
-    const active = drumsData.data.filter(d => d.status === 'active').length;
-    const extended = drumsData.data.filter(d => d.isExtended).length;
+  const [globalStats, setGlobalStats] = useState({
+    total: '-',
+    overdue: '-',
+    dueSoon: '-',
+    active: '-',
+    extended: '-'
+  });
 
-    return { total, overdue, dueSoon, active, extended };
-  };
+  useEffect(() => {
+    const fetchGlobalStats = async () => {
+      try {
+        const allDrums = await drumsAPI.getAllDrums();
+        
+        const overdue = allDrums.filter(d => d.status === 'overdue').length;
+        const dueSoon = allDrums.filter(d => d.status === 'due-soon').length;
+        const active = allDrums.filter(d => d.status === 'active').length;
+        const extended = allDrums.filter(d => d.isExtended).length;
+        
+        setGlobalStats({
+          total: allDrums.length,
+          overdue,
+          dueSoon,
+          active,
+          extended
+        });
+      } catch (err) {
+        console.error('Error fetching global stats:', err);
+      }
+    };
+    
+    fetchGlobalStats();
+  }, []);
 
-  const stats = getStatistics();
+  const stats = globalStats;
 
   // ZACHOWANE: DrumCard z twojego kodu
   const DrumCard = ({ drum, index }) => (
