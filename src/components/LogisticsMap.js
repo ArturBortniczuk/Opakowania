@@ -466,13 +466,15 @@ const LogisticsMap = () => {
                                   <div className="flex justify-between items-start">
                                     <div className="flex items-center">
                                       <span className="font-mono text-sm font-bold text-gray-800">{drum.cecha || drum.kod_bebna || 'Brak cechy'}</span>
-                                      <button 
-                                        onClick={() => navigate(`/admin/drums?searchTerm=${encodeURIComponent(drum.cecha || drum.kod_bebna)}&openModal=true`)}
-                                        className="ml-2 p-1 bg-white hover:bg-gray-100 border border-gray-200 rounded text-gray-500 hover:text-blue-600 transition-colors"
-                                        title="Zobacz szczegóły bębna"
+                                      <a 
+                                        href={`/admin/drums?searchTerm=${encodeURIComponent(drum.cecha || drum.kod_bebna)}&openModal=true`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="ml-2 p-1 bg-white hover:bg-gray-100 border border-gray-200 rounded text-gray-500 hover:text-blue-600 transition-colors inline-block"
+                                        title="Zobacz szczegóły bębna w nowej karcie"
                                       >
                                         <Eye className="w-3.5 h-3.5" />
-                                      </button>
+                                      </a>
                                     </div>
                                     {isOverdue && <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 ml-1" title="Przeterminowany (>120 dni)" />}
                                   </div>
