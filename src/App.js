@@ -181,8 +181,12 @@ const App = () => {
                       setCurrentUserCache(finalUser); // Bezpieczny cache
                       localStorage.setItem('currentUser', JSON.stringify(finalUser));
                       
-                      if (location.pathname === '/') {
+                      // Jeśli to logowanie z linku resetującego hasło, nie przekierowuj na dashboard!
+                      if (location.pathname === '/' && !window.location.href.includes('type=recovery') && !window.location.search.includes('code=')) {
                         navigate(isStaff(profile.role) ? '/admin' : '/dashboard', { replace: true });
+                      } else if (location.pathname === '/' && (window.location.href.includes('type=recovery') || window.location.search.includes('code='))) {
+                        // Awaryjne przechwycenie: jeśli Supabase zrzuciło nas na '/', a w URL jest code= lub type=recovery
+                        navigate('/set-password', { replace: true });
                       }
                     })
                     .catch(e => {
