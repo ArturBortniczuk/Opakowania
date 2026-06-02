@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
 import { supabase } from '../lib/supabase';
 import { returnsAPI } from '../utils/supabaseApi';
 import GeocodeMigration from './GeocodeMigration';
-import { MapPin, Map as MapIcon, X, Check, Search, AlertTriangle, Filter, Building, User } from 'lucide-react';
+import { MapPin, Map as MapIcon, X, Check, Search, AlertTriangle, Filter, Building, User, Eye } from 'lucide-react';
 
 const containerStyle = {
   width: '100%',
@@ -29,6 +30,8 @@ const LogisticsMap = () => {
     id: 'google-map-script',
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || ''
   });
+
+  const navigate = useNavigate();
 
   const [map, setMap] = useState(null);
   const [locations, setLocations] = useState([]);
@@ -461,7 +464,16 @@ const LogisticsMap = () => {
                               return (
                                 <div key={drum.id} className={`flex flex-col p-2 rounded border ${isOverdue ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'}`}>
                                   <div className="flex justify-between items-start">
-                                    <span className="font-mono text-sm font-bold text-gray-800">{drum.cecha || drum.kod_bebna || 'Brak cechy'}</span>
+                                    <div className="flex items-center">
+                                      <span className="font-mono text-sm font-bold text-gray-800">{drum.cecha || drum.kod_bebna || 'Brak cechy'}</span>
+                                      <button 
+                                        onClick={() => navigate(`/admin/drums?searchTerm=${encodeURIComponent(drum.cecha || drum.kod_bebna)}&openModal=true`)}
+                                        className="ml-2 p-1 bg-white hover:bg-gray-100 border border-gray-200 rounded text-gray-500 hover:text-blue-600 transition-colors"
+                                        title="Zobacz szczegóły bębna"
+                                      >
+                                        <Eye className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
                                     {isOverdue && <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 ml-1" title="Przeterminowany (>120 dni)" />}
                                   </div>
                                   <div className="flex justify-between items-end mt-1">
