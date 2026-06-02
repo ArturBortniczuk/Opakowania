@@ -25,6 +25,19 @@ import { supabase } from './lib/supabase';
 import { authAPI, setCurrentUserCache } from './utils/supabaseApi';
 import { Clock, LogOut } from 'lucide-react';
 
+const ProtectedRoute = ({ children, currentUser, isUserStaff, adminOnly = false, allowedRoles = null }) => {
+  if (!currentUser) {
+    return <Navigate to="/" replace />;
+  }
+  if (adminOnly && !isUserStaff) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
+    return <Navigate to={isUserStaff ? "/admin" : "/dashboard"} replace />;
+  }
+  return children;
+};
+
 const App = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [currentProfile, setCurrentProfile] = useState(null);
@@ -286,19 +299,7 @@ const App = () => {
     );
   }
 
-  // Helper dla chronionych tras
-  const ProtectedRoute = ({ children, adminOnly = false, allowedRoles = null }) => {
-    if (!currentUser) {
-      return <Navigate to="/" replace />;
-    }
-    if (adminOnly && !isUserStaff) {
-      return <Navigate to="/dashboard" replace />;
-    }
-    if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
-      return <Navigate to={isUserStaff ? "/admin" : "/dashboard"} replace />;
-    }
-    return children;
-  };
+  // Usunięto wewnętrzny ProtectedRoute by uniknąć remountowania komponentów
 
   const isResetPath = location.pathname.startsWith('/set-password');
   const shouldShowNavbar = currentUser && location.pathname !== '/' && !isResetPath && (isUserStaff || currentProfile);
@@ -355,34 +356,34 @@ const App = () => {
 
               {/* Trasy Klienta */}
               <Route path="/dashboard" element={
-                <ProtectedRoute>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff}>
                   <Dashboard user={currentUser} profile={currentProfile} />
                 </ProtectedRoute>
               } />
               <Route path="/drums" element={
-                <ProtectedRoute>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff}>
                   <DrumsList user={currentUser} />
                 </ProtectedRoute>
               } />
               <Route path="/return" element={
-                <ProtectedRoute>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff}>
                   <ReturnFormWrapper currentUser={currentUser} profile={currentProfile} />
                 </ProtectedRoute>
               } />
               <Route path="/my-returns" element={
-                <ProtectedRoute>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff}>
                   <ClientReturnRequests user={currentUser} />
                 </ProtectedRoute>
               } />
               <Route path="/help" element={
-                <ProtectedRoute>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff}>
                   <HelpGuide />
                 </ProtectedRoute>
               } />
 
               {/* Trasy Admina */}
               <Route path="/admin" element={
-                <ProtectedRoute adminOnly>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly>
                   <AdminDashboard
                     user={currentUser}
                     onNavigate={(page, state) => {
@@ -410,7 +411,7 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/admin/clients" element={
-                <ProtectedRoute adminOnly>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly>
                   <AdminClientsList
                     user={currentUser}
                     onNavigate={(page, state) => {
@@ -438,37 +439,37 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/admin/registrations" element={
-                <ProtectedRoute adminOnly allowedRoles={['admin', 'supervisor']}>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor']}>
                   <AdminRegistrationManager />
                 </ProtectedRoute>
               } />
               <Route path="/admin/drums" element={
-                <ProtectedRoute adminOnly>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly>
                   <AdminDrumsList user={currentUser} />
                 </ProtectedRoute>
               } />
               <Route path="/admin/returns" element={
-                <ProtectedRoute adminOnly>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly>
                   <AdminReturnRequests user={currentUser} />
                 </ProtectedRoute>
               } />
               <Route path="/admin/map" element={
-                <ProtectedRoute adminOnly>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly>
                   <LogisticsMap user={currentUser} />
                 </ProtectedRoute>
               } />
               <Route path="/admin/reports" element={
-                <ProtectedRoute adminOnly>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly>
                   <AdminReports user={currentUser} />
                 </ProtectedRoute>
               } />
               <Route path="/admin/return-periods" element={
-                <ProtectedRoute adminOnly allowedRoles={['admin', 'supervisor']}>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor']}>
                   <AdminReturnPeriodsManager user={currentUser} />
                 </ProtectedRoute>
               } />
               <Route path="/admin/supplier-rules" element={
-                <ProtectedRoute adminOnly allowedRoles={['admin', 'supervisor']}>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor']}>
                   <AdminSupplierRules user={currentUser} />
                 </ProtectedRoute>
               } />
