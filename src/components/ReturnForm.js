@@ -302,6 +302,27 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
     }
   };
 
+  // Zgłaszanie zatrzymania (klient zostawia bęben)
+  const handleReportKept = async (cecha, e) => {
+    e.stopPropagation(); // Nie przełączaj zaznaczenia wyboru
+    if (window.confirm(`Czy na pewno chcesz zachować bęben ${cecha}? Nie będziesz mógł go później zwrócić przez formularz.`)) {
+      try {
+        await drumsAPI.reportKept(cecha, user.nip, 'Klient zdecydował się zatrzymać bęben');
+        // Usuń z lokalnego stanu
+        setUserDrums(prev => prev.filter(d => d.cecha !== cecha && d.kod_bebna !== cecha));
+        // Usuń z zaznaczonych jeśli był
+        setFormData(prev => ({
+          ...prev,
+          selectedDrums: prev.selectedDrums.filter(d => d.cecha !== cecha)
+        }));
+        alert('Zgłoszono zatrzymanie bębna.');
+      } catch (err) {
+        console.error(err);
+        alert('Błąd zgłaszania zatrzymania.');
+      }
+    }
+  };
+
   // Oblicz całkowitą wartość wybranych bębnów (netto z marżą 20%)
   const calculateSelectedDrumsValue = () => {
     let totalVal = 0;
@@ -837,14 +858,23 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
                             )}
                           </div>
                         ) : (
-                          // Sekcja Zgubienia (tylko gdy NIE wybrany)
-                          <button
-                            onClick={(e) => handleReportLost(drumCecha, e)}
-                            className="w-full flex items-center justify-center space-x-1.5 py-1.5 px-3 bg-white border border-gray-300 hover:bg-red-50 hover:border-red-300 text-gray-600 hover:text-red-600 rounded-lg text-sm transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            <span>Zgłoś zagubienie</span>
-                          </button>
+                          // Sekcja Zgubienia / Zatrzymania (tylko gdy NIE wybrany)
+                          <div className="flex gap-2">
+                            <button
+                              onClick={(e) => handleReportLost(drumCecha, e)}
+                              className="flex-1 flex items-center justify-center space-x-1.5 py-1.5 px-2 bg-white border border-gray-300 hover:bg-red-50 hover:border-red-300 text-gray-600 hover:text-red-600 rounded-lg text-sm transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              <span>Zgłoś zagubienie</span>
+                            </button>
+                            <button
+                              onClick={(e) => handleReportKept(drumCecha, e)}
+                              className="flex-1 flex items-center justify-center space-x-1.5 py-1.5 px-2 bg-white border border-gray-300 hover:bg-blue-50 hover:border-blue-300 text-gray-600 hover:text-blue-600 rounded-lg text-sm transition-colors"
+                            >
+                              <Package className="w-4 h-4" />
+                              <span>Zostawiam sobie</span>
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>

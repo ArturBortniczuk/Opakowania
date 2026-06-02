@@ -413,18 +413,20 @@ export const drumsAPI = {
       // Paginacja - KLUCZOWE!
       const offset = (page - 1) * limit;
       query = query.range(offset, offset + limit - 1);
-
       const { data, error, count } = await query;
 
       if (error) throw error;
 
       console.log(`✅ Pobrano ${data?.length || 0} rekordów z ${count || 0} łącznie`);
 
-      // Pobieranie niestandardowych terminów dla pobranych bębnów
+      // Pobieranie niestandardowych terminów i wyjątków dla pobranych bębnów
       let customDeadlines = [];
+      let exceptions = [];
       if (data && data.length > 0) {
         const drumCechas = data.map(d => d.cecha).filter(Boolean);
         const nips = [...new Set(data.map(d => d.nip).filter(Boolean))];
+        
+        // Terminy
         const { data: deadlinesData } = await supabase
           .from('custom_drum_deadlines')
           .select('*')
@@ -433,10 +435,21 @@ export const drumsAPI = {
         if (deadlinesData) {
           customDeadlines = deadlinesData;
         }
+
+        // Wyjątki (zagubione / zatrzymane) - POBIERZ DLA WSZYSTKICH NIPÓW
+        const { data: excData } = await supabase
+          .from('drum_exceptions')
+          .select('*')
+          .in('nip', nips);
+        if (excData) {
+          exceptions = excData;
+        }
       }
 
       // Mapowanie danych do spójnego formatu używanego w komponentach
-      const mappedData = data.map(drum => {
+      const mappedData = data
+        .filter(drum => !exceptions.some(e => e.kod_bebna === drum.cecha && e.nip === drum.nip))
+        .map(drum => {
         const extension = customDeadlines.find(
           ext => ext.kod_bebna === drum.cecha && ext.nip === drum.nip
         );
@@ -568,14 +581,16 @@ export const drumsAPI = {
     try {
       console.log(`⚠️ Zgłaszanie zagubienia bębna: ${cecha} dla NIP: ${nip}`);
       const { data, error } = await supabase
-        .from('drums')
-        .update({
-          status: 'Lost',
-          uwagi: description, // Zakładamy pole 'uwagi' lub podobne, jeśli nie ma to stworzymy w migracji lub użyjemy innego
+        .from('drum_exceptions')
+        .upsert({
+          kod_bebna: cecha,
+          nip: nip,
+          exception_type: 'lost',
+          notes: description,
           updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'kod_bebna,nip'
         })
-        .eq('cecha', cecha)
-        .eq('nip', nip) // Dodatkowe zabezpieczenie
         .select()
         .single();
 
@@ -583,6 +598,38 @@ export const drumsAPI = {
       return data;
     } catch (error) {
       console.error('❌ Błąd zgłaszania zagubienia:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Zgłasza zatrzymanie bębna przez klienta.
+   * @param {string} cecha - Unikalna cecha bębna.
+   * @param {string} nip - NIP klienta (dla bezpieczeństwa).
+   * @param {string} description - Opis okoliczności zatrzymania.
+   * @returns {Promise<object>} Zaktualizowany rekord.
+   */
+  async reportKept(cecha, nip, description) {
+    try {
+      console.log(`⚠️ Zgłaszanie zatrzymania bębna: ${cecha} dla NIP: ${nip}`);
+      const { data, error } = await supabase
+        .from('drum_exceptions')
+        .upsert({
+          kod_bebna: cecha,
+          nip: nip,
+          exception_type: 'kept',
+          notes: description,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'kod_bebna,nip'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('❌ Błąd zgłaszania zatrzymania:', error);
       throw error;
     }
   },
@@ -646,32 +693,45 @@ export const drumsAPI = {
 
       console.log(`✅ getAllDrums pobrał ${allData.length} bębnów z bazy w ${pageIndex + 1} zapytaniach`);
 
-      // Pobranie niestandardowych terminów dla pobranych bębnów
+      // Pobranie niestandardowych terminów i wyjątków dla pobranych bębnów
       let customDeadlines = [];
+      let exceptions = [];
       if (allData && allData.length > 0) {
         const drumCechas = allData.map(d => d.cecha).filter(Boolean);
         let deadlinesQuery = supabase.from('custom_drum_deadlines').select('*');
+        let excQuery = supabase.from('drum_exceptions').select('*');
+        
         if (nip) {
           deadlinesQuery = deadlinesQuery.eq('nip', nip);
+          excQuery = excQuery.eq('nip', nip);
           if (drumCechas.length < 200) {
             deadlinesQuery = deadlinesQuery.in('kod_bebna', drumCechas);
+            excQuery = excQuery.in('kod_bebna', drumCechas);
           }
         } else if (allowedNips && allowedNips.length > 0) {
           deadlinesQuery = deadlinesQuery.in('nip', allowedNips);
+          excQuery = excQuery.in('nip', allowedNips);
           if (drumCechas.length < 200) {
             deadlinesQuery = deadlinesQuery.in('kod_bebna', drumCechas);
+            excQuery = excQuery.in('kod_bebna', drumCechas);
           }
         }
-        // Dla adminów (allowedNips === null) pobieramy po prostu wszystkie niestandardowe terminy,
-        // bez nakładania gigantycznego filtra IN, co całkowicie zapobiega błędom przekroczenia długości URL.
+        // Dla adminów pobieramy po prostu wszystkie.
         const { data: deadlinesData } = await deadlinesQuery;
         if (deadlinesData) {
           customDeadlines = deadlinesData;
         }
+
+        const { data: excData } = await excQuery;
+        if (excData) {
+          exceptions = excData;
+        }
       }
 
-      // Mapowanie danych (identyczne jak w getDrums)
-      return allData.map(drum => {
+      // Mapowanie danych (z filtrowaniem wyjątków)
+      return allData
+        .filter(drum => !exceptions.some(e => e.kod_bebna === drum.cecha && e.nip === drum.nip))
+        .map(drum => {
         const extension = customDeadlines.find(
           ext => ext.kod_bebna === drum.cecha && ext.nip === drum.nip
         );
