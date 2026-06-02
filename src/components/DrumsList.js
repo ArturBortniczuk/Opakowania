@@ -1,10 +1,10 @@
 // src/components/DrumsList.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
 import {
   Package, Calendar, Search, Filter, AlertCircle, CheckCircle, Clock,
-  ArrowUpDown, Truck, RefreshCw, ChevronLeft, ChevronRight
+  ArrowUpDown, Truck, RefreshCw, ChevronLeft, ChevronRight, ChevronDown
 } from 'lucide-react';
 
 const DrumsList = ({ user }) => {
@@ -21,6 +21,39 @@ const DrumsList = ({ user }) => {
   const [filterSize, setFilterSize] = useState('all');
   const [availableSizes, setAvailableSizes] = useState([]);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
+
+  // Status Dropdown State
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target)) {
+        setIsStatusDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleStatusToggle = (value) => {
+    setFilterStatus(prev => {
+      const newStatus = prev.includes(value) 
+        ? prev.filter(s => s !== value)
+        : [...prev, value];
+      setPage(1);
+      return newStatus;
+    });
+  };
+
+  const statusOptions = [
+    { value: 'active', label: 'Aktywne' },
+    { value: 'due-soon', label: 'Zbliża się termin' },
+    { value: 'overdue', label: 'Przeterminowane' },
+    { value: 'reported', label: 'Zgłoszone do zwrotu' },
+    { value: 'Zagubiony', label: 'Zagubione' },
+    { value: 'Zatrzymany', label: 'Zatrzymane' }
+  ];
 
   // Pagination State
   const [page, setPage] = useState(1);
@@ -391,25 +424,49 @@ const DrumsList = ({ user }) => {
                 />
               </div>
 
-              <div className="flex flex-col gap-1">
-                <select
-                  multiple
-                  value={filterStatus}
-                  onChange={(e) => { 
-                    const values = Array.from(e.target.selectedOptions, option => option.value);
-                    setFilterStatus(values); 
-                    setPage(1); 
-                  }}
-                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm h-32"
+              <div className="relative min-w-[200px]" ref={statusDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                  className="w-full p-3 border border-gray-300 rounded-xl bg-white flex justify-between items-center focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm h-[46px]"
                 >
-                  <option value="active">Aktywne</option>
-                  <option value="due-soon">Zbliża się termin</option>
-                  <option value="overdue">Przeterminowane</option>
-                  <option value="reported">Zgłoszone do zwrotu</option>
-                  <option value="Zagubiony">Zagubione</option>
-                  <option value="Zatrzymany">Zatrzymane</option>
-                </select>
-                <span className="text-xs text-gray-500 ml-1">Przytrzymaj Ctrl, aby zaznaczyć wiele. Puste = wszystkie.</span>
+                  <span className="truncate mr-2">
+                    {filterStatus.length === 0 
+                      ? 'Wszystkie statusy' 
+                      : `Wybrano: ${filterStatus.length} status(y)`}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                </button>
+
+                {isStatusDropdownOpen && (
+                  <div className="absolute z-20 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-72 overflow-auto">
+                    {statusOptions.map(option => (
+                      <label 
+                        key={option.value} 
+                        className="flex items-center px-4 py-3 hover:bg-blue-50 cursor-pointer transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={filterStatus.includes(option.value)}
+                          onChange={() => handleStatusToggle(option.value)}
+                          className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                        />
+                        <span className="ml-3 text-sm text-gray-700">{option.label}</span>
+                      </label>
+                    ))}
+                    {filterStatus.length > 0 && (
+                      <div className="border-t border-gray-100 p-2">
+                        <button
+                          type="button"
+                          onClick={() => { setFilterStatus([]); setPage(1); setIsStatusDropdownOpen(false); }}
+                          className="w-full text-center text-sm font-medium text-gray-500 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors"
+                        >
+                          Wyczyść filtry
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <select
