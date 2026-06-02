@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
 import { supabase } from '../lib/supabase';
 import { returnsAPI } from '../utils/supabaseApi';
 import GeocodeMigration from './GeocodeMigration';
-import { MapPin, Map as MapIcon, X, Check, Search, AlertTriangle } from 'lucide-react';
+import { MapPin, Map as MapIcon, X, Check, Search, AlertTriangle, Filter } from 'lucide-react';
 
 const containerStyle = {
   width: '100%',
@@ -26,7 +26,12 @@ const LogisticsMap = () => {
   const [locations, setLocations] = useState([]);
   const [missingAddresses, setMissingAddresses] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState(null);
+  
+  // Filtry i wyszukiwanie
   const [filter, setFilter] = useState('all'); // 'all', 'drums', 'pickups'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sizeFilter, setSizeFilter] = useState('');
+  const [availableSizes, setAvailableSizes] = useState([]);
 
   // Tryb ręcznego przypisywania
   const [assigningAddress, setAssigningAddress] = useState(null);
@@ -43,20 +48,27 @@ const LogisticsMap = () => {
 
   const fetchData = async () => {
     try {
-      // 1. Pobieramy bębny z i bez latitude/longitude
+      // 1. Pobieramy bębny (dodano cecha i nazwa)
       const { data: drumsData, error: drumsError } = await supabase
         .from('drums')
-        .select('id, kod_bebna, adres_dostawy, pelna_nazwa_kontrahenta, latitude, longitude, status, data_zwrotu_do_dostawcy')
+        .select('id, kod_bebna, cecha, nazwa, adres_dostawy, pelna_nazwa_kontrahenta, latitude, longitude, status, data_zwrotu_do_dostawcy')
         .not('adres_dostawy', 'is', null)
         .neq('adres_dostawy', '')
-        .limit(5000);
+        .limit(8000); // Zwiększony limit dla pełnego oglądu
         
       if (drumsError) console.error(drumsError);
 
       const drumsByLoc = {};
       const missingByLoc = {};
+      const sizesSet = new Set();
 
       (drumsData || []).forEach(d => {
+        // Zbieranie unikalnych rozmiarów
+        if (d.nazwa) sizesSet.add(d.nazwa.trim());
+
+        // Normalizacja cechy
+        d.cecha_normalized = (d.cecha || d.kod_bebna || '').toLowerCase();
+
         if (d.latitude && d.longitude) {
           // Ma współrzędne
           const locKey = `${d.latitude},${d.longitude}`;
@@ -88,6 +100,9 @@ const LogisticsMap = () => {
           missingByLoc[addr].drumIds.push(d.id);
         }
       });
+
+      // Sortuj rozmiary alfabetycznie
+      setAvailableSizes(Array.from(sizesSet).sort());
 
       const groupedDrums = Object.values(drumsByLoc).map(loc => ({
         ...loc,
@@ -131,12 +146,48 @@ const LogisticsMap = () => {
     return `http://maps.google.com/mapfiles/ms/icons/${color}-dot.png`;
   };
 
-  const filteredLocations = locations.filter(loc => {
-    if (filter === 'all') return true;
-    if (filter === 'drums') return loc.type === 'drums';
-    if (filter === 'pickups') return loc.type === 'pickup';
-    return true;
-  });
+  // LOGIKA FILTROWANIA
+  const filteredLocations = useMemo(() => {
+    let filtered = locations;
+
+    // 1. Podstawowy typ filtra (drums/pickups)
+    if (filter === 'drums') filtered = filtered.filter(l => l.type === 'drums');
+    if (filter === 'pickups') filtered = filtered.filter(l => l.type === 'pickup');
+
+    // 2. Zaawansowane filtry bębnów (searchQuery i sizeFilter)
+    const sQuery = searchQuery.trim().toLowerCase();
+    
+    // Jeśli użytkownik szuka konkretnego bębna lub rozmiaru, ukrywamy zgłoszenia odbioru
+    // (opcjonalnie moglibyśmy szukać też w zgłoszeniach, ale dla uproszczenia filtrujemy je z widoku)
+    if (sQuery || sizeFilter) {
+      filtered = filtered.filter(loc => loc.type === 'drums').map(loc => {
+        // Filtrujemy tablicę .drums wewnątrz każdej lokalizacji
+        const filteredDrums = loc.drums.filter(d => {
+          const matchQuery = !sQuery || d.cecha_normalized.includes(sQuery);
+          const matchSize = !sizeFilter || (d.nazwa && d.nazwa.trim() === sizeFilter);
+          return matchQuery && matchSize;
+        });
+
+        // Tworzymy kopię lokalizacji, podmieniając tablicę wyświetlanych bębnów na tę przefiltrowaną
+        return {
+          ...loc,
+          filteredDrums,
+          visibleCount: filteredDrums.length,
+          visibleOverdue: filteredDrums.filter(d => new Date(d.data_zwrotu_do_dostawcy) < new Date()).length
+        };
+      }).filter(loc => loc.visibleCount > 0); // Ukrywamy lokalizacje, które po odfiltrowaniu bębnów są puste
+    } else {
+      // Brak zaawansowanych filtrów - wszystkie bębny widoczne
+      filtered = filtered.map(loc => {
+        if (loc.type === 'drums') {
+          return { ...loc, filteredDrums: loc.drums, visibleCount: loc.drumsCount, visibleOverdue: loc.overdueCount };
+        }
+        return loc;
+      });
+    }
+
+    return filtered;
+  }, [locations, filter, searchQuery, sizeFilter]);
 
   const handleMapClick = (e) => {
     if (assigningAddress) {
@@ -152,7 +203,6 @@ const LogisticsMap = () => {
     
     setIsSavingManual(true);
     try {
-      // 1. Zapisujemy w trwałym cache'u
       const { error: cacheError } = await supabase
         .from('address_coordinates_cache')
         .upsert({
@@ -165,7 +215,6 @@ const LogisticsMap = () => {
 
       if (cacheError) throw cacheError;
 
-      // 2. Aktualizujemy bębny natychmiastowo, żeby widzieć je na mapie (normalnie zrobiłby to trigger przy syncu z ERP, ale chcemy mieć feedback UI)
       const chunkSize = 200;
       for (let j = 0; j < assigningAddress.drumIds.length; j += chunkSize) {
         const chunkIds = assigningAddress.drumIds.slice(j, j + chunkSize);
@@ -175,7 +224,6 @@ const LogisticsMap = () => {
           .in('id', chunkIds);
       }
 
-      // 3. Reset UI i ponowne pobranie
       setAssigningAddress(null);
       setTemporaryMarker(null);
       await fetchData();
@@ -194,31 +242,47 @@ const LogisticsMap = () => {
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 space-y-4 lg:space-y-0">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 space-y-4 lg:space-y-0 border-b pb-6">
           <h2 className="text-xl font-bold text-gray-800 flex items-center">
             <MapIcon className="w-6 h-6 mr-2 text-blue-600" />
-            Mapa Logistyczna
+            Zarządzanie Bębnami
           </h2>
           
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setFilter('all')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Wszystko</button>
+            <button onClick={() => setFilter('drums')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'drums' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>Bębny</button>
+            <button onClick={() => setFilter('pickups')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'pickups' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}>Odbiory</button>
+          </div>
+        </div>
+
+        {/* Panel Wyszukiwania Bębnów */}
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
+          <div className="flex-1 relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              placeholder="Wyszukaj bęben po numerze (cesze)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="w-full md:w-64 relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Filter className="h-5 w-5 text-gray-400" />
+            </div>
+            <select
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm appearance-none"
+              value={sizeFilter}
+              onChange={(e) => setSizeFilter(e.target.value)}
             >
-              Wszystko
-            </button>
-            <button
-              onClick={() => setFilter('drums')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'drums' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
-            >
-              Lokalizacje Bębnów
-            </button>
-            <button
-              onClick={() => setFilter('pickups')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'pickups' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}
-            >
-              Zaplanowane Odbiory
-            </button>
+              <option value="">Wszystkie rozmiary</option>
+              {availableSizes.map(size => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -232,23 +296,13 @@ const LogisticsMap = () => {
                     <MapPin className="w-5 h-5 mr-1" /> Tryb Ręcznego Przypisywania
                   </h4>
                   <p className="text-sm text-yellow-700 mt-1">
-                    Kliknij wybrane miejsce na mapie, aby trwale ustalić położenie dla: <br/>
-                    <strong>{assigningAddress.address}</strong> (Bębny: {assigningAddress.count})
+                    Kliknij miejsce na mapie dla: <strong>{assigningAddress.address}</strong>
                   </p>
                 </div>
                 <div className="flex space-x-2">
-                  <button 
-                    onClick={() => { setAssigningAddress(null); setTemporaryMarker(null); }}
-                    className="px-3 py-2 bg-white text-gray-700 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50"
-                  >
-                    Anuluj
-                  </button>
+                  <button onClick={() => { setAssigningAddress(null); setTemporaryMarker(null); }} className="px-3 py-2 bg-white text-gray-700 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50">Anuluj</button>
                   {temporaryMarker && (
-                    <button 
-                      onClick={handleSaveManualCoordinates}
-                      disabled={isSavingManual}
-                      className="px-3 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center"
-                    >
+                    <button onClick={handleSaveManualCoordinates} disabled={isSavingManual} className="px-3 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center">
                       {isSavingManual ? 'Zapisywanie...' : <><Check className="w-4 h-4 mr-1" /> Zapisz Punkt</>}
                     </button>
                   )}
@@ -264,12 +318,8 @@ const LogisticsMap = () => {
                 onLoad={onLoad}
                 onUnmount={onUnmount}
                 onClick={handleMapClick}
-                options={{
-                  clickableIcons: false, // Zapobiega klikaniu w biznesy na mapie
-                  gestureHandling: 'greedy' // Ułatwia przesuwanie
-                }}
+                options={{ clickableIcons: false, gestureHandling: 'greedy' }}
               >
-                {/* Rysujemy stałe punkty tylko gdy nie przypisujemy lub by mieć kontekst */}
                 {filteredLocations.map((loc) => (
                   <MarkerF
                     key={loc.id}
@@ -279,13 +329,8 @@ const LogisticsMap = () => {
                   />
                 ))}
 
-                {/* Tymczasowy Marker przypisywany ręcznie */}
                 {temporaryMarker && (
-                  <MarkerF
-                    position={temporaryMarker}
-                    icon="http://maps.google.com/mapfiles/ms/icons/green-dot.png"
-                    animation={window.google.maps.Animation.BOUNCE}
-                  />
+                  <MarkerF position={temporaryMarker} icon="http://maps.google.com/mapfiles/ms/icons/green-dot.png" animation={window.google.maps.Animation.BOUNCE} />
                 )}
 
                 {selectedLocation && !assigningAddress && (
@@ -293,17 +338,32 @@ const LogisticsMap = () => {
                     position={{ lat: selectedLocation.lat, lng: selectedLocation.lng }}
                     onCloseClick={() => setSelectedLocation(null)}
                   >
-                    <div className="p-3 max-w-xs">
-                      <h3 className="font-bold text-gray-900 mb-1 border-b pb-1">{selectedLocation.title}</h3>
-                      <p className="text-sm font-medium text-gray-700 mb-2">{selectedLocation.companyName}</p>
+                    <div className="p-3 max-w-sm w-80">
+                      <h3 className="font-bold text-gray-900 mb-1 border-b pb-1 truncate" title={selectedLocation.title}>{selectedLocation.title}</h3>
+                      <p className="text-sm font-medium text-gray-700 mb-2 truncate">{selectedLocation.companyName}</p>
                       
                       {selectedLocation.type === 'drums' && (
-                        <div className="bg-blue-50 p-2 rounded mb-3 border border-blue-100">
-                          <p className="text-sm text-blue-800 font-medium">Bębny w tej lokalizacji: <span className="font-bold">{selectedLocation.drumsCount}</span></p>
-                          {selectedLocation.overdueCount > 0 && (
-                            <p className="text-xs text-red-600 font-medium mt-1">W tym po terminie: {selectedLocation.overdueCount}</p>
-                          )}
-                        </div>
+                        <>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-bold text-gray-500 uppercase">Wyniki bębnów ({selectedLocation.visibleCount})</span>
+                            {selectedLocation.visibleOverdue > 0 && <span className="bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded font-bold">{selectedLocation.visibleOverdue} po terminie</span>}
+                          </div>
+                          
+                          <div className="max-h-48 overflow-y-auto pr-1 space-y-1 mb-3">
+                            {selectedLocation.filteredDrums.map(drum => {
+                              const isOverdue = new Date(drum.data_zwrotu_do_dostawcy) < new Date();
+                              return (
+                                <div key={drum.id} className={`flex justify-between items-center p-2 rounded border ${isOverdue ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100'}`}>
+                                  <div>
+                                    <span className="font-mono text-sm font-bold text-gray-800">{drum.cecha || drum.kod_bebna || 'Brak cechy'}</span>
+                                    <p className="text-xs text-gray-600 truncate max-w-[150px]" title={drum.nazwa}>{drum.nazwa || 'Nieznany rozmiar'}</p>
+                                  </div>
+                                  {isOverdue && <AlertTriangle className="w-4 h-4 text-red-500" title="Po terminie zwrotu" />}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
                       )}
                       
                       {selectedLocation.type === 'pickup' && (
@@ -332,8 +392,8 @@ const LogisticsMap = () => {
             
             <div className="mt-4 text-sm text-gray-500 bg-gray-50 p-4 rounded-lg">
               <ul className="list-disc pl-5 space-y-1">
-                <li><strong>Niebieskie znaczniki:</strong> Lokalizacje, gdzie fizycznie znajdują się bębny.</li>
-                <li><strong>Czerwone znaczniki:</strong> Potwierdzone lub oczekujące zgłoszenia odbioru.</li>
+                <li>Użyj pola <strong>Wyszukaj bęben</strong> aby wpisać jego cechę – odnajdziemy dokładnie ten plac budowy, na którym leży.</li>
+                <li>Użyj filtra obok, by wyizolować konkretne rozmiary (np. by ułożyć trasę dla małego busa tylko dla małych bębnów).</li>
               </ul>
             </div>
           </div>
@@ -341,18 +401,20 @@ const LogisticsMap = () => {
           {/* Panel Boczny: Niezidentyfikowane Adresy */}
           <div className="w-full xl:w-96 flex-shrink-0">
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm h-full max-h-[800px] flex flex-col">
-              <div className="p-4 border-b border-gray-200 bg-red-50 rounded-t-xl flex items-center">
-                <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
-                <div>
-                  <h3 className="font-bold text-gray-900">Brak współrzędnych</h3>
-                  <p className="text-xs text-red-600">Adresy nie odnalezione przez Google ({missingAddresses.length})</p>
+              <div className="p-4 border-b border-gray-200 bg-red-50 rounded-t-xl flex items-center justify-between">
+                <div className="flex items-center">
+                  <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
+                  <div>
+                    <h3 className="font-bold text-gray-900">Brak współrzędnych</h3>
+                    <p className="text-xs text-red-600">Nie znaleziono w Google ({missingAddresses.length})</p>
+                  </div>
                 </div>
               </div>
               
               <div className="flex-1 overflow-y-auto p-2 space-y-2">
                 {missingAddresses.length === 0 ? (
                   <div className="p-4 text-center text-gray-500 text-sm">
-                    Wszystkie bębny z adresem posiadają współrzędne!
+                    Wszystkie bębny posiadają współrzędne!
                   </div>
                 ) : (
                   missingAddresses.map((missing, idx) => (
@@ -372,7 +434,6 @@ const LogisticsMap = () => {
                         onClick={() => {
                           setAssigningAddress(missing);
                           setTemporaryMarker(null);
-                          // Skroluje mapę na środek Polski aby łatwiej szukać
                           if (map) map.setZoom(6);
                         }}
                         className={`w-full py-1.5 px-3 rounded text-xs font-medium flex items-center justify-center transition-colors ${assigningAddress?.address === missing.address ? 'bg-yellow-400 text-yellow-900' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
