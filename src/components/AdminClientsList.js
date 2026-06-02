@@ -746,6 +746,17 @@ const AdminClientsList = ({ onNavigate }) => {
                 </button>
 
                 <button
+                  onClick={() => handleSort('drumsCount')}
+                  className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 ${sortBy === 'drumsCount'
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
+                    }`}
+                >
+                  <span>Ilość bębnów</span>
+                  <ArrowUpDown className="w-4 h-4" />
+                </button>
+
+                <button
                   onClick={() => handleSort('lastActivity')}
                   className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 ${sortBy === 'lastActivity'
                     ? 'bg-blue-600 text-white border-blue-600'
