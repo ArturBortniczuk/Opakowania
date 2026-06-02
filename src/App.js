@@ -156,6 +156,10 @@ const App = () => {
                     navigate('/', { replace: true });
                   }
                 }
+              } else if (event === 'PASSWORD_RECOVERY') {
+                if (isMounted) {
+                  navigate('/set-password', { replace: true });
+                }
               } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
                 if (session && session.user) {
                   authAPI.getUserProfile(session.user.id)
@@ -291,7 +295,8 @@ const App = () => {
     return children;
   };
 
-  const shouldShowNavbar = currentUser && location.pathname !== '/' && location.pathname !== '/set-password' && (isUserStaff || currentProfile);
+  const isResetPath = location.pathname.startsWith('/set-password');
+  const shouldShowNavbar = currentUser && location.pathname !== '/' && !isResetPath && (isUserStaff || currentProfile);
 
   if (!isInitialized) {
     return (
@@ -303,7 +308,7 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
-      {currentUser && !isUserStaff && !currentProfile ? (
+      {currentUser && !isUserStaff && !currentProfile && !isResetPath ? (
         <ProfileSelection
           user={currentUser}
           onSelectProfile={handleSelectProfile}
