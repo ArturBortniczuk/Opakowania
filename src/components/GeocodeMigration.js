@@ -102,7 +102,7 @@ const GeocodeMigration = () => {
           await supabase.from('address_coordinates_cache').insert([{
             address: address,
             is_not_found: true
-          }]).catch(() => {}); // Ignoruj błędy
+          }]);
         }
 
         // Czekaj 250ms między zapytaniami do Google API (zgodnie z limitem 50 zapytań / sek, jesteśmy bardzo bezpieczni)
