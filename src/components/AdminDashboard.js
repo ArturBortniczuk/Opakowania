@@ -1,9 +1,11 @@
 // src/components/AdminDashboard.js - Zaktualizowany o prawdziwe dane
 import React, { useState, useEffect } from 'react';
 import { statsAPI, drumsAPI, returnsAPI } from '../utils/supabaseApi';
+import InviteClientModal from './InviteClientModal';
 import { 
   Users, 
   Package, 
+  Mail,
   Truck, 
   AlertTriangle,
   TrendingUp,
@@ -22,6 +24,7 @@ import {
 
 const AdminDashboard = ({ user, onNavigate }) => {
   const isSalesperson = user && ['Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(user.role);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   const [stats, setStats] = useState({
     totalClients: 0,
@@ -536,6 +539,22 @@ const AdminDashboard = ({ user, onNavigate }) => {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                     onClick={() => setIsInviteModalOpen(true)}>
+                  <div className="flex items-start space-x-4">
+                    <div className="p-3 rounded-xl bg-indigo-100 group-hover:bg-indigo-200 transition-colors duration-300">
+                      <Mail className="w-8 h-8 text-indigo-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Zaproś klienta</h3>
+                      <p className="text-gray-600 text-sm mb-4">Wyślij e-mail z zaproszeniem do korzystania z systemu</p>
+                      <button className="text-indigo-600 font-medium text-sm hover:text-indigo-800 transition-colors duration-200">
+                        Zaproś →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
                      onClick={() => onNavigate('admin-clients')}>
                   <div className="flex items-start space-x-4">
                     <div className="p-3 rounded-xl bg-blue-100 group-hover:bg-blue-200 transition-colors duration-300">
@@ -683,6 +702,11 @@ const AdminDashboard = ({ user, onNavigate }) => {
           </div>
         </div>
       </div>
+      
+      <InviteClientModal 
+        isOpen={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
+      />
     </div>
   );
 };
