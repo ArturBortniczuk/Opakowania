@@ -275,33 +275,6 @@ const LogisticsMap = () => {
     return filtered.filter(loc => loc.type === 'pickup' || loc.visibleCount > 0);
   }, [locations, filter, searchQuery, clientSearch, sizeFilter, supplierFilter, ageFilter]);
 
-  const handleMapClick = (e) => {
-    if (assigningAddress) {
-      setTemporaryMarker({
-        lat: e.latLng.lat(),
-        lng: e.latLng.lng()
-      });
-    }
-  };
-
-  const handleSaveManualCoordinates = async () => {
-    if (!assigningAddress || !temporaryMarker) return;
-    
-    setIsSavingManual(true);
-    try {
-      const { error: cacheError } = await supabase
-        .from('address_coordinates_cache')
-        .upsert({
-          address: assigningAddress.address,
-          latitude: temporaryMarker.lat,
-          longitude: temporaryMarker.lng,
-          is_manual: true,
-          is_not_found: false
-        }, { onConflict: 'address' });
-
-      if (cacheError) throw cacheError;
-
-      const chunkSize = 200;
   const handleMapClick = useCallback(async (e) => {
     if (!assigningLocation) return;
     
