@@ -51,7 +51,7 @@ const LogisticsMap = () => {
   const [availableSuppliers, setAvailableSuppliers] = useState([]);
 
   // Tryb ręcznego przypisywania
-  const [assigningAddress, setAssigningAddress] = useState(null);
+  const [assigningLocation, setAssigningLocation] = useState(null);
   const [temporaryMarker, setTemporaryMarker] = useState(null);
   const [isSavingManual, setIsSavingManual] = useState(false);
 
@@ -135,16 +135,19 @@ const LogisticsMap = () => {
         } else {
           // Brak współrzędnych
           const addr = d.adres_dostawy.trim();
-          if (!missingByLoc[addr]) {
-            missingByLoc[addr] = {
+          const comp = d.pelna_nazwa_kontrahenta || '';
+          const missingKey = `${addr}___${comp}`;
+          
+          if (!missingByLoc[missingKey]) {
+            missingByLoc[missingKey] = {
               address: addr,
-              companyName: d.pelna_nazwa_kontrahenta,
+              companyName: comp,
               count: 0,
               drumIds: []
             };
           }
-          missingByLoc[addr].count++;
-          missingByLoc[addr].drumIds.push(d.id);
+          missingByLoc[missingKey].count++;
+          missingByLoc[missingKey].drumIds.push(d.id);
         }
       });
 
@@ -299,25 +302,55 @@ const LogisticsMap = () => {
       if (cacheError) throw cacheError;
 
       const chunkSize = 200;
-      for (let j = 0; j < assigningAddress.drumIds.length; j += chunkSize) {
-        const chunkIds = assigningAddress.drumIds.slice(j, j + chunkSize);
-        await supabase
-          .from('drums')
-          .update({ latitude: temporaryMarker.lat, longitude: temporaryMarker.lng })
-          .in('id', chunkIds);
+  const handleMapClick = useCallback(async (e) => {
+    if (!assigningLocation) return;
+    
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+    setTemporaryMarker({ lat, lng });
+
+    if (window.confirm(`Czy na pewno chcesz przypisać te współrzędne dla adresu "${assigningLocation.address}" (Klient: ${assigningLocation.companyName})?`)) {
+      try {
+        // Jeśli adres nie jest śmieciowy (np. ","), dodaj do ogólnego cache
+        if (assigningLocation.address.length > 2) {
+          await supabase
+            .from('address_coordinates_cache')
+            .upsert({
+              address: assigningLocation.address,
+              latitude: lat,
+              longitude: lng,
+              is_manual: true,
+              is_not_found: false
+            }, { onConflict: 'address' });
+        }
+
+        // Aktualizuj Bębny TYLKO dla wybranego kontrahenta i adresu
+        let query = supabase.from('drums')
+          .update({ latitude: lat, longitude: lng })
+          .eq('adres_dostawy', assigningLocation.address);
+          
+        if (assigningLocation.companyName) {
+          query = query.eq('pelna_nazwa_kontrahenta', assigningLocation.companyName);
+        } else {
+          query = query.is('pelna_nazwa_kontrahenta', null);
+        }
+        
+        const { error: drumsError } = await query;
+
+        if (drumsError) throw drumsError;
+
+        alert('Pomyślnie przypisano współrzędne!');
+        setAssigningLocation(null);
+        setTemporaryMarker(null);
+        fetchData();
+      } catch (error) {
+        console.error('Błąd przypisywania:', error);
+        alert('Wystąpił błąd podczas przypisywania współrzędnych.');
       }
-
-      setAssigningAddress(null);
+    } else {
       setTemporaryMarker(null);
-      await fetchData();
-
-    } catch (error) {
-      console.error('Błąd zapisywania ręcznych współrzędnych:', error);
-      alert('Nie udało się zapisać ręcznych współrzędnych.');
-    } finally {
-      setIsSavingManual(false);
     }
-  };
+  }, [assigningLocation, fetchData]);
 
   if (loadError) return <div className="p-4 bg-red-50 text-red-700 rounded-lg">Błąd ładowania mapy. Upewnij się, że klucz API jest poprawny.</div>;
   if (!isLoaded) return <div className="p-4">Ładowanie mapy...</div>;
@@ -416,28 +449,21 @@ const LogisticsMap = () => {
         <div className="flex flex-col xl:flex-row gap-6">
           {/* Kolumna Mapy */}
           <div className="flex-grow">
-            {assigningAddress && (
+            {assigningLocation && (
               <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center justify-between shadow-sm animate-pulse">
                 <div>
                   <h4 className="font-bold text-yellow-800 flex items-center">
                     <MapPin className="w-5 h-5 mr-1" /> Tryb Ręcznego Przypisywania
                   </h4>
                   <p className="text-sm text-yellow-700 mt-1">
-                    Kliknij miejsce na mapie dla: <strong>{assigningAddress.address}</strong>
+                    Kliknij miejsce na mapie dla: <strong>{assigningLocation.address}</strong>
                   </p>
                 </div>
-                <div className="flex space-x-2">
-                  <button onClick={() => { setAssigningAddress(null); setTemporaryMarker(null); }} className="px-3 py-2 bg-white text-gray-700 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50">Anuluj</button>
-                  {temporaryMarker && (
-                    <button onClick={handleSaveManualCoordinates} disabled={isSavingManual} className="px-3 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 flex items-center">
-                      {isSavingManual ? 'Zapisywanie...' : <><Check className="w-4 h-4 mr-1" /> Zapisz Punkt</>}
-                    </button>
-                  )}
-                </div>
+                <button onClick={() => setAssigningLocation(null)} className="px-3 py-2 bg-white text-gray-700 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50">Anuluj</button>
               </div>
             )}
 
-            <div className={`relative rounded-lg overflow-hidden border ${assigningAddress ? 'border-yellow-400 shadow-lg ring-2 ring-yellow-400 ring-opacity-50 cursor-crosshair' : 'border-gray-200'}`}>
+            <div className={`relative rounded-lg overflow-hidden border ${assigningLocation ? 'border-yellow-400 shadow-lg ring-2 ring-yellow-400 ring-opacity-50 cursor-crosshair' : 'border-gray-200'}`}>
               <GoogleMap
                 mapContainerStyle={containerStyle}
                 center={center}
@@ -456,7 +482,7 @@ const LogisticsMap = () => {
                       key={loc.id}
                       position={{ lat: loc.lat, lng: loc.lng }}
                       icon={icon}
-                      onClick={() => !assigningAddress && setSelectedLocation(loc)}
+                      onClick={() => !assigningLocation && setSelectedLocation(loc)}
                     />
                   );
                 })}
@@ -465,7 +491,7 @@ const LogisticsMap = () => {
                   <MarkerF position={temporaryMarker} icon="http://maps.google.com/mapfiles/ms/icons/blue-dot.png" animation={window.google.maps.Animation.BOUNCE} />
                 )}
 
-                {selectedLocation && !assigningAddress && (
+                {selectedLocation && !assigningLocation && (
                   <InfoWindowF
                     position={{ lat: selectedLocation.lat, lng: selectedLocation.lng }}
                     onCloseClick={() => setSelectedLocation(null)}
@@ -568,30 +594,34 @@ const LogisticsMap = () => {
                     Wszystkie bębny posiadają współrzędne!
                   </div>
                 ) : (
-                  missingAddresses.map((missing, idx) => (
+                  missingAddresses.map((m, idx) => (
                     <div 
                       key={idx} 
-                      className={`p-3 rounded-lg border transition-all ${assigningAddress?.address === missing.address ? 'bg-yellow-50 border-yellow-400 shadow-sm' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}`}
+                      className={`p-3 rounded-lg border transition-all ${assigningLocation?.address === m.address ? 'bg-yellow-50 border-yellow-400 shadow-sm' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}`}
                     >
                       <div className="flex justify-between items-start mb-1">
-                        <h4 className="text-sm font-bold text-gray-800 break-all">{missing.address}</h4>
-                        <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full ml-2 flex-shrink-0">
-                          {missing.count} szt.
-                        </span>
+                        <h4 className="text-sm font-bold text-gray-800 break-words">{m.address || '(Pusty Adres)'}</h4>
                       </div>
-                      <p className="text-xs text-gray-500 mb-3">{missing.companyName}</p>
+                      <p className="text-xs text-gray-500 uppercase mt-1">{m.companyName || 'Brak klienta'}</p>
+                      <span className="text-xs font-bold text-blue-700 bg-blue-100 px-2 py-1 rounded-full whitespace-nowrap">{m.count} szt.</span>
                       
                       <button
                         onClick={() => {
-                          setAssigningAddress(missing);
-                          setTemporaryMarker(null);
-                          if (map) map.setZoom(6);
+                          setAssigningLocation({ address: m.address, companyName: m.companyName });
+                          alert(`Kliknij na mapie w miejscu, gdzie znajduje się adres:\n${m.address} (Klient: ${m.companyName || 'Brak'})`);
                         }}
-                        className={`w-full py-1.5 px-3 rounded text-xs font-medium flex items-center justify-center transition-colors ${assigningAddress?.address === missing.address ? 'bg-yellow-400 text-yellow-900' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                        className="w-full mt-3 flex items-center justify-center space-x-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition text-xs font-medium"
                       >
-                        <MapPin className="w-3 h-3 mr-1" /> 
-                        {assigningAddress?.address === missing.address ? 'Kliknij miejsce na mapie...' : 'Przypisz ręcznie'}
+                        <MapPin className="w-3 h-3" />
+                        <span>Przypisz ręcznie</span>
                       </button>
+
+                      {assigningLocation && assigningLocation.address === m.address && assigningLocation.companyName === m.companyName && (
+                        <div className="mt-2 text-xs text-yellow-600 bg-yellow-50 p-2 rounded flex justify-between items-center">
+                          <span>Wskazujesz na mapie...</span>
+                          <button onClick={(e) => { e.stopPropagation(); setAssigningLocation(null); }} className="text-yellow-800 hover:underline">Anuluj</button>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
