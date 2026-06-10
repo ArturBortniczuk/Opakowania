@@ -71,7 +71,7 @@ const LogisticsMap = () => {
         .select('id, kod_bebna, cecha, rozmiar_bebna, kon_dostawca, data_wydania, adres_dostawy, pelna_nazwa_kontrahenta, latitude, longitude, status, data_zwrotu_do_dostawcy')
         .not('adres_dostawy', 'is', null)
         .neq('adres_dostawy', '')
-        .limit(8000);
+        .limit(50000);
         
       if (drumsError) console.error(drumsError);
 
