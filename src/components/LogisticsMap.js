@@ -66,14 +66,39 @@ const LogisticsMap = () => {
   const fetchData = async () => {
     try {
       // 1. Pobieramy bębny z nowymi kolumnami
-      const { data: drumsData, error: drumsError } = await supabase
-        .from('drums')
-        .select('id, kod_bebna, cecha, rozmiar_bebna, kon_dostawca, data_wydania, adres_dostawy, pelna_nazwa_kontrahenta, latitude, longitude, status, data_zwrotu_do_dostawcy')
-        .not('adres_dostawy', 'is', null)
-        .neq('adres_dostawy', '')
-        .limit(50000);
+      // Supabase domyślnie ucina zapytania do 1000 rekordów. Używamy pętli (paginacji), by pobrać wszystkie bębny
+      let allDrums = [];
+      let pageIndex = 0;
+      const chunkSize = 1000;
+      
+      while (true) {
+        const from = pageIndex * chunkSize;
+        const to = from + chunkSize - 1;
         
-      if (drumsError) console.error(drumsError);
+        const { data: chunk, error: chunkError } = await supabase
+          .from('drums')
+          .select('id, kod_bebna, cecha, rozmiar_bebna, kon_dostawca, data_wydania, adres_dostawy, pelna_nazwa_kontrahenta, latitude, longitude, status, data_zwrotu_do_dostawcy')
+          .not('adres_dostawy', 'is', null)
+          .neq('adres_dostawy', '')
+          .range(from, to)
+          .order('id');
+          
+        if (chunkError) {
+          console.error(chunkError);
+          break;
+        }
+        
+        if (chunk && chunk.length > 0) {
+          allDrums = [...allDrums, ...chunk];
+        }
+        
+        if (!chunk || chunk.length < chunkSize) {
+          break;
+        }
+        pageIndex++;
+      }
+      
+      const drumsData = allDrums;
 
       const drumsByLoc = {};
       const missingByLoc = {};
