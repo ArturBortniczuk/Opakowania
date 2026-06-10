@@ -18,15 +18,30 @@ const GeocodeMigration = () => {
       // 1. Pobierz wszystkie unikalne adresy z bębnów
       addLog('Skanowanie adresów z tabeli bębnów...');
       
-      // Optymalizacja: pobieramy tylko bębny bez współrzędnych,
-      // ale dla pewności możemy też opierać się o słownik.
-      const { data: drums, error } = await supabase
-        .from('drums')
-        .select('adres_dostawy')
-        .not('adres_dostawy', 'is', null)
-        .neq('adres_dostawy', '');
+      // Używamy paginacji, aby pobrać adresy ze WSZYSTKICH bębnów (ominięcie limitu 1000 rekordów)
+      let allDrums = [];
+      let pageIndex = 0;
+      const chunkSize = 1000;
+      
+      while (true) {
+        const from = pageIndex * chunkSize;
+        const to = from + chunkSize - 1;
+        
+        const { data: chunk, error: chunkError } = await supabase
+          .from('drums')
+          .select('adres_dostawy')
+          .not('adres_dostawy', 'is', null)
+          .neq('adres_dostawy', '')
+          .range(from, to);
 
-      if (error) throw error;
+        if (chunkError) throw chunkError;
+        if (chunk && chunk.length > 0) allDrums = [...allDrums, ...chunk];
+        if (!chunk || chunk.length < chunkSize) break;
+        
+        pageIndex++;
+      }
+
+      const drums = allDrums;
 
       if (!drums || drums.length === 0) {
         addLog('Brak bębnów z adresem w bazie.');
