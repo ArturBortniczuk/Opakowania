@@ -44,7 +44,8 @@ const LogisticsMap = () => {
   const [clientSearch, setClientSearch] = useState(''); // Po nazwie klienta
   const [sizeFilter, setSizeFilter] = useState(''); // Po rozmiar_bebna
   const [supplierFilter, setSupplierFilter] = useState(''); // Po kon_dostawca
-  const [ageFilter, setAgeFilter] = useState('all'); // '0-50', '50-100', '100-120', '120+'
+  const [minAge, setMinAge] = useState(''); // Termin zwrotu od (dni)
+  const [maxAge, setMaxAge] = useState(''); // Termin zwrotu do (dni)
 
   // Dynamiczne słowniki dla dropdownów
   const [availableSizes, setAvailableSizes] = useState([]);
@@ -244,13 +245,9 @@ const LogisticsMap = () => {
           // Kablownia
           if (supplierFilter && d.kon_dostawca !== supplierFilter) return false;
           
-          // Przedział Wiekowy
-          if (ageFilter !== 'all') {
-            if (ageFilter === '0-50' && (d.age_days < 0 || d.age_days >= 50)) return false;
-            if (ageFilter === '50-100' && (d.age_days < 50 || d.age_days >= 100)) return false;
-            if (ageFilter === '100-120' && (d.age_days < 100 || d.age_days > 120)) return false;
-            if (ageFilter === '120+' && d.age_days <= 120) return false;
-          }
+          // Przedział Wiekowy (Od - Do dni)
+          if (minAge !== '' && d.age_days < parseInt(minAge, 10)) return false;
+          if (maxAge !== '' && d.age_days > parseInt(maxAge, 10)) return false;
 
           return true;
         });
@@ -273,7 +270,7 @@ const LogisticsMap = () => {
 
     // Ukrywamy puste lokalizacje
     return filtered.filter(loc => loc.type === 'pickup' || loc.visibleCount > 0);
-  }, [locations, filter, searchQuery, clientSearch, sizeFilter, supplierFilter, ageFilter]);
+  }, [locations, filter, searchQuery, clientSearch, sizeFilter, supplierFilter, minAge, maxAge]);
 
   const handleMapClick = useCallback(async (e) => {
     if (!assigningLocation) return;
@@ -401,19 +398,27 @@ const LogisticsMap = () => {
             </select>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">Status Terminowy (Wiek)</label>
-            <select
-              className="w-full py-2 px-3 border border-gray-300 rounded text-sm bg-white focus:ring-blue-500 focus:border-blue-500 font-medium"
-              value={ageFilter}
-              onChange={(e) => setAgeFilter(e.target.value)}
-            >
-              <option value="all">Wszystkie</option>
-              <option value="120+" className="text-red-600 font-bold">🔴 &gt; 120 dni (Pilne!)</option>
-              <option value="100-120" className="text-orange-600 font-bold">🟠 100 - 120 dni</option>
-              <option value="50-100" className="text-yellow-600 font-bold">🟡 50 - 100 dni</option>
-              <option value="0-50" className="text-green-600 font-bold">🟢 0 - 50 dni (Świeże)</option>
-            </select>
+          <div className="flex space-x-2">
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-gray-700 mb-1">Dni w posiadaniu (od)</label>
+              <input
+                type="number"
+                placeholder="Np. 120"
+                className="w-full py-2 px-3 border border-gray-300 rounded text-sm bg-white focus:ring-blue-500 focus:border-blue-500"
+                value={minAge}
+                onChange={(e) => setMinAge(e.target.value)}
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-gray-700 mb-1">Dni w posiadaniu (do)</label>
+              <input
+                type="number"
+                placeholder="Np. 720"
+                className="w-full py-2 px-3 border border-gray-300 rounded text-sm bg-white focus:ring-blue-500 focus:border-blue-500"
+                value={maxAge}
+                onChange={(e) => setMaxAge(e.target.value)}
+              />
+            </div>
           </div>
 
         </div>
