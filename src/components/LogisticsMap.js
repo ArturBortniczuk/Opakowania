@@ -253,7 +253,7 @@ const LogisticsMap = () => {
         });
 
         // Kalkulacja maksymalnego wieku, żeby nadać odpowiedni kolor pinezki
-        const maxAge = filteredDrums.length > 0 
+        const calculatedMaxAge = filteredDrums.length > 0 
           ? Math.max(...filteredDrums.map(d => d.age_days)) 
           : 0;
 
@@ -262,7 +262,7 @@ const LogisticsMap = () => {
           filteredDrums,
           visibleCount: filteredDrums.length,
           visibleOverdue: filteredDrums.filter(d => new Date(d.data_zwrotu_do_dostawcy) < new Date()).length,
-          maxAgeDays: maxAge
+          maxAgeDays: calculatedMaxAge
         };
       }
       return loc;
