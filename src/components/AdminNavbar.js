@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Menu, X, Home, Users, Package, Truck, BarChart3, LogOut, Building2,
-  UserCheck, ChevronRight, Shield, Settings, Bell, Crown, Pin, PinOff, Map
+  UserCheck, ChevronRight, Shield, Settings, Bell, Crown, Pin, PinOff, Map, MapPin
 } from 'lucide-react';
 import { statsAPI } from '../utils/supabaseApi';
 
