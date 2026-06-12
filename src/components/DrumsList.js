@@ -51,13 +51,7 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
           style={{ backfaceVisibility: 'hidden' }}
           onClick={() => setIsFlipped(true)}
         >
-          {drum.clientNote && (
-            <div className="absolute top-4 right-4 text-blue-500 bg-blue-50 p-1.5 rounded-full shadow-sm" title="Posiada notatkę">
-              <FileText className="w-5 h-5" />
-            </div>
-          )}
-          
-          <div className="flex items-start justify-between mb-4 pr-8">
+          <div className="flex items-start justify-between mb-4">
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
                 <Package className="w-6 h-6 text-white" />
@@ -69,11 +63,17 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
                 )}
               </div>
             </div>
-            {!drum.clientNote && (
+            
+            <div className="flex items-center space-x-2">
+              {drum.clientNote && (
+                <div className="text-blue-500 bg-blue-50 p-1.5 rounded-full shadow-sm" title="Posiada notatkę">
+                  <FileText className="w-4 h-4" />
+                </div>
+              )}
               <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.color || 'bg-gray-100 text-gray-600'}`}>
                 {drum.text || drum.status || 'Aktywny'}
               </div>
-            )}
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -147,14 +147,6 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
               </div>
             </div>
             
-            {drum.clientNote && (
-              <div className="flex justify-between items-center mt-1">
-                <span className="text-sm text-gray-500">Status</span>
-                <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.color || 'bg-gray-100 text-gray-600'}`}>
-                  {drum.text || drum.status || 'Aktywny'}
-                </div>
-              </div>
-            )}
           </div>
           
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-white to-transparent h-12 rounded-b-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-2 pointer-events-none">
