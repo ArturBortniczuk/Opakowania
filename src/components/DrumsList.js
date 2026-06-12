@@ -7,6 +7,212 @@ import {
   ArrowUpDown, Truck, RefreshCw, ChevronLeft, ChevronRight, ChevronDown
 } from 'lucide-react';
 
+
+const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
+  const [isFlipped, setIsFlipped] = React.useState(false);
+  const [note, setNote] = React.useState(drum.clientNote || '');
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  const kodBebna = drum.kod_bebna || drum.KOD_BEBNA;
+  const returnDate = drum.clientReturnDeadline || drum.data_zwrotu_do_dostawcy;
+  const company = drum.company || drum.pelna_nazwa_kontrahenta;
+  const nip = drum.nip || drum.NIP;
+
+  const priceRaw = parseFloat(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
+  const clientPrice = !isNaN(priceRaw) ? priceRaw * 1.2 : null;
+
+  const handleSaveNote = async (e) => {
+    e.stopPropagation();
+    setIsSaving(true);
+    try {
+      await drumsAPI.saveDrumNote(drum.cecha || kodBebna, userNip, note);
+      onNoteSaved(drum.cecha || kodBebna, note);
+      setIsFlipped(false);
+    } catch (err) {
+      console.error('Błąd zapisu notatki:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div 
+      className="relative w-full group"
+      style={{ perspective: '1000px', animationDelay: `${index * 50}ms` }}
+    >
+      <div 
+        className="w-full transition-transform duration-500 ease-in-out"
+        style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)', minHeight: '380px' }}
+      >
+        {/* FRONT */}
+        <div 
+          className={`absolute inset-0 w-full bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl cursor-pointer hover:border-blue-300 ${drum.borderColor || 'border-gray-200'}`}
+          style={{ backfaceVisibility: 'hidden' }}
+          onClick={() => setIsFlipped(true)}
+        >
+          {drum.clientNote && (
+            <div className="absolute top-4 right-4 text-blue-500 bg-blue-50 p-1.5 rounded-full shadow-sm" title="Posiada notatkę">
+              <FileText className="w-5 h-5" />
+            </div>
+          )}
+          
+          <div className="flex items-start justify-between mb-4 pr-8">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
+                <Package className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 text-lg">{drum.cecha || kodBebna}</h3>
+                {drum.rozmiar_bebna && (
+                  <p className="text-gray-600 text-sm">Rozmiar bębna: {drum.rozmiar_bebna}</p>
+                )}
+              </div>
+            </div>
+            {!drum.clientNote && (
+              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.color || 'bg-gray-100 text-gray-600'}`}>
+                {drum.text || drum.status || 'Aktywny'}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            {clientPrice !== null && (
+              <div className="space-y-2 mb-2">
+                <div className="flex justify-between items-center bg-blue-50/50 p-2.5 rounded-xl border border-blue-100/50">
+                  <span className="text-sm font-semibold text-blue-800">Wartość bębna</span>
+                  <span className="text-sm font-extrabold text-blue-950">
+                    {clientPrice.toFixed(2)} PLN
+                  </span>
+                </div>
+                {(() => {
+                  const days = drum.daysInPossession;
+                  let returnPercentage = 100;
+                  if (days === undefined || isNaN(days) || days <= 120) returnPercentage = 100;
+                  else if (days <= 150) returnPercentage = 90;
+                  else if (days <= 180) returnPercentage = 75;
+                  else if (days <= 240) returnPercentage = 50;
+                  else if (days <= 340) returnPercentage = 25;
+                  else returnPercentage = 0;
+
+                  const returnValue = clientPrice * (returnPercentage / 100);
+
+                  return (
+                    <div className="flex justify-between items-center bg-emerald-50/40 p-2.5 rounded-xl border border-emerald-100/50">
+                      <span className="text-sm font-semibold text-emerald-850">Wartość przy zwrocie</span>
+                      <span className="text-sm font-extrabold text-emerald-950">
+                        {returnPercentage === 0 ? (
+                          <span className="text-red-600 font-bold">0.00 PLN</span>
+                        ) : (
+                          <span>{returnValue.toFixed(2)} PLN ({returnPercentage}%)</span>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Termin zwrotu</span>
+              <span className="text-sm font-medium text-gray-900 flex items-center space-x-1">
+                {returnDate ? (
+                  <>
+                    <span className={drum.isExtended ? "text-indigo-600 font-semibold" : ""}>
+                      {new Date(returnDate).toLocaleDateString('pl-PL')}
+                    </span>
+                    {drum.isExtended && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 border border-indigo-200 text-indigo-700" title={drum.extensionNotes}>
+                        Uzgodniony
+                      </span>
+                    )}
+                  </>
+                ) : 'Brak danych'}
+              </span>
+            </div>
+
+            {drum.daysInPossession !== undefined && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500">Dni w posiadaniu</span>
+                <span className="text-sm font-medium text-gray-900">{drum.daysInPossession}</span>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Lokalizacja</span>
+              <div className="text-sm font-medium text-gray-900 text-right max-w-xs truncate">
+                {drum.adres_dostawy ? (
+                  <div className="truncate" title={drum.adres_dostawy}>{drum.adres_dostawy}</div>
+                ) : 'Brak adresu'}
+              </div>
+            </div>
+            
+            {drum.clientNote && (
+              <div className="flex justify-between items-center mt-1">
+                <span className="text-sm text-gray-500">Status</span>
+                <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.color || 'bg-gray-100 text-gray-600'}`}>
+                  {drum.text || drum.status || 'Aktywny'}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-white to-transparent h-12 rounded-b-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-2 pointer-events-none">
+            <span className="text-blue-600 text-xs font-medium bg-white/80 px-3 py-1 rounded-full shadow-sm backdrop-blur-sm">Kliknij, aby edytować notatkę</span>
+          </div>
+        </div>
+
+        {/* BACK */}
+        <div 
+          className="absolute inset-0 w-full h-full bg-white backdrop-blur-lg rounded-2xl p-6 shadow-xl border border-blue-200 flex flex-col z-10"
+          style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+        >
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-600" />
+              Notatka
+            </h3>
+            <button 
+              onClick={(e) => { e.stopPropagation(); setIsFlipped(false); }}
+              className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+          
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Wpisz swoje uwagi, np. informacje o uszkodzeniach, planowanym zwrocie..."
+            className="w-full flex-1 p-3 border border-gray-300 rounded-xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4 text-sm text-gray-700"
+          />
+
+          <div className="flex justify-end gap-2 mt-auto">
+            <button
+              onClick={(e) => { e.stopPropagation(); setIsFlipped(false); setNote(drum.clientNote || ''); }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              disabled={isSaving}
+            >
+              Anuluj
+            </button>
+            <button
+              onClick={handleSaveNote}
+              disabled={isSaving}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+            >
+              {isSaving ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              Zapisz
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DrumsList = ({ user }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -245,123 +451,10 @@ const DrumsList = ({ user }) => {
     }
   };
 
-  const DrumCard = ({ drum, index }) => {
-    const kodBebna = drum.kod_bebna || drum.KOD_BEBNA;
-    const returnDate = drum.clientReturnDeadline || drum.data_zwrotu_do_dostawcy;
-    const company = drum.company || drum.pelna_nazwa_kontrahenta;
-    const nip = drum.nip || drum.NIP;
-
-    // Przeliczenie ceny netto + 20% marży dla klienta
-    const priceRaw = parseFloat(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
-    const clientPrice = !isNaN(priceRaw) ? priceRaw * 1.2 : null;
-
-    return (
-      <div
-        className={`bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] ${drum.borderColor || 'border-gray-200'}`}
-        style={{ animationDelay: `${index * 50}ms` }}
-      >
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
-              <Package className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 className="font-bold text-gray-900 text-lg">{drum.cecha || kodBebna}</h3>
-              {drum.rozmiar_bebna && (
-                <p className="text-gray-600 text-sm">Rozmiar bębna: {drum.rozmiar_bebna}</p>
-              )}
-            </div>
-          </div>
-          <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.color || 'bg-gray-100 text-gray-600'}`}>
-            {drum.text || drum.status || 'Aktywny'}
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          {clientPrice !== null && (
-            <div className="space-y-2 mb-2">
-              <div className="flex justify-between items-center bg-blue-50/50 p-2.5 rounded-xl border border-blue-100/50">
-                <span className="text-sm font-semibold text-blue-800">Wartość bębna</span>
-                <span className="text-sm font-extrabold text-blue-950">
-                  {clientPrice.toFixed(2)} PLN
-                </span>
-              </div>
-              {(() => {
-                const days = drum.daysInPossession;
-                let returnPercentage = 100;
-                if (days === undefined || isNaN(days) || days <= 120) returnPercentage = 100;
-                else if (days <= 150) returnPercentage = 90;
-                else if (days <= 180) returnPercentage = 75;
-                else if (days <= 240) returnPercentage = 50;
-                else if (days <= 340) returnPercentage = 25;
-                else returnPercentage = 0;
-
-                const returnValue = clientPrice * (returnPercentage / 100);
-
-                return (
-                  <div className="flex justify-between items-center bg-emerald-50/40 p-2.5 rounded-xl border border-emerald-100/50 animate-fade-in">
-                    <span className="text-sm font-semibold text-emerald-850">Wartość przy zwrocie</span>
-                    <span className="text-sm font-extrabold text-emerald-950">
-                      {returnPercentage === 0 ? (
-                        <span className="text-red-600 font-bold">0.00 PLN (Brak zwrotu)</span>
-                      ) : (
-                        <span>{returnValue.toFixed(2)} PLN ({returnPercentage}%)</span>
-                      )}
-                    </span>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Termin zwrotu</span>
-            <span className="text-sm font-medium text-gray-900 flex items-center space-x-1">
-              {returnDate ? (
-                <>
-                  <span className={drum.isExtended ? "text-indigo-600 font-semibold" : ""}>
-                    {new Date(returnDate).toLocaleDateString('pl-PL')}
-                  </span>
-                  {drum.isExtended && (
-                    <span 
-                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 border border-indigo-200 text-indigo-700 cursor-help"
-                      title={drum.extensionNotes || "Indywidualny termin zwrotu uzgodniony z działem logistyki"}
-                    >
-                      Uzgodniony termin
-                    </span>
-                  )}
-                </>
-              ) : (
-                'Brak danych'
-              )}
-            </span>
-          </div>
-
-          {drum.daysInPossession !== undefined && (
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-500">Dni w posiadaniu</span>
-              <span className="text-sm font-medium text-gray-900">{drum.daysInPossession}</span>
-            </div>
-          )}
-
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Lokalizacja</span>
-            <div className="text-sm font-medium text-gray-900 text-right max-w-xs truncate">
-              {drum.adres_dostawy ? (
-                <div className="truncate" title={drum.adres_dostawy}>{drum.adres_dostawy}</div>
-              ) : 'Brak informacji o adresie'}
-            </div>
-          </div>
-
-          <div className="flex justify-between items-center mt-1">
-            <span className="text-sm text-gray-500">Numer faktury</span>
-            <span className="text-sm font-medium text-gray-900" title={drum.numer_faktury}>{drum.numer_faktury || 'Brak danych'}</span>
-          </div>
-        </div>
-
-
-      </div>
-    );
+  const handleNoteSaved = (cecha, newNote) => {
+    setDrums(prevDrums => prevDrums.map(d => 
+      (d.cecha === cecha || d.kod_bebna === cecha) ? { ...d, clientNote: newNote } : d
+    ));
   };
 
   if (loading && isFirstLoad) {
@@ -552,7 +645,7 @@ const DrumsList = ({ user }) => {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
               {drums.map((drum, index) => (
-                <DrumCard key={drum.id || drum.cecha || index} drum={drum} index={index} />
+                <DrumCard key={drum.id || drum.cecha || index} drum={drum} index={index} userNip={user?.nip} onNoteSaved={handleNoteSaved} />
               ))}
             </div>
 

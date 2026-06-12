@@ -444,6 +444,16 @@ export const drumsAPI = {
         if (excData) {
           exceptions = excData;
         }
+
+        // Notatki klienta
+        let clientNotes = [];
+        const { data: notesData } = await supabase
+          .from('client_drum_notes')
+          .select('*')
+          .in('nip', nips);
+        if (notesData) {
+          clientNotes = notesData;
+        }
       }
 
       // Mapowanie danych do spójnego formatu używanego w komponentach
@@ -492,6 +502,9 @@ export const drumsAPI = {
           }
         }
 
+        const clientNoteObj = clientNotes.find(n => n.kod_bebna === drum.cecha && n.nip === drum.nip);
+        const clientNote = clientNoteObj ? clientNoteObj.note : null;
+
         return {
           ...drum,
           db_data_zwrotu_do_dostawcy: drum.data_zwrotu_do_dostawcy, // Zachowaj surową wartość przed nadpisaniem
@@ -502,6 +515,8 @@ export const drumsAPI = {
           extensionNotes: extension ? extension.notes : null,
           extensionCreatedBy: extension ? extension.created_by : null,
           extensionCreatedAt: extension ? extension.created_at : null,
+          
+          clientNote,
           
           // Zachowaj oryginalne nazwy kolumn z bazy
           kod_bebna: drum.kod_bebna,
@@ -734,6 +749,24 @@ export const drumsAPI = {
         if (excData) {
           exceptions = excData;
         }
+        
+        let clientNotes = [];
+        let notesQuery = supabase.from('client_drum_notes').select('*');
+        if (nip) {
+          notesQuery = notesQuery.eq('nip', nip);
+          if (drumCechas.length < 200) {
+            notesQuery = notesQuery.in('kod_bebna', drumCechas);
+          }
+        } else if (allowedNips && allowedNips.length > 0) {
+          notesQuery = notesQuery.in('nip', allowedNips);
+          if (drumCechas.length < 200) {
+            notesQuery = notesQuery.in('kod_bebna', drumCechas);
+          }
+        }
+        const { data: notesData } = await notesQuery;
+        if (notesData) {
+          clientNotes = notesData;
+        }
       }
 
       // Mapowanie danych (z mapowaniem wyjątków)
@@ -786,6 +819,9 @@ export const drumsAPI = {
           }
         }
 
+        const clientNoteObj = clientNotes.find(n => n.kod_bebna === drum.cecha && n.nip === drum.nip);
+        const clientNote = clientNoteObj ? clientNoteObj.note : null;
+
         return {
           ...drum,
           db_data_zwrotu_do_dostawcy: drum.data_zwrotu_do_dostawcy, // Zachowaj surową wartość przed nadpisaniem
@@ -796,6 +832,8 @@ export const drumsAPI = {
           extensionNotes: extension ? extension.notes : null,
           extensionCreatedBy: extension ? extension.created_by : null,
           extensionCreatedAt: extension ? extension.created_at : null,
+          
+          clientNote,
           
           clientReturnDeadline: clientReturnDeadline,
           returnPeriodDays,
@@ -957,6 +995,37 @@ export const drumsAPI = {
       return data;
     } catch (error) {
       console.error('❌ Błąd usuwania niestandardowego terminu zwrotu:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Zapisuje notatkę klienta dla bębna.
+   * @param {string} cecha - Unikalna cecha bębna.
+   * @param {string} nip - NIP klienta.
+   * @param {string} note - Treść notatki.
+   * @returns {Promise<object>} Zaktualizowany rekord.
+   */
+  async saveDrumNote(cecha, nip, note) {
+    try {
+      console.log(`📝 Zapisywanie notatki dla bębna: ${cecha}, NIP: ${nip}`);
+      const { data, error } = await supabase
+        .from('client_drum_notes')
+        .upsert({
+          kod_bebna: cecha,
+          nip: nip,
+          note: note,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'kod_bebna,nip'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('❌ Błąd zapisywania notatki:', error);
       throw error;
     }
   }
