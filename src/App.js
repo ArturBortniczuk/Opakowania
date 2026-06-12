@@ -19,6 +19,7 @@ import AdminSupplierRules from './components/AdminSupplierRules';
 import AdminRegistrationManager from './components/AdminRegistrationManager';
 import HelpGuide from './components/HelpGuide';
 import LogisticsMap from './components/LogisticsMap';
+import AdminWarehouseDrums from './components/AdminWarehouseDrums';
 import './App.css';
 
 import { supabase } from './lib/supabase';
@@ -446,6 +447,11 @@ const App = () => {
               <Route path="/admin/drums" element={
                 <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista']}>
                   <AdminDrumsList user={currentUser} />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/warehouse-drums" element={
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Wsparcie']}>
+                  <AdminWarehouseDrums />
                 </ProtectedRoute>
               } />
               <Route path="/admin/returns" element={

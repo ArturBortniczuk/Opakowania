@@ -59,9 +59,10 @@ const AdminNavbar = ({
     { path: '/admin/registrations', label: 'Weryfikacja kont', icon: UserCheck, description: 'Zatwierdzaj nowych użytkowników' },
     { path: '/admin/drums', label: 'Wszystkie bębny', icon: Package, description: 'Monitoruj bębny' },
     { path: '/admin/returns', label: 'Zgłoszenia zwrotów', icon: Truck, description: 'Zarządzaj zwrotami' },
-    { path: '/admin/map', label: 'Mapa logistyczna', icon: Map, description: 'Planowanie tras i odbiory' },
+    { path: '/admin/map', label: 'Mapa logistyczna', icon: MapPin, description: 'Geolokalizacja bębnów' },
     { path: '/admin/return-periods', label: 'Terminy zwrotu', icon: Settings, description: 'Ustaw terminy dla klientów' },
     { path: '/admin/supplier-rules', label: 'Terminy kablowni', icon: Settings, description: 'Zasady zwrotów dostawców' },
+    { path: '/admin/warehouse-drums', label: 'Magazyn Bębnów', icon: Package, description: 'Stany magazynowe' },
     { path: '/admin/reports', label: 'Raporty i analizy', icon: BarChart3, description: 'Statystyki i raporty' }
   ];
 
@@ -73,10 +74,11 @@ const AdminNavbar = ({
       if (isSalesperson) {
         return item.path !== '/admin/return-periods' && 
                item.path !== '/admin/supplier-rules' &&
-               item.path !== '/admin/registrations';
+               item.path !== '/admin/registrations' &&
+               item.path !== '/admin/warehouse-drums';
       }
       if (isMagazyn) {
-        return item.path === '/admin' || item.path === '/admin/map';
+        return item.path === '/admin' || item.path === '/admin/map' || item.path === '/admin/warehouse-drums';
       }
       return true;
     })

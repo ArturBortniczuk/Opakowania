@@ -259,6 +259,76 @@ export const drumsAPI = {
   },
 
   /**
+   * Pobiera bębny znajdujące się na magazynie (na podstawie statusu).
+   * Zoptymalizowane do wyświetlania w nowym module Magazynu.
+   */
+  async getWarehouseDrums(options = {}) {
+    try {
+      const {
+        page = 1,
+        limit = 100,
+        sortBy = 'data_zwrotu_do_dostawcy',
+        sortOrder = 'asc',
+        search = '',
+        statusFilter = 'all', // 'all', 'empty', 'full'
+        urgentOnly = false
+      } = options;
+
+      let query = supabase
+        .from('drums')
+        .select('*', { count: 'exact' });
+
+      if (statusFilter === 'empty') {
+        query = query.eq('status', 'pusty na magazynie');
+      } else if (statusFilter === 'full') {
+        query = query.eq('status', 'na magazynie z towarem');
+      } else {
+        query = query.in('status', ['pusty na magazynie', 'na magazynie z towarem']);
+      }
+
+      if (urgentOnly) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const nextMonth = new Date(today);
+        nextMonth.setDate(today.getDate() + 30);
+        
+        const nextMonthStr = nextMonth.toISOString().split('T')[0];
+        
+        query = query.lte('data_zwrotu_do_dostawcy', nextMonthStr);
+      }
+
+      if (search) {
+        const safeSearch = `%${search}%`;
+        query = query.or(`cecha.ilike.${safeSearch},nazwa.ilike.${safeSearch},kon_dostawca.ilike.${safeSearch},rozmiar_bebna.ilike.${safeSearch},lokalizacja_wms.ilike.${safeSearch}`);
+      }
+
+      query = query.order(sortBy, { ascending: sortOrder === 'asc', nullsFirst: false });
+
+      const offset = (page - 1) * limit;
+      query = query.range(offset, offset + limit - 1);
+      
+      const { data, error, count } = await query;
+      if (error) throw error;
+
+      return {
+        data: data || [],
+        pagination: {
+          page,
+          limit,
+          total: count || 0,
+          totalPages: Math.ceil((count || 0) / limit),
+          hasNext: page < Math.ceil((count || 0) / limit),
+          hasPrev: page > 1
+        }
+      };
+    } catch (error) {
+      console.error('Błąd getWarehouseDrums:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Pobiera listę bębnów, opcjonalnie filtrując po NIP z paginacją.
    * @param {string|null} nip - NIP klienta do filtrowania.
    * @param {object} options - Opcje paginacji i sortowania.
