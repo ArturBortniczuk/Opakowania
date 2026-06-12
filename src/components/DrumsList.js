@@ -149,7 +149,7 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
             </div>
             <div className="flex justify-between items-center mt-1 pt-1 border-t border-gray-50">
               <span className="text-sm text-gray-500">Status</span>
-              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.color || 'bg-gray-100 text-gray-600'}`}>
+              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.bgColor ? drum.bgColor + ' ' : ''}${drum.color || 'bg-gray-100 text-gray-600'}`}>
                 {drum.text || drum.status || 'Aktywny'}
               </div>
             </div>
