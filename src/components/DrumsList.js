@@ -63,16 +63,17 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
                 )}
               </div>
             </div>
-            
             <div className="flex items-center space-x-2">
               {drum.clientNote && (
                 <div className="text-blue-500 bg-blue-50 p-1.5 rounded-full shadow-sm" title="Posiada notatkę">
                   <FileText className="w-4 h-4" />
                 </div>
               )}
-              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.color || 'bg-gray-100 text-gray-600'}`}>
-                {drum.text || drum.status || 'Aktywny'}
-              </div>
+              <div 
+                className={`w-3.5 h-3.5 rounded-full ${drum.color ? drum.color.split(' ').find(c => c.startsWith('text-')) : 'text-gray-400'}`} 
+                style={{ backgroundColor: 'currentColor' }}
+                title={drum.text || drum.status || 'Aktywny'}
+              />
             </div>
           </div>
 
@@ -144,6 +145,12 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
                 {drum.adres_dostawy ? (
                   <div className="truncate" title={drum.adres_dostawy}>{drum.adres_dostawy}</div>
                 ) : 'Brak adresu'}
+              </div>
+            </div>
+            <div className="flex justify-between items-center mt-1 pt-1 border-t border-gray-50">
+              <span className="text-sm text-gray-500">Status</span>
+              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.color || 'bg-gray-100 text-gray-600'}`}>
+                {drum.text || drum.status || 'Aktywny'}
               </div>
             </div>
             
