@@ -411,7 +411,7 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/admin/clients" element={
-                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista']}>
                   <AdminClientsList
                     user={currentUser}
                     onNavigate={(page, state) => {
@@ -444,12 +444,12 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/admin/drums" element={
-                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista']}>
                   <AdminDrumsList user={currentUser} />
                 </ProtectedRoute>
               } />
               <Route path="/admin/returns" element={
-                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista']}>
                   <AdminReturnRequests user={currentUser} />
                 </ProtectedRoute>
               } />
@@ -459,7 +459,7 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/admin/reports" element={
-                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista']}>
                   <AdminReports user={currentUser} />
                 </ProtectedRoute>
               } />

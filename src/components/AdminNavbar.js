@@ -65,13 +65,18 @@ const AdminNavbar = ({
     { path: '/admin/reports', label: 'Raporty i analizy', icon: BarChart3, description: 'Statystyki i raporty' }
   ];
 
-  const isSalesperson = ['Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(user.role);
+  const isSalesperson = ['Dyrektor', 'Kierownik', 'Specjalista'].includes(user.role);
+  const isMagazyn = user.role === 'Wsparcie';
+  
   const filteredMenuItems = menuItems
     .filter(item => {
       if (isSalesperson) {
         return item.path !== '/admin/return-periods' && 
                item.path !== '/admin/supplier-rules' &&
                item.path !== '/admin/registrations';
+      }
+      if (isMagazyn) {
+        return item.path === '/admin' || item.path === '/admin/map';
       }
       return true;
     })
@@ -91,7 +96,7 @@ const AdminNavbar = ({
       supervisor: { label: 'Koordynator', icon: Shield, gradient: 'from-blue-600 to-blue-800' },
       Dyrektor: { label: 'Dyrektor', icon: Crown, gradient: 'from-red-600 to-red-800' },
       Kierownik: { label: 'Kierownik Rynku', icon: Shield, gradient: 'from-blue-500 to-indigo-700' },
-      Wsparcie: { label: 'Wsparcie Sprzedaży', icon: Users, gradient: 'from-emerald-500 to-teal-700' },
+      Wsparcie: { label: 'Magazyn', icon: Package, gradient: 'from-emerald-500 to-teal-700' },
       Specjalista: { label: 'Specjalista', icon: UserCheck, gradient: 'from-indigo-500 to-purple-700' }
     };
     const config = roleConfig[role] || { label: role, icon: UserCheck, gradient: 'from-slate-600 to-slate-800' };

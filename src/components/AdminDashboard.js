@@ -23,7 +23,8 @@ import {
 } from 'lucide-react';
 
 const AdminDashboard = ({ user, onNavigate }) => {
-  const isSalesperson = user && ['Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(user.role);
+  const isSalesperson = user && ['Dyrektor', 'Kierownik', 'Specjalista'].includes(user.role);
+  const isMagazyn = user && user.role === 'Wsparcie';
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   const [stats, setStats] = useState({
@@ -538,8 +539,10 @@ const AdminDashboard = ({ user, onNavigate }) => {
               </h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                     onClick={() => setIsInviteModalOpen(true)}>
+                {!isMagazyn && (
+                  <>
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                         onClick={() => setIsInviteModalOpen(true)}>
                   <div className="flex items-start space-x-4">
                     <div className="p-3 rounded-xl bg-indigo-100 group-hover:bg-indigo-200 transition-colors duration-300">
                       <Mail className="w-8 h-8 text-indigo-600" />
@@ -635,24 +638,26 @@ const AdminDashboard = ({ user, onNavigate }) => {
                     </div>
                   </div>
                 )}
+                  </>
+                )}
                 
-                <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                     onClick={() => onNavigate('admin-reports')}>
+                <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-indigo-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                     onClick={() => onNavigate('admin-map', null) || (window.location.href='/admin/map')}>
                   <div className="flex items-start space-x-4">
-                    <div className="p-3 rounded-xl bg-teal-100 group-hover:bg-teal-200 transition-colors duration-300">
-                      <BarChart3 className="w-8 h-8 text-teal-600" />
+                    <div className="p-3 rounded-xl bg-indigo-100 group-hover:bg-indigo-200 transition-colors duration-300">
+                      <MapPin className="w-8 h-8 text-indigo-600" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Raporty i analizy</h3>
-                      <p className="text-gray-600 text-sm mb-4">Generuj raporty i analizuj dane</p>
-                      <button className="text-teal-600 font-medium text-sm hover:text-teal-800 transition-colors duration-200">
-                        Zobacz raporty →
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Mapa logistyczna</h3>
+                      <p className="text-gray-600 text-sm mb-4">Planowanie tras i monitorowanie odbiorów na mapie</p>
+                      <button className="text-indigo-600 font-medium text-sm hover:text-indigo-800 transition-colors duration-200">
+                        Otwórz mapę →
                       </button>
                     </div>
                   </div>
                 </div>
  
-                {!isSalesperson && (
+                {(!isSalesperson && !isMagazyn) && (
                   <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
                        onClick={() => onNavigate('admin-supplier-rules')}>
                     <div className="flex items-start space-x-4">
