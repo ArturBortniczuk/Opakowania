@@ -70,8 +70,9 @@ const Dashboard = ({ user, profile }) => {
               isReported: true,
               status: 'reported',
               text: 'Zgłoszony do zwrotu',
-              color: 'bg-orange-100 text-orange-700',
-              borderColor: 'border-orange-200'
+              color: 'text-purple-700',
+              bgColor: 'bg-purple-100',
+              borderColor: 'border-purple-200'
             };
           }
           return d;
@@ -563,7 +564,7 @@ const Dashboard = ({ user, profile }) => {
                     {statusBreakdown.reportedPercent > 0 && (
                       <div 
                         style={{ width: `${statusBreakdown.reportedPercent}%` }} 
-                        className="bg-gradient-to-r from-orange-400 to-orange-500 h-full transition-all duration-500" 
+                        className="bg-gradient-to-r from-purple-400 to-purple-500 h-full transition-all duration-500" 
                         title={`Zgłoszone: ${statusBreakdown.reported}`} 
                       />
                     )}
@@ -589,10 +590,10 @@ const Dashboard = ({ user, profile }) => {
                       <span className="text-xs text-emerald-500 mt-0.5">{statusBreakdown.activePercent.toFixed(0)}% sumy</span>
                     </div>
 
-                    <div className="p-3 bg-orange-50 border border-orange-100 rounded-xl flex flex-col">
-                      <span className="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-1">Zgłoszone zwroty</span>
-                      <span className="text-xl font-bold text-orange-700">{statusBreakdown.reported}</span>
-                      <span className="text-xs text-orange-500 mt-0.5">{statusBreakdown.reportedPercent.toFixed(0)}% sumy</span>
+                    <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl flex flex-col">
+                      <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider mb-1">Zgłoszone zwroty</span>
+                      <span className="text-xl font-bold text-purple-700">{statusBreakdown.reported}</span>
+                      <span className="text-xs text-purple-500 mt-0.5">{statusBreakdown.reportedPercent.toFixed(0)}% sumy</span>
                     </div>
                   </div>
                 </div>
