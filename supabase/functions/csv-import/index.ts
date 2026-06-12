@@ -63,6 +63,9 @@ Deno.serve(async (req) => {
           case 'data_przyjecia_na_stan':
             record.data_przyjecia_na_stan = value;
             break;
+          case 'lokalizacja_wms':
+            record.lokalizacja_wms = value;
+            break;
           default:
             record[header.toLowerCase()] = value;
         }

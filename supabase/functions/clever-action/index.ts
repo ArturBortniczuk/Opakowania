@@ -132,6 +132,9 @@ Deno.serve(async (req)=>{
             case 'data_wydania':
               record.DATA_WYDANIA = value;
               break;
+            case 'lokalizacja_wms':
+              record.lokalizacja_wms = value;
+              break;
             default:
               // Zachowaj oryginalny nagłówek jeśli nie ma mapowania
               record[header] = value;
