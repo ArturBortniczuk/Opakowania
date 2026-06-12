@@ -271,7 +271,8 @@ export const drumsAPI = {
         sortOrder = 'asc',
         search = '',
         statusFilter = 'all', // 'all', 'empty', 'full'
-        urgentOnly = false
+        urgentOnly = false,
+        withLocationOnly = false
       } = options;
 
       let query = supabase
@@ -293,9 +294,14 @@ export const drumsAPI = {
         const nextMonth = new Date(today);
         nextMonth.setDate(today.getDate() + 30);
         
+        const todayStr = today.toISOString().split('T')[0];
         const nextMonthStr = nextMonth.toISOString().split('T')[0];
         
-        query = query.lte('data_zwrotu_do_dostawcy', nextMonthStr);
+        query = query.gte('data_zwrotu_do_dostawcy', todayStr).lte('data_zwrotu_do_dostawcy', nextMonthStr);
+      }
+
+      if (withLocationOnly) {
+        query = query.not('lokalizacja_wms', 'is', null).neq('lokalizacja_wms', '');
       }
 
       if (search) {

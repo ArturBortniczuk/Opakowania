@@ -25,6 +25,7 @@ const AdminWarehouseDrums = () => {
   
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'empty', 'full'
   const [urgentOnly, setUrgentOnly] = useState(false);
+  const [withLocationOnly, setWithLocationOnly] = useState(false);
 
   const [drumsData, setDrumsData] = useState({
     data: [],
@@ -54,6 +55,7 @@ const AdminWarehouseDrums = () => {
         search: searchTerm,
         statusFilter,
         urgentOnly,
+        withLocationOnly,
         ...options
       };
 
@@ -65,7 +67,7 @@ const AdminWarehouseDrums = () => {
     } finally {
       setLoading(false);
     }
-  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly]);
+  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly, withLocationOnly]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -76,7 +78,7 @@ const AdminWarehouseDrums = () => {
 
   useEffect(() => {
     fetchDrums({ page: 1 });
-  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly]);
+  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly, withLocationOnly]);
 
   const goToPage = (page) => {
     setDrumsData(prev => ({ ...prev, pagination: { ...prev.pagination, page } }));
@@ -99,7 +101,7 @@ const AdminWarehouseDrums = () => {
     today.setHours(0,0,0,0);
     const diffTime = date - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays <= 30;
+    return diffDays >= 0 && diffDays <= 30;
   };
 
   const isOverdue = (dateString) => {
@@ -111,12 +113,12 @@ const AdminWarehouseDrums = () => {
   };
 
   const DrumCard = ({ drum, index }) => {
-    const urgent = isUrgent(drum.data_zwrotu_do_dostawcy);
     const overdue = isOverdue(drum.data_zwrotu_do_dostawcy);
+    const urgent = !overdue && isUrgent(drum.data_zwrotu_do_dostawcy);
     
+    // Jeśli przeterminowany, traktujemy go jako "Własny" - bez czerwonego alarmu
     let borderColor = 'border-blue-100';
-    if (overdue) borderColor = 'border-red-400 bg-red-50/30';
-    else if (urgent) borderColor = 'border-orange-400 bg-orange-50/30';
+    if (urgent) borderColor = 'border-orange-400 bg-orange-50/30';
 
     return (
       <div
@@ -138,12 +140,10 @@ const AdminWarehouseDrums = () => {
             </div>
           </div>
           
-          {overdue ? (
-            <AlertCircle className="w-6 h-6 text-red-500 flex-shrink-0" title="Przeterminowany zwrot!" />
-          ) : urgent ? (
-            <Clock className="w-6 h-6 text-orange-500 flex-shrink-0" title="Pilny zwrot (< 30 dni)" />
+          {urgent ? (
+            <Clock className="w-6 h-6 text-orange-500 flex-shrink-0" title="Pilny zwrot (≤ 30 dni)" />
           ) : (
-            <CheckCircle className="w-6 h-6 text-emerald-500 flex-shrink-0" title="Termin w normie" />
+            <CheckCircle className="w-6 h-6 text-emerald-500 flex-shrink-0" title="Własny lub termin w normie" />
           )}
         </div>
 
@@ -175,12 +175,11 @@ const AdminWarehouseDrums = () => {
           <div className="flex justify-between items-center pt-2 border-t border-gray-100">
             <span className="text-sm text-gray-500">Termin zwrotu</span>
             <span className={`text-sm font-bold ${
-              overdue ? 'text-red-600' : urgent ? 'text-orange-600' : 'text-gray-900'
+              urgent ? 'text-orange-600' : (overdue ? 'text-indigo-600' : 'text-gray-900')
             }`}>
-              {drum.data_zwrotu_do_dostawcy ?
+              {overdue ? 'Własny (nasz)' : (drum.data_zwrotu_do_dostawcy ?
                 new Date(drum.data_zwrotu_do_dostawcy).toLocaleDateString('pl-PL') :
-                'Brak danych'
-              }
+                'Własny')}
             </span>
           </div>
         </div>
@@ -237,18 +236,33 @@ const AdminWarehouseDrums = () => {
                 <option value="full">Z towarem na magazynie</option>
               </select>
 
-              <label className="flex items-center space-x-3 p-3 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={urgentOnly}
-                  onChange={(e) => setUrgentOnly(e.target.checked)}
-                  className="w-5 h-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
-                />
-                <span className="font-medium text-gray-700 flex items-center">
-                  <Clock className="w-4 h-4 mr-1 text-orange-500" />
-                  Tylko pilne (≤ 30 dni)
-                </span>
-              </label>
+              <div className="flex items-center space-x-4">
+                <label className="flex items-center space-x-3 p-3 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={withLocationOnly}
+                    onChange={(e) => setWithLocationOnly(e.target.checked)}
+                    className="w-5 h-5 text-emerald-500 rounded border-gray-300 focus:ring-emerald-500"
+                  />
+                  <span className="font-medium text-gray-700 flex items-center">
+                    <MapPin className="w-4 h-4 mr-1 text-emerald-500" />
+                    Z lokalizacją WMS
+                  </span>
+                </label>
+
+                <label className="flex items-center space-x-3 p-3 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={urgentOnly}
+                    onChange={(e) => setUrgentOnly(e.target.checked)}
+                    className="w-5 h-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
+                  />
+                  <span className="font-medium text-gray-700 flex items-center">
+                    <Clock className="w-4 h-4 mr-1 text-orange-500" />
+                    Tylko pilne (≤ 30 dni)
+                  </span>
+                </label>
+              </div>
               
               <div className="flex items-center space-x-2">
                 <span className="text-sm font-medium text-gray-500 flex items-center">
@@ -292,7 +306,7 @@ const AdminWarehouseDrums = () => {
           </div>
         ) : drumsData.data.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8 items-stretch">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8 items-stretch">
               {drumsData.data.map((drum, index) => (
                 <DrumCard key={drum.id || drum.cecha || index} drum={drum} index={index} />
               ))}
