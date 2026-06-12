@@ -324,6 +324,32 @@ const DrumsList = ({ user }) => {
           if (req.status !== 'Rejected' && req.status !== 'Cancelled') {
             if (Array.isArray(req.selected_drums)) {
               req.selected_drums.forEach(d => reportedDrums.add(d.cecha));
+            }
+          }
+        });
+      }
+
+      // Aktualizujemy statusy bębnów zgłoszonych
+      let mappedDrums = allDrums.map(d => {
+        if (reportedDrums.has(d.cecha)) {
+          return {
+            ...d,
+            isReported: true,
+            status: 'reported',
+            text: 'Zgłoszony do zwrotu',
+            color: 'text-purple-700',
+            bgColor: 'bg-purple-100',
+            borderColor: 'border-purple-200'
+          };
+        }
+        return d;
+      });
+
+      // Wyciągamy unikalne rozmiary
+      const sizes = [...new Set(allDrums.map(d => d.rozmiar_bebna).filter(Boolean))].sort((a, b) => 
+        String(a).localeCompare(String(b), undefined, { numeric: true })
+      );
+      setAvailableSizes(sizes);
 
       // 1. Filtrowanie (Search) - WYRZUCONO kod_bebna i cecha
       let filtered = mappedDrums;
