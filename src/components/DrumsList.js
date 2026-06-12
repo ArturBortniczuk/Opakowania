@@ -4,7 +4,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
 import {
   Package, Calendar, Search, Filter, AlertCircle, CheckCircle, Clock,
-  ArrowUpDown, Truck, RefreshCw, ChevronLeft, ChevronRight, ChevronDown
+  ArrowUpDown, Truck, RefreshCw, ChevronLeft, ChevronRight, ChevronDown,
+  FileText, X, Save
 } from 'lucide-react';
 
 

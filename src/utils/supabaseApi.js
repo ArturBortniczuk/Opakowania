@@ -422,6 +422,7 @@ export const drumsAPI = {
       // Pobieranie niestandardowych terminów i wyjątków dla pobranych bębnów
       let customDeadlines = [];
       let exceptions = [];
+      let clientNotes = [];
       if (data && data.length > 0) {
         const drumCechas = data.map(d => d.cecha).filter(Boolean);
         const nips = [...new Set(data.map(d => d.nip).filter(Boolean))];
@@ -446,7 +447,6 @@ export const drumsAPI = {
         }
 
         // Notatki klienta
-        let clientNotes = [];
         const { data: notesData } = await supabase
           .from('client_drum_notes')
           .select('*')
@@ -719,6 +719,7 @@ export const drumsAPI = {
       // Pobranie niestandardowych terminów i wyjątków dla pobranych bębnów
       let customDeadlines = [];
       let exceptions = [];
+      let clientNotes = [];
       if (allData && allData.length > 0) {
         const drumCechas = allData.map(d => d.cecha).filter(Boolean);
         let deadlinesQuery = supabase.from('custom_drum_deadlines').select('*');
@@ -750,7 +751,6 @@ export const drumsAPI = {
           exceptions = excData;
         }
         
-        let clientNotes = [];
         let notesQuery = supabase.from('client_drum_notes').select('*');
         if (nip) {
           notesQuery = notesQuery.eq('nip', nip);
