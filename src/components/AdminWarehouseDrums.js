@@ -214,7 +214,7 @@ const AdminWarehouseDrums = () => {
 
           {/* Search and Filters */}
           <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-emerald-100 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-center">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                 <input
