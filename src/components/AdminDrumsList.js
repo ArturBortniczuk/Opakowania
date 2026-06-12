@@ -683,6 +683,14 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
               </button>
 
               <button
+                onClick={() => navigate('/return')}
+                className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-lg hover:from-emerald-600 hover:to-emerald-700 transition-colors duration-200 flex items-center space-x-2 font-semibold"
+              >
+                <Truck className="w-4 h-4" />
+                <span>Nowe zgłoszenie</span>
+              </button>
+
+              <button
                 onClick={handleRefresh}
                 disabled={loading}
                 className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"

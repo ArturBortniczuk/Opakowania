@@ -601,6 +601,22 @@ const AdminDashboard = ({ user, onNavigate }) => {
                     </div>
                   </div>
                 </div>
+
+                <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-emerald-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                     onClick={() => window.location.href = '/return'}>
+                  <div className="flex items-start space-x-4">
+                    <div className="p-3 rounded-xl bg-emerald-100 group-hover:bg-emerald-200 transition-colors duration-300">
+                      <Truck className="w-8 h-8 text-emerald-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Nowe zgłoszenie</h3>
+                      <p className="text-gray-600 text-sm mb-4">Wygeneruj zgłoszenie zwrotu dla klienta</p>
+                      <button className="text-emerald-600 font-medium text-sm hover:text-emerald-800 transition-colors duration-200">
+                        Utwórz zgłoszenie →
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 
                 {!isSalesperson && (
                   <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"

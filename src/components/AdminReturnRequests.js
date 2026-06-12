@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { returnsAPI, companiesAPI, drumsAPI } from '../utils/supabaseApi';
 import {
   Truck,
@@ -20,6 +20,7 @@ import {
 
 const AdminReturnRequests = ({ initialFilter = {} }) => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const urlClientNip = searchParams.get('clientNip');
 
   const [requests, setRequests] = useState([]);
@@ -711,6 +712,13 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
             </div>
 
             <div className="flex space-x-2">
+              <button
+                onClick={() => navigate('/return')}
+                className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 flex items-center space-x-2 shadow-sm font-semibold"
+              >
+                <Truck className="w-4 h-4" />
+                <span>Nowe zgłoszenie</span>
+              </button>
               <button
                 onClick={handleRefresh}
                 className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2"
