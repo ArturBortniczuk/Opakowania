@@ -573,6 +573,24 @@ const AdminDashboard = ({ user, onNavigate }) => {
                   </div>
                 </div>
                 
+                {(!isSalesperson) && (
+                  <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-teal-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                       onClick={() => onNavigate('admin-users', null) || (window.location.href='/admin/users')}>
+                    <div className="flex items-start space-x-4">
+                      <div className="p-3 rounded-xl bg-teal-100 group-hover:bg-teal-200 transition-colors duration-300">
+                        <Users className="w-8 h-8 text-teal-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Użytkownicy i Uprawnienia</h3>
+                        <p className="text-gray-600 text-sm mb-4">Zarządzaj dostępami pracowników i klientów</p>
+                        <button className="text-teal-600 font-medium text-sm hover:text-teal-800 transition-colors duration-200">
+                          Panel Użytkowników →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
                      onClick={() => onNavigate('admin-drums')}>
                   <div className="flex items-start space-x-4">

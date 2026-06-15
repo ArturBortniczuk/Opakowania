@@ -55,6 +55,7 @@ const AdminNavbar = ({
 
   const menuItems = [
     { path: '/admin', label: 'Dashboard', icon: Home, description: 'Panel główny' },
+    { path: '/admin/users', label: 'Użytkownicy i Uprawnienia', icon: Shield, description: 'Zarządzaj dostępami' },
     { path: '/admin/clients', label: 'Zarządzaj klientami', icon: Users, description: 'Klienci w systemie' },
     { path: '/admin/registrations', label: 'Weryfikacja kont', icon: UserCheck, description: 'Zatwierdzaj nowych użytkowników' },
     { path: '/admin/drums', label: 'Wszystkie bębny', icon: Package, description: 'Monitoruj bębny' },
@@ -75,6 +76,7 @@ const AdminNavbar = ({
         return item.path !== '/admin/return-periods' && 
                item.path !== '/admin/supplier-rules' &&
                item.path !== '/admin/registrations' &&
+               item.path !== '/admin/users' &&
                item.path !== '/admin/warehouse-drums';
       }
       if (isMagazyn) {

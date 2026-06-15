@@ -17,6 +17,7 @@ import AdminReturnRequests from './components/AdminReturnRequests';
 import AdminReports from './components/AdminReports';
 import AdminSupplierRules from './components/AdminSupplierRules';
 import AdminRegistrationManager from './components/AdminRegistrationManager';
+import AdminUsersManager from './components/AdminUsersManager';
 import HelpGuide from './components/HelpGuide';
 import LogisticsMap from './components/LogisticsMap';
 import AdminWarehouseDrums from './components/AdminWarehouseDrums';
@@ -442,6 +443,11 @@ const App = () => {
               <Route path="/admin/registrations" element={
                 <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor']}>
                   <AdminRegistrationManager />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/users" element={
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor']}>
+                  <AdminUsersManager user={currentUser} />
                 </ProtectedRoute>
               } />
               <Route path="/admin/drums" element={
