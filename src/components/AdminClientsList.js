@@ -206,7 +206,7 @@ const AdminClientsList = ({ onNavigate }) => {
 
   const renderClientCard = (client, index) => (
     <div
-      className="bg-white/90 rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]"
+      className="bg-white/90 rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] flex flex-col h-full"
       style={{ animationDelay: `${index * 100}ms` }}
     >
       <div className="flex items-start justify-between mb-4">
@@ -278,31 +278,37 @@ const AdminClientsList = ({ onNavigate }) => {
             <span>Rynek: {client.market}</span>
           </div>
         )}
-        {client.email && (
-          <div className="flex items-center space-x-2 text-gray-600">
-            <Mail className="w-4 h-4" />
-            <span>{client.email}</span>
+        {!client.salesperson_name && !client.market && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-gray-50/75 py-2 px-3 rounded-lg border border-gray-100">
+            <div className="flex items-center space-x-2 text-gray-500 text-sm">
+              <UserCheck className="w-4 h-4 text-gray-400" />
+              <span className="truncate italic">Brak opiekuna</span>
+            </div>
           </div>
         )}
-        {client.phone && (
-          <div className="flex items-center space-x-2 text-gray-600">
-            <Phone className="w-4 h-4" />
-            <span>{client.phone}</span>
-          </div>
-        )}
-        {client.address && (
-          <div className="flex items-center space-x-2 text-gray-600">
-            <MapPin className="w-4 h-4" />
-            <span className="truncate">{client.address}</span>
-          </div>
-        )}
+        
+        <div className={`flex items-center space-x-2 ${client.email ? 'text-gray-600' : 'text-gray-400 italic'}`}>
+          <Mail className="w-4 h-4" />
+          <span className="truncate">{client.email || 'Brak adresu e-mail'}</span>
+        </div>
+        
+        <div className={`flex items-center space-x-2 ${client.phone ? 'text-gray-600' : 'text-gray-400 italic'}`}>
+          <Phone className="w-4 h-4" />
+          <span className="truncate">{client.phone || 'Brak numeru telefonu'}</span>
+        </div>
+        
+        <div className={`flex items-center space-x-2 ${client.address ? 'text-gray-600' : 'text-gray-400 italic'}`}>
+          <MapPin className="w-4 h-4" />
+          <span className="truncate">{client.address || 'Brak adresu firmy'}</span>
+        </div>
+        
         <div className="flex items-center space-x-2 text-gray-600">
           <Calendar className="w-4 h-4" />
           <span>Ostatnia aktywność: {new Date(client.lastActivity).toLocaleDateString('pl-PL')}</span>
         </div>
       </div>
 
-      <div className="flex space-x-2">
+      <div className="flex space-x-2 mt-auto pt-2">
         <button
           onClick={() => handleViewClient(client)}
           className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-2 px-4 rounded-xl font-medium hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2"
