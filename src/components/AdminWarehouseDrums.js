@@ -14,7 +14,6 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  ChevronsRight,
   Filter,
   Download,
   Check
