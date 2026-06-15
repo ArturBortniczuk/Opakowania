@@ -80,25 +80,29 @@ const AdminDashboard = ({ user, onNavigate }) => {
 
             // Logika "Nasze" (własne) bębny
             const nameUpper = (drum.nazwa || '').toUpperCase();
-            const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
-            const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
             
             // Oryginalna data zwrotu do dostawcy (db_data_zwrotu_do_dostawcy, którą dodaliśmy do API)
             const returnDeadline = drum.db_data_zwrotu_do_dostawcy 
               ? new Date(drum.db_data_zwrotu_do_dostawcy) 
               : null;
 
+            // Dni od terminu zwrotu
+            const daysSinceDeadline = returnDeadline 
+              ? Math.floor((new Date() - returnDeadline) / (1000 * 60 * 60 * 24))
+              : 0;
+
             const isOurDrum = 
               !drum.db_data_zwrotu_do_dostawcy || // Brak w bazie pierwotnej daty zwrotu = własny
               nameUpper.startsWith('BĘBEN ELTRON') || 
-              daysInPossession > 360 ||
-              (returnDeadline && new Date() > returnDeadline);
+              daysSinceDeadline > 360; // Przeterminowane zwrotu do kablowni powyżej 360 dni
 
             if (isOurDrum) {
               ourVal += priceRaw;
             }
           }
         });
+
+        console.log(`Podsumowanie: Załadowano ${allDrums.length} bębnów. Wartość całkowita: ${totalVal}, Własne: ${ourVal}`);
 
         // Obliczamy bębny w trakcie zwrotów
         // Tworzymy mapę cech bębnów z ich cenami z allDrums dla szybkiego wyszukiwania
