@@ -258,34 +258,15 @@ const AdminClientsList = ({ onNavigate }) => {
       </div>
 
       <div className="space-y-2 mb-4 text-sm">
-        {client.salesperson_name && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-blue-50/75 py-2 px-3 rounded-lg border border-blue-100">
-            <div className="flex items-center space-x-2 text-blue-800 font-bold text-sm">
-              <UserCheck className="w-4 h-4 text-blue-600" />
-              <span className="truncate">{client.salesperson_name}</span>
-            </div>
-            {client.market && (
-              <div className="flex items-center space-x-1 text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-100 shadow-sm text-xs font-semibold w-fit">
-                <MapPin className="w-3 h-3 text-indigo-500" />
-                <span>Rynek: {client.market}</span>
-              </div>
-            )}
-          </div>
-        )}
-        {!client.salesperson_name && client.market && (
-          <div className="flex items-center space-x-2 text-indigo-700 bg-indigo-50/75 py-1 px-2.5 rounded-lg border border-indigo-100 font-semibold w-fit">
-            <MapPin className="w-4 h-4 text-indigo-500" />
-            <span>Rynek: {client.market}</span>
-          </div>
-        )}
-        {!client.salesperson_name && !client.market && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-gray-50/75 py-2 px-3 rounded-lg border border-gray-100">
-            <div className="flex items-center space-x-2 text-gray-500 text-sm">
-              <UserCheck className="w-4 h-4 text-gray-400" />
-              <span className="truncate italic">Brak opiekuna</span>
-            </div>
-          </div>
-        )}
+        <div className={`flex items-center space-x-2 py-1.5 px-2.5 rounded-lg border ${client.salesperson_name ? 'bg-blue-50/75 border-blue-100 text-blue-800 font-bold' : 'bg-gray-50/75 border-gray-100 text-gray-500 italic'}`}>
+          <UserCheck className={`w-4 h-4 ${client.salesperson_name ? 'text-blue-600' : 'text-gray-400'}`} />
+          <span className="truncate">{client.salesperson_name || 'Brak opiekuna'}</span>
+        </div>
+
+        <div className={`flex items-center space-x-2 ${client.market ? 'text-indigo-700 font-semibold' : 'text-gray-400 italic'}`}>
+          <MapPin className={`w-4 h-4 ${client.market ? 'text-indigo-500' : 'text-gray-400'}`} />
+          <span className="truncate">{client.market ? `Rynek: ${client.market}` : 'Brak przypisanego rynku'}</span>
+        </div>
         
         <div className={`flex items-center space-x-2 ${client.email ? 'text-gray-600' : 'text-gray-400 italic'}`}>
           <Mail className="w-4 h-4" />
