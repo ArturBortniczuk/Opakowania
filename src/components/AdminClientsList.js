@@ -221,11 +221,6 @@ const AdminClientsList = ({ onNavigate }) => {
         </div>
 
         <div className="flex items-center space-x-2">
-          {client.market && (
-            <span className="px-2.5 py-1 rounded-full text-xs font-bold border bg-indigo-50 text-indigo-700 border-indigo-150 shadow-sm">
-              Rynek: {client.market}
-            </span>
-          )}
           <div className="relative">
             <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors duration-200">
               <MoreVertical className="w-4 h-4" />
@@ -234,33 +229,53 @@ const AdminClientsList = ({ onNavigate }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="flex items-center space-x-2 text-sm">
-          <Package className="w-4 h-4 text-blue-600" />
-          <span className="text-gray-600">Bębny:</span>
-          <span className="font-medium text-gray-900">{client.drumsCount}</span>
-        </div>
-
-        <div className="flex items-center space-x-2 text-sm">
-          <Clock className="w-4 h-4 text-yellow-600" />
-          <span className="text-gray-600">Oczekujące:</span>
-          <span className="font-medium text-gray-900">{client.pendingRequests}</span>
-        </div>
-
-        {client.overdueDrums > 0 && (
-          <div className="flex items-center space-x-2 text-sm">
-            <AlertCircle className="w-4 h-4 text-red-600" />
-            <span className="text-gray-600">Przeterminowane:</span>
-            <span className="font-medium text-red-600">{client.overdueDrums}</span>
+      <div className="grid grid-cols-3 gap-2 mb-4 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
+        <div className="flex flex-col items-center justify-center text-center">
+          <div className="flex items-center space-x-1 text-sm mb-1">
+            <Package className="w-4 h-4 text-blue-600" />
+            <span className="text-gray-500 font-medium text-xs">Bębny</span>
           </div>
-        )}
+          <span className="font-bold text-gray-900">{client.drumsCount}</span>
+        </div>
+
+        <div className="flex flex-col items-center justify-center text-center border-l border-r border-gray-200">
+          <div className="flex items-center space-x-1 text-sm mb-1">
+            <Clock className="w-4 h-4 text-yellow-600" />
+            <span className="text-gray-500 font-medium text-xs">Oczekujące</span>
+          </div>
+          <span className="font-bold text-gray-900">{client.pendingRequests}</span>
+        </div>
+
+        <div className="flex flex-col items-center justify-center text-center">
+          <div className="flex items-center space-x-1 text-sm mb-1">
+            <AlertCircle className={`w-4 h-4 ${client.overdueDrums > 0 ? 'text-red-600' : 'text-gray-400'}`} />
+            <span className="text-gray-500 font-medium text-xs">Po terminie</span>
+          </div>
+          <span className={`font-bold ${client.overdueDrums > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+            {client.overdueDrums}
+          </span>
+        </div>
       </div>
 
       <div className="space-y-2 mb-4 text-sm">
         {client.salesperson_name && (
-          <div className="flex items-center space-x-2 text-blue-700 font-semibold bg-blue-50/75 py-1 px-2.5 rounded-lg border border-blue-100">
-            <UserCheck className="w-4 h-4 text-blue-600" />
-            <span className="truncate">Handlowiec: {client.salesperson_name}</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-blue-50/75 py-2 px-3 rounded-lg border border-blue-100">
+            <div className="flex items-center space-x-2 text-blue-800 font-bold text-sm">
+              <UserCheck className="w-4 h-4 text-blue-600" />
+              <span className="truncate">{client.salesperson_name}</span>
+            </div>
+            {client.market && (
+              <div className="flex items-center space-x-1 text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-100 shadow-sm text-xs font-semibold w-fit">
+                <MapPin className="w-3 h-3 text-indigo-500" />
+                <span>Rynek: {client.market}</span>
+              </div>
+            )}
+          </div>
+        )}
+        {!client.salesperson_name && client.market && (
+          <div className="flex items-center space-x-2 text-indigo-700 bg-indigo-50/75 py-1 px-2.5 rounded-lg border border-indigo-100 font-semibold w-fit">
+            <MapPin className="w-4 h-4 text-indigo-500" />
+            <span>Rynek: {client.market}</span>
           </div>
         )}
         {client.email && (
