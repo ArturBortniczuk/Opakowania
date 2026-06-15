@@ -19,8 +19,17 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
   const company = drum.company || drum.pelna_nazwa_kontrahenta;
   const nip = drum.nip || drum.NIP;
 
-  const priceRaw = parseFloat(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
-  const clientPrice = !isNaN(priceRaw) ? priceRaw * 1.2 : null;
+  // Bezpieczny parser cen z plików Excela
+  const parsePriceRaw = (val) => {
+    if (!val) return 0;
+    if (typeof val === 'number') return val;
+    const cleaned = String(val).replace(/\s/g, '').replace(',', '.');
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const priceRaw = parsePriceRaw(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
+  const clientPrice = priceRaw > 0 ? priceRaw * 1.2 : null;
 
   const handleSaveNote = async (e) => {
     e.stopPropagation();

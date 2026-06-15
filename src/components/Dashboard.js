@@ -91,9 +91,18 @@ const Dashboard = ({ user, profile }) => {
         let overdueVal = 0;
         let lostValTotal = 0;
 
+        // Bezpieczny parser cen z plików Excela
+        const parsePriceRaw = (val) => {
+          if (!val) return 0;
+          if (typeof val === 'number') return val;
+          const cleaned = String(val).replace(/\s/g, '').replace(',', '.');
+          const parsed = parseFloat(cleaned);
+          return isNaN(parsed) ? 0 : parsed;
+        };
+
         mappedDrums.forEach(drum => {
-          const priceRaw = parseFloat(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
-          if (!isNaN(priceRaw)) {
+          const priceRaw = parsePriceRaw(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
+          if (priceRaw > 0) {
             const clientPrice = priceRaw * 1.2;
             totalVal += clientPrice;
 
@@ -649,7 +658,7 @@ const Dashboard = ({ user, profile }) => {
                             }`}>{daysStr}</span>
                             {drum.cena_netto_bebna && (
                               <span className="text-[10px] font-bold text-gray-600 block mt-0.5">
-                                Wartość: {((parseFloat(drum.cena_netto_bebna) || 0) * 1.2).toFixed(2)} PLN
+                                Wartość: {(parsePriceRaw(drum.cena_netto_bebna) * 1.2).toFixed(2)} PLN
                               </span>
                             )}
                             <span className="text-[10px] text-gray-400 block font-medium mt-0.5">Termin: {returnDate ? new Date(returnDate).toLocaleDateString('pl-PL') : 'Brak'}</span>

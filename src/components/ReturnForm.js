@@ -323,6 +323,15 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
     }
   };
 
+  // Bezpieczny parser cen z plików Excela
+  const parsePriceRaw = (val) => {
+    if (!val) return 0;
+    if (typeof val === 'number') return val;
+    const cleaned = String(val).replace(/\s/g, '').replace(',', '.');
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
   // Oblicz całkowitą wartość wybranych bębnów (netto z marżą 20%)
   const calculateSelectedDrumsValue = () => {
     let totalVal = 0;
@@ -331,8 +340,8 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
       const origDrum = userDrums.find(d => d.cecha === selDrum.cecha);
       const cenaNetto = origDrum?.cena_netto_bebna || selDrum.cena_netto;
       if (cenaNetto) {
-        const val = parseFloat(cenaNetto) * 1.2;
-        if (!isNaN(val)) {
+        const val = parsePriceRaw(cenaNetto) * 1.2;
+        if (val > 0) {
           totalVal += val;
         }
       }
@@ -347,8 +356,8 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
       const origDrum = userDrums.find(d => d.cecha === selDrum.cecha);
       const cenaNetto = origDrum?.cena_netto_bebna || selDrum.cena_netto;
       if (cenaNetto) {
-        const val = parseFloat(cenaNetto) * 1.2;
-        if (!isNaN(val)) {
+        const val = parsePriceRaw(cenaNetto) * 1.2;
+        if (val > 0) {
           // Policz procent zwrotu
           const daysInPossession = origDrum?.daysInPossession !== undefined 
             ? origDrum.daysInPossession 
@@ -759,7 +768,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
                   else if (daysInPossession <= 340) returnPercentage = 25;
                   else returnPercentage = 0;
 
-                  const drumPrice = (parseFloat(drum.cena_netto_bebna) || 0) * 1.2;
+                  const drumPrice = parsePriceRaw(drum.cena_netto_bebna) * 1.2;
                   const refundValue = drumPrice * (returnPercentage / 100);
 
                   return (
