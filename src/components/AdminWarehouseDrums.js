@@ -14,8 +14,12 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Filter
+  ChevronsRight,
+  Filter,
+  Download,
+  Check
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 const AdminWarehouseDrums = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,6 +30,11 @@ const AdminWarehouseDrums = () => {
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'empty', 'full'
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [withLocationOnly, setWithLocationOnly] = useState(false);
+
+  const [availableSizes, setAvailableSizes] = useState([]);
+  const [selectedSizes, setSelectedSizes] = useState([]);
+  const [showSizesMenu, setShowSizesMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const [drumsData, setDrumsData] = useState({
     data: [],
@@ -56,6 +65,7 @@ const AdminWarehouseDrums = () => {
         statusFilter,
         urgentOnly,
         withLocationOnly,
+        selectedSizes,
         ...options
       };
 
@@ -67,7 +77,7 @@ const AdminWarehouseDrums = () => {
     } finally {
       setLoading(false);
     }
-  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly, withLocationOnly]);
+  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly, withLocationOnly, selectedSizes]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -77,8 +87,16 @@ const AdminWarehouseDrums = () => {
   }, [localSearchTerm]);
 
   useEffect(() => {
+    const fetchSizes = async () => {
+      const sizes = await drumsAPI.getWarehouseDrumSizes();
+      setAvailableSizes(sizes);
+    };
+    fetchSizes();
+  }, []);
+
+  useEffect(() => {
     fetchDrums({ page: 1 });
-  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly, withLocationOnly]);
+  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly, withLocationOnly, selectedSizes]);
 
   const goToPage = (page) => {
     setDrumsData(prev => ({ ...prev, pagination: { ...prev.pagination, page } }));
@@ -92,6 +110,54 @@ const AdminWarehouseDrums = () => {
       setSortBy(field);
       setSortOrder('asc');
     }
+  };
+
+  const handleExportXLSX = async () => {
+    try {
+      setExporting(true);
+      const requestOptions = {
+        page: 1,
+        limit: 10000,
+        sortBy,
+        sortOrder,
+        search: searchTerm,
+        statusFilter,
+        urgentOnly,
+        withLocationOnly,
+        selectedSizes
+      };
+      
+      const result = await drumsAPI.getWarehouseDrums(requestOptions);
+      if (!result.data || result.data.length === 0) {
+         alert("Brak danych do eksportu");
+         return;
+      }
+      
+      const exportData = result.data.map(drum => ({
+         'Cecha/Kod': drum.cecha || drum.kod_bebna,
+         'Rozmiar': drum.nazwa || drum.rozmiar_bebna,
+         'Status': drum.status,
+         'Lokalizacja WMS': drum.lokalizacja_wms || '',
+         'Kablownia (Dostawca)': drum.kon_dostawca || '',
+         'Data zwrotu': drum.data_zwrotu_do_dostawcy || 'Własny'
+      }));
+      
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Magazyn");
+      XLSX.writeFile(workbook, `Magazyn_Bebnow_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (err) {
+      console.error('Błąd eksportu XLSX:', err);
+      alert("Wystąpił błąd podczas generowania pliku Excel.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const toggleSize = (size) => {
+    setSelectedSizes(prev => 
+      prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
+    );
   };
 
   const isUrgent = (dateString) => {
@@ -202,14 +268,25 @@ const AdminWarehouseDrums = () => {
               </p>
             </div>
 
-            <button
-              onClick={() => fetchDrums()}
-              disabled={loading}
-              className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200"
-              title="Odśwież"
-            >
-              <RefreshCw className={`w-6 h-6 ${loading ? 'animate-spin' : ''}`} />
-            </button>
+            <div className="flex space-x-3">
+              <button
+                onClick={handleExportXLSX}
+                disabled={exporting || loading || drumsData.data.length === 0}
+                className="flex items-center space-x-2 px-4 py-2 bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 rounded-xl font-medium transition-all shadow-sm disabled:opacity-50"
+              >
+                {exporting ? <Loader className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                <span>Eksportuj XLSX</span>
+              </button>
+              
+              <button
+                onClick={() => fetchDrums()}
+                disabled={loading}
+                className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200"
+                title="Odśwież"
+              >
+                <RefreshCw className={`w-6 h-6 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
           </div>
 
           {/* Search and Filters */}
@@ -235,6 +312,48 @@ const AdminWarehouseDrums = () => {
                 <option value="empty">Puste na magazynie</option>
                 <option value="full">Z towarem na magazynie</option>
               </select>
+
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowSizesMenu(!showSizesMenu)}
+                  className="w-full flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors text-gray-700 font-medium"
+                >
+                  <div className="flex items-center">
+                    <Filter className="w-4 h-4 mr-2 text-emerald-500" />
+                    <span>Rozmiary ({selectedSizes.length > 0 ? selectedSizes.length : 'Wszystkie'})</span>
+                  </div>
+                  <ChevronLeft className={`w-5 h-5 transition-transform ${showSizesMenu ? '-rotate-90' : ''}`} />
+                </button>
+                
+                {showSizesMenu && (
+                  <div className="absolute z-10 mt-2 w-full max-h-60 overflow-auto bg-white border border-gray-200 rounded-xl shadow-xl p-2">
+                    {availableSizes.length > 0 ? (
+                      availableSizes.map(size => (
+                        <label key={size} className="flex items-center p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedSizes.includes(size)}
+                            onChange={() => toggleSize(size)}
+                            className="w-4 h-4 text-emerald-500 border-gray-300 rounded focus:ring-emerald-500"
+                          />
+                          <span className="ml-2 text-sm font-medium text-gray-700">{size}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <div className="p-2 text-sm text-gray-500 text-center">Brak rozmiarów do wyboru</div>
+                    )}
+                    {selectedSizes.length > 0 && (
+                      <button 
+                        onClick={() => setSelectedSizes([])}
+                        className="w-full mt-2 p-2 text-sm text-red-600 hover:bg-red-50 rounded-lg font-medium"
+                      >
+                        Wyczyść wybór
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="flex items-center space-x-4">
                 <label className="flex items-center space-x-3 p-3 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">

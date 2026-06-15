@@ -259,6 +259,23 @@ export const drumsAPI = {
   },
 
   /**
+   * Pobiera unikalną listę rozmiarów bębnów znajdujących się na magazynie.
+   */
+  async getWarehouseDrumSizes() {
+    try {
+      const { data, error } = await supabase
+        .from('drums')
+        .select('rozmiar_bebna')
+        .in('status', ['pusty na magazynie', 'na magazynie z towarem']);
+      if (error) throw error;
+      return [...new Set(data.map(d => d.rozmiar_bebna).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    } catch (error) {
+      console.error('Błąd pobierania rozmiarów:', error);
+      return [];
+    }
+  },
+
+  /**
    * Pobiera bębny znajdujące się na magazynie (na podstawie statusu).
    * Zoptymalizowane do wyświetlania w nowym module Magazynu.
    */
@@ -272,7 +289,8 @@ export const drumsAPI = {
         search = '',
         statusFilter = 'all', // 'all', 'empty', 'full'
         urgentOnly = false,
-        withLocationOnly = false
+        withLocationOnly = false,
+        selectedSizes = []
       } = options;
 
       let query = supabase
@@ -302,6 +320,10 @@ export const drumsAPI = {
 
       if (withLocationOnly) {
         query = query.not('lokalizacja_wms', 'is', null).neq('lokalizacja_wms', '');
+      }
+
+      if (selectedSizes && selectedSizes.length > 0) {
+        query = query.in('rozmiar_bebna', selectedSizes);
       }
 
       if (search) {
