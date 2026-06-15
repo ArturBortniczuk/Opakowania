@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS public.drums (
   data_przyjecia_na_stan DATE,
   kontrahent TEXT,
   status VARCHAR(50),
+  cena_netto_bebna TEXT,
   data_wydania DATE,
   lokalizacja_wms TEXT,
   latitude NUMERIC,

@@ -72,10 +72,19 @@ const AdminDashboard = ({ user, onNavigate }) => {
         let returnBaseVal = 0;
         let returnClientVal = 0;
 
+        // Bezpieczny parser cen z plików Excela (usuwa spacje tysięcy i zamienia przecinki na kropki)
+        const parsePriceRaw = (val) => {
+          if (!val) return 0;
+          if (typeof val === 'number') return val;
+          const cleaned = String(val).replace(/\s/g, '').replace(',', '.');
+          const parsed = parseFloat(cleaned);
+          return isNaN(parsed) ? 0 : parsed;
+        };
+
         // Obliczamy wartość ogólną i wartość własną z allDrums
         allDrums.forEach(drum => {
-          const priceRaw = parseFloat(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA || 0);
-          if (!isNaN(priceRaw) && priceRaw > 0) {
+          const priceRaw = parsePriceRaw(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
+          if (priceRaw > 0) {
             totalVal += priceRaw;
 
             // Logika "Nasze" (własne) bębny
@@ -109,7 +118,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
         const drumPriceMap = {};
         allDrums.forEach(drum => {
           if (drum.cecha) {
-            drumPriceMap[drum.cecha] = parseFloat(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA || 0);
+            drumPriceMap[drum.cecha] = parsePriceRaw(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
           }
         });
 
@@ -125,10 +134,10 @@ const AdminDashboard = ({ user, onNavigate }) => {
                   // Pobierz cenę netto - najpierw z allDrums (live), potem z obiektu snapshotu
                   let price = drumPriceMap[cecha];
                   if (price === undefined && typeof d === 'object') {
-                    price = parseFloat(d.cena_netto || d.cena_netto_bebna || 0);
+                    price = parsePriceRaw(d.cena_netto || d.cena_netto_bebna);
                   }
                   
-                  if (price && !isNaN(price)) {
+                  if (price && price > 0) {
                     returnBaseVal += price;
                     returnClientVal += price * 1.2;
                   }

@@ -24,8 +24,8 @@ Zanim wgrasz pliki CSV z systemu (np. firmy i bębny), musisz poprawić kilka og
 2. **Bębny (Drums) - NIPy z myślnikami i brakująca kolumna:**
    Wejdź w SQL Editor i uruchom:
    ```sql
-   -- Dodanie brakującej kolumny
-   ALTER TABLE public.drums ADD COLUMN IF NOT EXISTS cena_netto_bebna NUMERIC;
+   -- Dodanie brakującej kolumny (tylko w razie potrzeby, migracja v2 już ją ma)
+   ALTER TABLE public.drums ADD COLUMN IF NOT EXISTS cena_netto_bebna TEXT;
 
    -- Zwiększenie limitu znaków dla NIPu z myślnikami
    -- (Najpierw zdejmujemy widok i RLS, zmieniamy typ i zakładamy z powrotem)
