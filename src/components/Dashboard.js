@@ -5,6 +5,15 @@ import {
 } from 'lucide-react';
 import { drumsAPI, returnsAPI, companiesAPI } from '../utils/supabaseApi';
 
+// Bezpieczny parser cen z plików Excela
+const parsePriceRaw = (val) => {
+  if (!val) return 0;
+  if (typeof val === 'number') return val;
+  const cleaned = String(val).replace(/\s/g, '').replace(',', '.');
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? 0 : parsed;
+};
+
 const Dashboard = ({ user, profile }) => {
   const navigate = useNavigate();
   const [stats, setStats] = useState({
@@ -90,16 +99,6 @@ const Dashboard = ({ user, profile }) => {
         let activeVal = 0;
         let overdueVal = 0;
         let lostValTotal = 0;
-
-        // Bezpieczny parser cen z plików Excela
-        const parsePriceRaw = (val) => {
-          if (!val) return 0;
-          if (typeof val === 'number') return val;
-          const cleaned = String(val).replace(/\s/g, '').replace(',', '.');
-          const parsed = parseFloat(cleaned);
-          return isNaN(parsed) ? 0 : parsed;
-        };
-
         mappedDrums.forEach(drum => {
           const priceRaw = parsePriceRaw(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
           if (priceRaw > 0) {
