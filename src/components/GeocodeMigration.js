@@ -76,15 +76,23 @@ const GeocodeMigration = () => {
       const uniqueAddresses = [...new Set(drums.map(d => d.adres_dostawy.trim()))].filter(a => a);
       addLog(`Znaleziono ${uniqueAddresses.length} unikalnych adresów w systemie.`);
 
-      // 3. Pobierz istniejący Cache
-      const { data: cacheData, error: cacheError } = await supabase
-        .from('address_coordinates_cache')
-        .select('address, is_not_found');
+      // 3. Pobierz istniejący Cache z paginacją (omijając limit 1000)
+      let allCacheData = [];
+      let cPage = 0;
+      while (true) {
+        const { data: cacheChunk, error: cacheError } = await supabase
+          .from('address_coordinates_cache')
+          .select('address, is_not_found')
+          .range(cPage * 1000, cPage * 1000 + 999);
+          
+        if (cacheError && cacheError.code !== '42P01') throw cacheError;
+        if (cacheChunk && cacheChunk.length > 0) allCacheData = [...allCacheData, ...cacheChunk];
+        if (!cacheChunk || cacheChunk.length < 1000) break;
+        cPage++;
+      }
 
-      if (cacheError && cacheError.code !== '42P01') throw cacheError; // 42P01 to brak tabeli
-      
-      const cacheSet = new Set((cacheData || []).map(c => c.address));
-      const notFoundSet = new Set((cacheData || []).filter(c => c.is_not_found).map(c => c.address));
+      const cacheSet = new Set(allCacheData.map(c => c.address));
+      const notFoundSet = new Set(allCacheData.filter(c => c.is_not_found).map(c => c.address));
 
       // 4. Wyznacz adresy, których nie ma w Cache
       const addressesToGeocode = uniqueAddresses.filter(addr => !cacheSet.has(addr));

@@ -101,6 +101,29 @@ const LogisticsMap = () => {
       
       const drumsData = allDrums;
 
+      // Pobieramy cały cache (z paginacją, by uniknąć limitu 1000)
+      let allCacheData = [];
+      let cPage = 0;
+      while (true) {
+        const { data: cacheChunk, error: cacheError } = await supabase
+          .from('address_coordinates_cache')
+          .select('address, latitude, longitude')
+          .range(cPage * 1000, cPage * 1000 + 999);
+        
+        if (cacheError) break;
+        if (cacheChunk && cacheChunk.length > 0) allCacheData = [...allCacheData, ...cacheChunk];
+        if (!cacheChunk || cacheChunk.length < 1000) break;
+        cPage++;
+      }
+      
+      // Słownik cache dla szybkiego dostępu (ignorujemy wielkość liter i spacje)
+      const cacheMap = {};
+      allCacheData.forEach(c => {
+        if (c.address && c.latitude) {
+          cacheMap[c.address.trim().toLowerCase()] = c;
+        }
+      });
+
       const drumsByLoc = {};
       const missingByLoc = {};
       const sizesSet = new Set();
@@ -117,6 +140,15 @@ const LogisticsMap = () => {
         
         // Oblicz wiek w dniach
         d.age_days = getAgeInDays(d.data_wydania);
+
+        // Naprawa brakujących współrzędnych "w locie" na podstawie pobranego cache
+        if ((!d.latitude || !d.longitude) && d.adres_dostawy) {
+          const cached = cacheMap[d.adres_dostawy.trim().toLowerCase()];
+          if (cached) {
+            d.latitude = cached.latitude;
+            d.longitude = cached.longitude;
+          }
+        }
 
         if (d.latitude && d.longitude) {
           const locKey = `${d.latitude},${d.longitude}`;
