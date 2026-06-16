@@ -454,7 +454,7 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/admin/drums" element={
-                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista']}>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista', 'Magazyn']}>
                   <AdminDrumsList user={currentUser} />
                 </ProtectedRoute>
               } />
@@ -464,7 +464,7 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/admin/returns" element={
-                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista']}>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista', 'Magazyn']}>
                   <AdminReturnRequests user={currentUser} />
                 </ProtectedRoute>
               } />

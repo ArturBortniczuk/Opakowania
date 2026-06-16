@@ -25,7 +25,7 @@ export function getCurrentUserFromCache() {
 export async function getAllowedNips(user) {
   if (!user) return [];
   const roleLower = user.role?.toLowerCase() || '';
-  if (roleLower === 'admin' || roleLower === 'supervisor') return null;
+  if (roleLower === 'admin' || roleLower === 'supervisor' || roleLower === 'magazyn') return null;
   if (roleLower === 'client') return [user.nip];
   
   if (['dyrektor', 'kierownik', 'wsparcie', 'magazyn', 'specjalista'].includes(roleLower)) {

@@ -299,10 +299,10 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- 6.1. PROFILE
 CREATE POLICY "Użytkownik odczytuje własny profil" ON public.profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Admin i pracownicy odczytują wszystkie profile" ON public.profiles FOR SELECT USING (public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'));
+CREATE POLICY "Admin i pracownicy odczytują wszystkie profile" ON public.profiles FOR SELECT USING (public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista'));
 CREATE POLICY "Zezwól na rejestrację profilu" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id AND role = 'client');
 CREATE POLICY "Użytkownik aktualizuje własny profil" ON public.profiles FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Admin i pracownicy zarządzają profilami" ON public.profiles FOR ALL USING (public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'));
+CREATE POLICY "Admin i pracownicy zarządzają profilami" ON public.profiles FOR ALL USING (public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista'));
 
 -- 6.2. FIRMY (Pełen dostęp dla aplikacji klienckiej wg najnowszych fixów)
 CREATE POLICY "Zarządzanie firmami dla wszystkich" ON public.companies FOR ALL USING (true) WITH CHECK (true);
@@ -314,12 +314,12 @@ CREATE POLICY "Admin zarządza handlowcami" ON public.salespeople FOR ALL USING 
 -- 6.4. BĘBNY
 CREATE POLICY "Klient odczytuje swoje bębny" ON public.drums FOR SELECT USING (nip = (SELECT nip FROM public.profiles WHERE id = auth.uid() AND status = 'approved'));
 CREATE POLICY "Klient aktualizuje swoje bębny" ON public.drums FOR UPDATE USING (nip = (SELECT nip FROM public.profiles WHERE id = auth.uid() AND status = 'approved'));
-CREATE POLICY "Admin i pracownicy zarządzają bębnami" ON public.drums FOR ALL USING (public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'));
+CREATE POLICY "Admin i pracownicy zarządzają bębnami" ON public.drums FOR ALL USING (public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista'));
 
 -- 6.5. ZGŁOSZENIA ZWROTÓW (RETURN REQUESTS)
 CREATE POLICY "Klient odczytuje swoje zwroty" ON public.return_requests FOR SELECT USING (user_nip = (SELECT nip FROM public.profiles WHERE id = auth.uid() AND status = 'approved'));
 CREATE POLICY "Klient dodaje zgłoszenie zwrotu" ON public.return_requests FOR INSERT WITH CHECK (user_nip = (SELECT nip FROM public.profiles WHERE id = auth.uid() AND status = 'approved'));
-CREATE POLICY "Admin i pracownicy zarządzają zgłoszeniami" ON public.return_requests FOR ALL USING (public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'));
+CREATE POLICY "Admin i pracownicy zarządzają zgłoszeniami" ON public.return_requests FOR ALL USING (public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista'));
 
 -- 6.6. PROFILE PRACOWNIKÓW KLIENTÓW
 CREATE POLICY "Zarządzanie profilami dla wszystkich" ON public.client_profiles FOR ALL USING (true) WITH CHECK (true);
@@ -342,7 +342,7 @@ CREATE POLICY "Admin zarządza zasadami zwrotów dostawców" ON public.supplier_
 
 -- 6.12. CACHE GEOLOKALIZACJI
 CREATE POLICY "Wszyscy zalogowani odczytują cache" ON public.address_coordinates_cache FOR SELECT USING (auth.role() = 'authenticated');
-CREATE POLICY "Admini zarządzają cachem" ON public.address_coordinates_cache FOR ALL USING (public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'));
+CREATE POLICY "Admini zarządzają cachem" ON public.address_coordinates_cache FOR ALL USING (public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista'));
 
 
 -- 7. INICJALIZACJA DANYCH (Handlowcy, Zasady dostawców, Konta)
