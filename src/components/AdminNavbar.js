@@ -68,7 +68,7 @@ const AdminNavbar = ({
   ];
 
   const isSalesperson = ['Dyrektor', 'Kierownik', 'Specjalista'].includes(user.role);
-  const isMagazyn = user.role === 'Wsparcie';
+  const isMagazyn = ['Wsparcie', 'Magazyn'].includes(user.role);
   
   const filteredMenuItems = menuItems
     .filter(item => {
@@ -101,6 +101,7 @@ const AdminNavbar = ({
       Dyrektor: { label: 'Dyrektor', icon: Crown, gradient: 'from-red-600 to-red-800' },
       Kierownik: { label: 'Kierownik Rynku', icon: Shield, gradient: 'from-blue-500 to-indigo-700' },
       Wsparcie: { label: 'Magazyn', icon: Package, gradient: 'from-emerald-500 to-teal-700' },
+      Magazyn: { label: 'Magazyn', icon: Package, gradient: 'from-emerald-500 to-teal-700' },
       Specjalista: { label: 'Specjalista', icon: UserCheck, gradient: 'from-indigo-500 to-purple-700' }
     };
     const config = roleConfig[role] || { label: role, icon: UserCheck, gradient: 'from-slate-600 to-slate-800' };

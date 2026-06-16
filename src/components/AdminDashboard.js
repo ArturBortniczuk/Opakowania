@@ -24,7 +24,7 @@ import {
 
 const AdminDashboard = ({ user, onNavigate }) => {
   const isSalesperson = user && ['Dyrektor', 'Kierownik', 'Specjalista'].includes(user.role);
-  const isMagazyn = user && user.role === 'Wsparcie';
+  const isMagazyn = user && ['Wsparcie', 'Magazyn'].includes(user.role);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   const [stats, setStats] = useState({

@@ -6,6 +6,7 @@ const ROLES = [
   { value: 'client', label: 'Klient' },
   { value: 'Specjalista', label: 'Specjalista' },
   { value: 'Wsparcie', label: 'Wsparcie' },
+  { value: 'Magazyn', label: 'Magazyn' },
   { value: 'Kierownik', label: 'Kierownik' },
   { value: 'Dyrektor', label: 'Dyrektor' },
   { value: 'supervisor', label: 'Supervisor' },
@@ -231,7 +232,7 @@ const AdminUsersManager = ({ user: currentUser }) => {
                 filteredUsers.map((u) => {
                   const roleDef = ROLES.find(r => r.value === u.role) || { label: u.role };
                   const statusDef = STATUSES.find(s => s.value === u.status) || STATUSES[1];
-                  const isStaff = ['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(u.role);
+                  const isStaff = ['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista'].includes(u.role);
                   
                   return (
                     <tr key={u.id} className="hover:bg-gray-50 transition-colors">

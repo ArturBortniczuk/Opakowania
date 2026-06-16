@@ -16,7 +16,7 @@ const ReturnFormWrapper = ({ currentUser, profile }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState(null);
 
-  const isStaff = ['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(currentUser?.role);
+  const isStaff = ['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista'].includes(currentUser?.role);
 
   // Pobierz dane wybranego klienta (jeśli NIP jest w URL)
   useEffect(() => {

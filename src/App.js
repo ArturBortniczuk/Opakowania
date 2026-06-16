@@ -50,7 +50,7 @@ const App = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const isStaff = (role) => ['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(role);
+  const isStaff = (role) => ['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista'].includes(role);
 
   useEffect(() => {
     let isMounted = true;
@@ -456,7 +456,7 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/admin/warehouse-drums" element={
-                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Wsparcie']}>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Wsparcie', 'Magazyn']}>
                   <AdminWarehouseDrums />
                 </ProtectedRoute>
               } />

@@ -27,7 +27,7 @@ export async function getAllowedNips(user) {
   if (user.role === 'admin' || user.role === 'supervisor') return null;
   if (user.role === 'client') return [user.nip];
   
-  if (['Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(user.role)) {
+  if (['Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista'].includes(user.role)) {
     if (user.role === 'Dyrektor' && user.region === 'Wszystkie') {
       return null;
     }
@@ -36,7 +36,7 @@ export async function getAllowedNips(user) {
     
     if (user.role === 'Specjalista') {
       q = q.eq('salesperson_name', user.name);
-    } else if (user.role === 'Wsparcie' || user.role === 'Kierownik') {
+    } else if (user.role === 'Wsparcie' || user.role === 'Magazyn' || user.role === 'Kierownik') {
       q = q.eq('market', user.market);
     } else if (user.role === 'Dyrektor') {
       const { data: sps } = await supabase
