@@ -37,13 +37,23 @@ export async function getAllowedNips(user) {
     
     if (roleLower === 'specjalista') {
       q = q.eq('salesperson_name', user.name);
-    } else if (roleLower === 'wsparcie' || roleLower === 'magazyn' || roleLower === 'kierownik') {
-      q = q.eq('market', user.market);
-    } else if (roleLower === 'dyrektor') {
+    } else if (roleLower === 'kierownik' || roleLower === 'wsparcie') {
+      // Pobierz wszystkich handlowców z tego samego rynku
       const { data: sps } = await supabase
         .from('salespeople')
         .select('name')
-        .eq('region', user.region);
+        .eq('market', user.market);
+      const spNames = sps ? sps.map(s => s.name) : [];
+      
+      if (spNames.length === 0) return [];
+      q = q.in('salesperson_name', spNames);
+    } else if (roleLower === 'dyrektor') {
+      // Pobierz wszystkich handlowców z tego samego regionu
+      let spQuery = supabase.from('salespeople').select('name');
+      if (user.region && user.region !== 'Wszystkie') {
+        spQuery = spQuery.eq('region', user.region);
+      }
+      const { data: sps } = await spQuery;
       const spNames = sps ? sps.map(s => s.name) : [];
       
       if (spNames.length === 0) return [];
