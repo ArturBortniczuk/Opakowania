@@ -72,8 +72,12 @@ const GeocodeMigration = () => {
         return;
       }
 
-      // 2. Unikalne adresy
-      const uniqueAddresses = [...new Set(drums.map(d => d.adres_dostawy.trim()))].filter(a => a);
+      // 2. Unikalne adresy (filtrujemy puste i śmieciowe, np. samo ",")
+      const uniqueAddresses = [...new Set(drums.map(d => d.adres_dostawy.trim()))].filter(a => {
+        if (!a || a === ',') return false;
+        if (a.replace(/[^a-zA-Z0-9]/g, '').length < 2) return false;
+        return true;
+      });
       addLog(`Znaleziono ${uniqueAddresses.length} unikalnych adresów w systemie.`);
 
       // 3. Pobierz istniejący Cache z paginacją (omijając limit 1000)

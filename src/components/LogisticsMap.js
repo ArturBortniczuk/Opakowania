@@ -141,9 +141,17 @@ const LogisticsMap = () => {
         // Oblicz wiek w dniach
         d.age_days = getAgeInDays(d.data_wydania);
 
-        // Naprawa brakujących współrzędnych "w locie" na podstawie pobranego cache
-        if ((!d.latitude || !d.longitude) && d.adres_dostawy) {
-          const cached = cacheMap[d.adres_dostawy.trim().toLowerCase()];
+        // Identyfikacja adresów-śmieci (np. samo "," lub b. krótkie)
+        const addrTrimmed = (d.adres_dostawy || '').trim();
+        const isJunkAddress = !addrTrimmed || addrTrimmed === ',' || addrTrimmed.replace(/[^a-zA-Z0-9]/g, '').length < 2;
+
+        if (isJunkAddress) {
+          // Wymuś brak współrzędnych, żeby trafiły na czerwoną listę po prawej
+          d.latitude = null;
+          d.longitude = null;
+        } else if (!d.latitude || !d.longitude) {
+          // Naprawa brakujących współrzędnych "w locie" na podstawie pobranego cache
+          const cached = cacheMap[addrTrimmed.toLowerCase()];
           if (cached) {
             d.latitude = cached.latitude;
             d.longitude = cached.longitude;
