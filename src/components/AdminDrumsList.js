@@ -4,6 +4,7 @@ import { drumsAPI, companiesAPI, getCurrentUserFromCache } from '../utils/supaba
 import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { pl } from 'date-fns/locale/pl';
+import * as XLSX from 'xlsx';
 
 import {
   Package,
@@ -34,6 +35,7 @@ registerLocale('pl', pl);
 const AdminDrumsList = ({ initialFilter = {} }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const currentUser = getCurrentUserFromCache();
 
   const urlSearchTerm = searchParams.get('searchTerm');
   const urlOpenModal = searchParams.get('openModal') === 'true';
@@ -649,6 +651,50 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
 
 
 
+  const handleExportExcel = async () => {
+    try {
+      // Pobierz wszystko (do 10 000 rekordów) z obecnymi filtrami
+      const result = await drumsAPI.getDrums(urlClientNip || null, {
+        page: 1,
+        limit: 10000,
+        sortBy,
+        sortOrder,
+        search: searchTerm,
+        status: filterStatus,
+        dateRange: filterDateRange
+      });
+
+      if (!result.data || result.data.length === 0) {
+        alert('Brak danych do wyeksportowania.');
+        return;
+      }
+
+      const exportData = result.data.map(drum => ({
+        'Kod bębna / Cecha': drum.cecha || drum.kod_bebna,
+        'Nazwa bębna': drum.nazwa,
+        'Firma': drum.pelna_nazwa_kontrahenta,
+        'NIP': drum.nip,
+        'Status': drum.status,
+        'Data wydania': drum.data_wydania || drum.data_przyjecia_na_stan,
+        'Termin zwrotu': drum.data_zwrotu_do_dostawcy,
+        'Dni w posiadaniu': drum.daysInPossession,
+        'Cena netto': drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA,
+        'Adres dostawy': drum.adres_dostawy,
+        'Numer faktury': drum.numer_faktury,
+        'Notatka': drum.clientNote || '',
+        'Przedłużony': drum.isExtended ? 'Tak' : 'Nie'
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Bębny");
+      XLSX.writeFile(workbook, `Bebny_Eksport_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (err) {
+      console.error('Błąd eksportu:', err);
+      alert('Nie udało się wyeksportować pliku.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100">
       <div className="max-w-7xl mx-auto p-6">
@@ -663,24 +709,36 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
             </div>
 
             <div className="flex items-center space-x-4">
-              {/* PRZYCISK IMPORT CSV/XLSX */}
+              {/* Eksport XLS */}
               <button
-                onClick={handleImportFile}
-                disabled={importLoading || loading}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 transition-all duration-200"
+                onClick={handleExportExcel}
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2 transition-all duration-200"
               >
-                {importLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Importuję...</span>
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4" />
-                    <span>Import CSV/XLSX</span>
-                  </>
-                )}
+                <Download className="w-4 h-4" />
+                <span>Eksport do Excel</span>
               </button>
+
+              {/* PRZYCISK IMPORT CSV/XLSX (TYLKO DLA ADMINA) */}
+              {currentUser?.role?.toLowerCase() === 'admin' && (
+                <button
+                  onClick={handleImportFile}
+                  disabled={importLoading || loading}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 transition-all duration-200"
+                >
+                  {importLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Importuję...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      <span>Import CSV/XLSX</span>
+                    </>
+                  )}
+                </button>
+              )}
 
               <button
                 onClick={() => navigate('/return')}
