@@ -68,7 +68,7 @@ const AdminNavbar = ({
   ];
 
   const isSalesperson = ['Dyrektor', 'Kierownik', 'Specjalista'].includes(user.role);
-  const isMagazyn = ['Wsparcie', 'Magazyn'].includes(user.role);
+  const isMagazyn = ['wsparcie', 'magazyn'].includes(user.role?.toLowerCase());
   
   const filteredMenuItems = menuItems
     .filter(item => {

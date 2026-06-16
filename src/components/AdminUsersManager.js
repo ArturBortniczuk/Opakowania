@@ -232,7 +232,7 @@ const AdminUsersManager = ({ user: currentUser }) => {
                 filteredUsers.map((u) => {
                   const roleDef = ROLES.find(r => r.value === u.role) || { label: u.role };
                   const statusDef = STATUSES.find(s => s.value === u.status) || STATUSES[1];
-                  const isStaff = ['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista'].includes(u.role);
+                  const isStaff = ['admin', 'supervisor', 'dyrektor', 'kierownik', 'wsparcie', 'magazyn', 'specjalista'].includes(u.role?.toLowerCase());
                   
                   return (
                     <tr key={u.id} className="hover:bg-gray-50 transition-colors">

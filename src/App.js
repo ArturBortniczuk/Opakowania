@@ -50,7 +50,10 @@ const App = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const isStaff = (role) => ['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista'].includes(role);
+  const isStaff = (role) => {
+    if (!role) return false;
+    return ['admin', 'supervisor', 'dyrektor', 'kierownik', 'wsparcie', 'magazyn', 'specjalista'].includes(role.toLowerCase());
+  };
 
   useEffect(() => {
     let isMounted = true;

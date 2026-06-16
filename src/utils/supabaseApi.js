@@ -24,21 +24,22 @@ export function getCurrentUserFromCache() {
 // Pomocnicza funkcja pobierająca listę NIP-ów, do których zalogowany użytkownik ma dostęp
 export async function getAllowedNips(user) {
   if (!user) return [];
-  if (user.role === 'admin' || user.role === 'supervisor') return null;
-  if (user.role === 'client') return [user.nip];
+  const roleLower = user.role?.toLowerCase() || '';
+  if (roleLower === 'admin' || roleLower === 'supervisor') return null;
+  if (roleLower === 'client') return [user.nip];
   
-  if (['Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista'].includes(user.role)) {
-    if (user.role === 'Dyrektor' && user.region === 'Wszystkie') {
+  if (['dyrektor', 'kierownik', 'wsparcie', 'magazyn', 'specjalista'].includes(roleLower)) {
+    if (roleLower === 'dyrektor' && user.region === 'Wszystkie') {
       return null;
     }
     
     let q = supabase.from('companies').select('nip');
     
-    if (user.role === 'Specjalista') {
+    if (roleLower === 'specjalista') {
       q = q.eq('salesperson_name', user.name);
-    } else if (user.role === 'Wsparcie' || user.role === 'Magazyn' || user.role === 'Kierownik') {
+    } else if (roleLower === 'wsparcie' || roleLower === 'magazyn' || roleLower === 'kierownik') {
       q = q.eq('market', user.market);
-    } else if (user.role === 'Dyrektor') {
+    } else if (roleLower === 'dyrektor') {
       const { data: sps } = await supabase
         .from('salespeople')
         .select('name')
