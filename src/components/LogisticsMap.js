@@ -121,12 +121,16 @@ const LogisticsMap = () => {
         // Jeśli bęben nie ma jeszcze przypisanych współrzędnych, próbujemy je "w locie" dobrać z cache
         if (!d.latitude || !d.longitude) {
           const isJunkAddress = !addrTrimmed || addrTrimmed === ',' || addrTrimmed.replace(/[^a-zA-Z0-9]/g, '').length < 2;
-          if (!isJunkAddress) {
+          const compTrimmed = (d.pelna_nazwa_kontrahenta || '').trim();
+
+          if (!isJunkAddress && cacheMap[addrTrimmed.toLowerCase()]) {
             const cached = cacheMap[addrTrimmed.toLowerCase()];
-            if (cached) {
-              d.latitude = cached.latitude;
-              d.longitude = cached.longitude;
-            }
+            d.latitude = cached.latitude;
+            d.longitude = cached.longitude;
+          } else if (compTrimmed && cacheMap[compTrimmed.toLowerCase()]) {
+            const cached = cacheMap[compTrimmed.toLowerCase()];
+            d.latitude = cached.latitude;
+            d.longitude = cached.longitude;
           }
         }
 
@@ -147,9 +151,9 @@ const LogisticsMap = () => {
           drumsByLoc[locKey].drums.push(d);
         } else {
           // Brak współrzędnych
-          const addr = addrTrimmed || d.magazyn || 'Brak przypisanego adresu';
-          const comp = d.pelna_nazwa_kontrahenta || '';
-          const missingKey = `${addr}___${comp}`;
+          const addr = addrTrimmed || 'Brak przypisanego adresu';
+          const comp = d.pelna_nazwa_kontrahenta || 'Nieznany klient';
+          const missingKey = `${comp}___${addr}`;
           
           if (!missingByLoc[missingKey]) {
             missingByLoc[missingKey] = {
@@ -291,14 +295,16 @@ const LogisticsMap = () => {
     const lng = e.latLng.lng();
     setTemporaryMarker({ lat, lng });
 
-    if (window.confirm(`Czy na pewno chcesz przypisać te współrzędne dla adresu "${assigningLocation.address}" (Klient: ${assigningLocation.companyName})?`)) {
+    if (window.confirm(`Czy na pewno chcesz przypisać te współrzędne dla klienta "${assigningLocation.companyName}" (${assigningLocation.address})?`)) {
       try {
-        // Jeśli adres nie jest śmieciowy (np. ","), dodaj do ogólnego cache
-        if (assigningLocation.address.length > 2) {
+        const isAddressJunk = assigningLocation.address === 'Brak przypisanego adresu' || assigningLocation.address.length < 2;
+        const cacheKey = isAddressJunk ? assigningLocation.companyName : assigningLocation.address;
+
+        if (cacheKey && cacheKey.length > 2) {
           await supabase
             .from('address_coordinates_cache')
             .upsert({
-              address: assigningLocation.address,
+              address: cacheKey,
               latitude: lat,
               longitude: lng,
               is_manual: true,
@@ -306,20 +312,18 @@ const LogisticsMap = () => {
             }, { onConflict: 'address' });
         }
 
-        // Aktualizuj Bębny TYLKO dla wybranego kontrahenta i adresu
-        let query = supabase.from('drums')
-          .update({ latitude: lat, longitude: lng })
-          .eq('adres_dostawy', assigningLocation.address);
-          
-        if (assigningLocation.companyName) {
-          query = query.eq('pelna_nazwa_kontrahenta', assigningLocation.companyName);
-        } else {
-          query = query.is('pelna_nazwa_kontrahenta', null);
+        // Aktualizuj Bębny po ID - to najbezpieczniejsze i zapewnia, że nie zmienimy innych!
+        // Supabase w in() przyjmuje max ok 1000 elementów, ale dla pewności dzielimy na chunki po 500
+        const chunkSize = 500;
+        const ids = assigningLocation.drumIds;
+        for (let i = 0; i < ids.length; i += chunkSize) {
+          const chunkIds = ids.slice(i, i + chunkSize);
+          const { error: drumsError } = await supabase
+            .from('drums')
+            .update({ latitude: lat, longitude: lng })
+            .in('id', chunkIds);
+          if (drumsError) throw drumsError;
         }
-        
-        const { error: drumsError } = await query;
-
-        if (drumsError) throw drumsError;
 
         alert('Pomyślnie przypisano współrzędne!');
         setAssigningLocation(null);
@@ -445,8 +449,7 @@ const LogisticsMap = () => {
                   <h4 className="font-bold text-yellow-800 flex items-center">
                     <MapPin className="w-5 h-5 mr-1" /> Tryb Ręcznego Przypisywania
                   </h4>
-                  <p className="text-sm text-yellow-700 mt-1">
-                    Kliknij miejsce na mapie dla: <strong>{assigningLocation.address}</strong>
+                    Kliknij miejsce na mapie dla klienta: <br/><strong>{assigningLocation.companyName}</strong> <br/><span className="text-xs">({assigningLocation.address})</span>
                   </p>
                 </div>
                 <button onClick={() => setAssigningLocation(null)} className="px-3 py-2 bg-white text-gray-700 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50">Anuluj</button>
@@ -590,14 +593,22 @@ const LogisticsMap = () => {
                       className={`p-3 rounded-lg border transition-all ${assigningLocation?.address === m.address ? 'bg-yellow-50 border-yellow-400 shadow-sm' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}`}
                     >
                       <div className="flex justify-between items-start mb-1">
-                        <h4 className="text-sm font-bold text-gray-800 break-words">{m.address || '(Pusty Adres)'}</h4>
+                        <div className="flex flex-col">
+                          <p className="font-bold text-gray-800 break-words">{m.companyName}</p>
+                          <p className="text-xs text-gray-500">{m.address}</p>
+                        </div>
+                        <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-bold whitespace-nowrap ml-2">
+                          {m.count} {m.count === 1 ? 'bęben' : (m.count % 10 >= 2 && m.count % 10 <= 4 && (m.count % 100 < 10 || m.count % 100 >= 20) ? 'bębny' : 'bębnów')}
+                        </span>
                       </div>
-                      <p className="text-xs text-gray-500 uppercase mt-1">{m.companyName || 'Brak klienta'}</p>
-                      <span className="text-xs font-bold text-blue-700 bg-blue-100 px-2 py-1 rounded-full whitespace-nowrap">{m.count} szt.</span>
                       
                       <button
                         onClick={() => {
-                          setAssigningLocation({ address: m.address, companyName: m.companyName });
+                          setAssigningLocation({ 
+                            address: m.address, 
+                            companyName: m.companyName, 
+                            drumIds: m.drumIds 
+                          });
                           alert(`Kliknij na mapie w miejscu, gdzie znajduje się adres:\n${m.address} (Klient: ${m.companyName || 'Brak'})`);
                         }}
                         className="w-full mt-3 flex items-center justify-center space-x-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition text-xs font-medium"
