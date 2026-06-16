@@ -33,6 +33,11 @@ const AdminWarehouseDrums = () => {
   const [availableSizes, setAvailableSizes] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
   const [showSizesMenu, setShowSizesMenu] = useState(false);
+
+  const [availableMagazyny, setAvailableMagazyny] = useState([]);
+  const [selectedMagazyny, setSelectedMagazyny] = useState([]);
+  const [showMagazynyMenu, setShowMagazynyMenu] = useState(false);
+  
   const [exporting, setExporting] = useState(false);
 
   const [drumsData, setDrumsData] = useState({
@@ -65,6 +70,7 @@ const AdminWarehouseDrums = () => {
         urgentOnly,
         withLocationOnly,
         selectedSizes,
+        selectedMagazyny,
         ...options
       };
 
@@ -76,7 +82,7 @@ const AdminWarehouseDrums = () => {
     } finally {
       setLoading(false);
     }
-  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly, withLocationOnly, selectedSizes]);
+  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly, withLocationOnly, selectedSizes, selectedMagazyny]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -86,17 +92,21 @@ const AdminWarehouseDrums = () => {
   }, [localSearchTerm]);
 
   useEffect(() => {
-    const fetchSizes = async () => {
-      const sizes = await drumsAPI.getWarehouseDrumSizes();
+    const fetchDropdowns = async () => {
+      const [sizes, magazyny] = await Promise.all([
+        drumsAPI.getWarehouseDrumSizes(),
+        drumsAPI.getWarehouseDrumMagazyny()
+      ]);
       sizes.sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
       setAvailableSizes(sizes);
+      setAvailableMagazyny(magazyny);
     };
-    fetchSizes();
+    fetchDropdowns();
   }, []);
 
   useEffect(() => {
     fetchDrums({ page: 1 });
-  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly, withLocationOnly, selectedSizes]);
+  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly, withLocationOnly, selectedSizes, selectedMagazyny]);
 
   const goToPage = (page) => {
     setDrumsData(prev => ({ ...prev, pagination: { ...prev.pagination, page } }));
@@ -124,7 +134,8 @@ const AdminWarehouseDrums = () => {
         statusFilter,
         urgentOnly,
         withLocationOnly,
-        selectedSizes
+        selectedSizes,
+        selectedMagazyny
       };
       
       const result = await drumsAPI.getWarehouseDrums(requestOptions);
@@ -137,6 +148,7 @@ const AdminWarehouseDrums = () => {
          'Cecha/Kod': drum.cecha || drum.kod_bebna,
          'Rozmiar': drum.nazwa || drum.rozmiar_bebna,
          'Status': drum.status,
+         'Magazyn': drum.magazyn || '',
          'Lokalizacja WMS': drum.lokalizacja_wms || '',
          'Kablownia (Dostawca)': drum.kon_dostawca || '',
          'Data zwrotu': drum.data_zwrotu_do_dostawcy || 'Własny'
@@ -157,6 +169,12 @@ const AdminWarehouseDrums = () => {
   const toggleSize = (size) => {
     setSelectedSizes(prev => 
       prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
+    );
+  };
+
+  const toggleMagazyn = (mag) => {
+    setSelectedMagazyny(prev => 
+      prev.includes(mag) ? prev.filter(m => m !== mag) : [...prev, mag]
     );
   };
 
@@ -220,6 +238,13 @@ const AdminWarehouseDrums = () => {
               drum.status === 'pusty na magazynie' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
             }`}>
               {drum.status}
+            </span>
+          </div>
+
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">Magazyn</span>
+            <span className="text-sm font-medium text-gray-900 truncate ml-2">
+              {drum.magazyn || 'Brak'}
             </span>
           </div>
 
@@ -355,6 +380,50 @@ const AdminWarehouseDrums = () => {
                 )}
               </div>
 
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowMagazynyMenu(!showMagazynyMenu)}
+                  className="w-full flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors text-gray-700 font-medium"
+                >
+                  <div className="flex items-center">
+                    <Filter className="w-4 h-4 mr-2 text-emerald-500" />
+                    <span className="truncate">Magazyny ({selectedMagazyny.length > 0 ? selectedMagazyny.length : 'Wszystkie'})</span>
+                  </div>
+                  <ChevronLeft className={`w-5 h-5 transition-transform flex-shrink-0 ml-2 ${showMagazynyMenu ? '-rotate-90' : ''}`} />
+                </button>
+                
+                {showMagazynyMenu && (
+                  <div className="absolute z-50 mt-2 w-full max-h-60 overflow-auto bg-white border border-gray-200 rounded-xl shadow-xl p-2">
+                    {availableMagazyny.length > 0 ? (
+                      availableMagazyny.map(mag => (
+                        <label key={mag} className="flex items-center p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedMagazyny.includes(mag)}
+                            onChange={() => toggleMagazyn(mag)}
+                            className="w-4 h-4 text-emerald-500 border-gray-300 rounded focus:ring-emerald-500"
+                          />
+                          <span className="ml-2 text-sm font-medium text-gray-700">{mag}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <div className="p-2 text-sm text-gray-500 text-center">Brak magazynów</div>
+                    )}
+                    {selectedMagazyny.length > 0 && (
+                      <button 
+                        onClick={() => setSelectedMagazyny([])}
+                        className="w-full mt-2 p-2 text-sm text-red-600 hover:bg-red-50 rounded-lg font-medium"
+                      >
+                        Wyczyść wybór
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
               <div className="flex items-center space-x-4">
                 <label className="flex items-center space-x-3 p-3 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
                   <input

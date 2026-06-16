@@ -276,6 +276,25 @@ export const drumsAPI = {
     }
   },
 
+  async getWarehouseDrumMagazyny() {
+    try {
+      const { data, error } = await supabase
+        .from('drums')
+        .select('magazyn')
+        .in('status', ['pusty na magazynie', 'na magazynie z towarem'])
+        .not('magazyn', 'is', null)
+        .neq('magazyn', '');
+      
+      if (error) throw error;
+      
+      const magazyny = [...new Set(data.map(d => d.magazyn))];
+      return magazyny.sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+    } catch (error) {
+      console.error('Błąd getWarehouseDrumMagazyny:', error);
+      throw error;
+    }
+  },
+
   /**
    * Pobiera bębny znajdujące się na magazynie (na podstawie statusu).
    * Zoptymalizowane do wyświetlania w nowym module Magazynu.
@@ -291,7 +310,8 @@ export const drumsAPI = {
         statusFilter = 'all', // 'all', 'empty', 'full'
         urgentOnly = false,
         withLocationOnly = false,
-        selectedSizes = []
+        selectedSizes = [],
+        selectedMagazyny = []
       } = options;
 
       let query = supabase
@@ -325,6 +345,10 @@ export const drumsAPI = {
 
       if (selectedSizes && selectedSizes.length > 0) {
         query = query.in('rozmiar_bebna', selectedSizes);
+      }
+
+      if (selectedMagazyny && selectedMagazyny.length > 0) {
+        query = query.in('magazyn', selectedMagazyny);
       }
 
       if (search) {
