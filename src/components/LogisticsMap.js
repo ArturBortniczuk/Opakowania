@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
 import { supabase } from '../lib/supabase';
-import { returnsAPI } from '../utils/supabaseApi';
+import { returnsAPI, drumsAPI } from '../utils/supabaseApi';
 import GeocodeMigration from './GeocodeMigration';
 import { MapPin, Map as MapIcon, X, Check, Search, AlertTriangle, Filter, Building, User, Eye } from 'lucide-react';
 
@@ -66,37 +66,12 @@ const LogisticsMap = () => {
 
   const fetchData = async () => {
     try {
-      // 1. Pobieramy bębny z nowymi kolumnami
-      // Supabase domyślnie ucina zapytania do 1000 rekordów. Używamy pętli (paginacji), by pobrać wszystkie bębny
+      // 1. Pobieramy bębny (z respektowaniem uprawnień handlowców)
       let allDrums = [];
-      let pageIndex = 0;
-      const chunkSize = 1000;
-      
-      while (true) {
-        const from = pageIndex * chunkSize;
-        const to = from + chunkSize - 1;
-        
-        const { data: chunk, error: chunkError } = await supabase
-          .from('drums')
-          .select('id, kod_bebna, cecha, rozmiar_bebna, kon_dostawca, data_wydania, adres_dostawy, pelna_nazwa_kontrahenta, latitude, longitude, status, data_zwrotu_do_dostawcy')
-          .not('adres_dostawy', 'is', null)
-          .neq('adres_dostawy', '')
-          .range(from, to)
-          .order('id');
-          
-        if (chunkError) {
-          console.error(chunkError);
-          break;
-        }
-        
-        if (chunk && chunk.length > 0) {
-          allDrums = [...allDrums, ...chunk];
-        }
-        
-        if (!chunk || chunk.length < chunkSize) {
-          break;
-        }
-        pageIndex++;
+      try {
+        allDrums = await drumsAPI.getAllDrums();
+      } catch (err) {
+        console.error('Błąd pobierania bębnów do mapy:', err);
       }
       
       const drumsData = allDrums;
@@ -141,20 +116,17 @@ const LogisticsMap = () => {
         // Oblicz wiek w dniach
         d.age_days = getAgeInDays(d.data_wydania);
 
-        // Identyfikacja adresów-śmieci (np. samo "," lub b. krótkie)
         const addrTrimmed = (d.adres_dostawy || '').trim();
-        const isJunkAddress = !addrTrimmed || addrTrimmed === ',' || addrTrimmed.replace(/[^a-zA-Z0-9]/g, '').length < 2;
-
-        if (isJunkAddress) {
-          // Wymuś brak współrzędnych, żeby trafiły na czerwoną listę po prawej
-          d.latitude = null;
-          d.longitude = null;
-        } else if (!d.latitude || !d.longitude) {
-          // Naprawa brakujących współrzędnych "w locie" na podstawie pobranego cache
-          const cached = cacheMap[addrTrimmed.toLowerCase()];
-          if (cached) {
-            d.latitude = cached.latitude;
-            d.longitude = cached.longitude;
+        
+        // Jeśli bęben nie ma jeszcze przypisanych współrzędnych, próbujemy je "w locie" dobrać z cache
+        if (!d.latitude || !d.longitude) {
+          const isJunkAddress = !addrTrimmed || addrTrimmed === ',' || addrTrimmed.replace(/[^a-zA-Z0-9]/g, '').length < 2;
+          if (!isJunkAddress) {
+            const cached = cacheMap[addrTrimmed.toLowerCase()];
+            if (cached) {
+              d.latitude = cached.latitude;
+              d.longitude = cached.longitude;
+            }
           }
         }
 
@@ -175,7 +147,7 @@ const LogisticsMap = () => {
           drumsByLoc[locKey].drums.push(d);
         } else {
           // Brak współrzędnych
-          const addr = d.adres_dostawy.trim();
+          const addr = addrTrimmed || d.magazyn || 'Brak przypisanego adresu';
           const comp = d.pelna_nazwa_kontrahenta || '';
           const missingKey = `${addr}___${comp}`;
           
