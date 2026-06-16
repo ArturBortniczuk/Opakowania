@@ -1202,17 +1202,16 @@ export const companiesAPI = {
         .from('company_client_stats')
         .select('*', { count: 'exact' });
 
-      // Filtrowanie uprawnień dla handlowców
-      if (currentUser && ['Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(currentUser.role)) {
-        if (currentUser.role === 'Specjalista') {
-          query = query.eq('salesperson_name', currentUser.name);
-        } else if (currentUser.role === 'Wsparcie' || currentUser.role === 'Kierownik') {
-          query = query.eq('market', currentUser.market);
-        } else if (currentUser.role === 'Dyrektor') {
-          if (currentUser.region !== 'Wszystkie') {
-            query = query.eq('salesperson_region', currentUser.region);
-          }
+      // Filtrowanie uprawnień poprzez wspólny mechanizm
+      const allowedNips = await getAllowedNips(currentUser);
+      if (allowedNips !== null) {
+        if (allowedNips.length === 0) {
+          return {
+            data: [],
+            pagination: { page, limit, total: 0, totalPages: 0, hasNext: false, hasPrev: false }
+          };
         }
+        query = query.in('nip', allowedNips);
       }
 
       // Wyszukiwanie
@@ -1285,17 +1284,15 @@ export const companiesAPI = {
       
       const currentUser = _currentUserCache;
       
+      const allowedNips = await getAllowedNips(currentUser);
+      
       const applyFilters = (query) => {
-        if (currentUser && ['Dyrektor', 'Kierownik', 'Wsparcie', 'Specjalista'].includes(currentUser.role)) {
-          if (currentUser.role === 'Specjalista') {
-            return query.eq('salesperson_name', currentUser.name);
-          } else if (currentUser.role === 'Wsparcie' || currentUser.role === 'Kierownik') {
-            return query.eq('market', currentUser.market);
-          } else if (currentUser.role === 'Dyrektor') {
-            if (currentUser.region !== 'Wszystkie') {
-              return query.eq('salesperson_region', currentUser.region);
-            }
+        if (allowedNips !== null) {
+          if (allowedNips.length === 0) {
+            // Trick by zapytanie zwróciło 0 rekordów jeśli użytkownik nie ma żadnych klientów
+            return query.eq('nip', 'BRAK_DOSTEPU_000');
           }
+          return query.in('nip', allowedNips);
         }
         return query;
       };
