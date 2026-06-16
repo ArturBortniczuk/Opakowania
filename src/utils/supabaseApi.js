@@ -29,7 +29,17 @@ export async function getAllowedNips(user) {
   if (roleLower === 'client') return [user.nip];
   
   if (['dyrektor', 'kierownik', 'wsparcie', 'magazyn', 'specjalista'].includes(roleLower)) {
-    if (roleLower === 'dyrektor' && user.region === 'Wszystkie') {
+    // Pobierz aktualny rynek i region pracownika z tabeli salespeople
+    const { data: myData } = await supabase
+      .from('salespeople')
+      .select('market, region')
+      .eq('email', user.email)
+      .single();
+      
+    const myMarket = myData?.market || user.market;
+    const myRegion = myData?.region || user.region;
+
+    if (roleLower === 'dyrektor' && myRegion === 'Wszystkie') {
       return null;
     }
     
@@ -42,7 +52,7 @@ export async function getAllowedNips(user) {
       const { data: sps } = await supabase
         .from('salespeople')
         .select('name')
-        .eq('market', user.market);
+        .eq('market', myMarket);
       const spNames = sps ? sps.map(s => s.name) : [];
       
       if (spNames.length === 0) return [];
@@ -50,8 +60,8 @@ export async function getAllowedNips(user) {
     } else if (roleLower === 'dyrektor') {
       // Pobierz wszystkich handlowców z tego samego regionu
       let spQuery = supabase.from('salespeople').select('name');
-      if (user.region && user.region !== 'Wszystkie') {
-        spQuery = spQuery.eq('region', user.region);
+      if (myRegion && myRegion !== 'Wszystkie') {
+        spQuery = spQuery.eq('region', myRegion);
       }
       const { data: sps } = await spQuery;
       const spNames = sps ? sps.map(s => s.name) : [];
