@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Menu, X, Home, Users, Package, Truck, BarChart3, LogOut, Building2,
-  UserCheck, ChevronRight, Shield, Settings, Bell, Crown, Pin, PinOff, Map, MapPin
+  UserCheck, ChevronRight, Shield, Settings, Bell, Crown, Pin, PinOff, Map, MapPin, HelpCircle
 } from 'lucide-react';
 import { statsAPI } from '../utils/supabaseApi';
 
@@ -64,11 +64,12 @@ const AdminNavbar = ({
     { path: '/admin/return-periods', label: 'Terminy zwrotu', icon: Settings, description: 'Ustaw terminy dla klientów' },
     { path: '/admin/supplier-rules', label: 'Terminy kablowni', icon: Settings, description: 'Zasady zwrotów dostawców' },
     { path: '/admin/warehouse-drums', label: 'Magazyn Bębnów', icon: Package, description: 'Stany magazynowe' },
-    { path: '/admin/reports', label: 'Raporty i analizy', icon: BarChart3, description: 'Statystyki i raporty' }
+    { path: '/admin/reports', label: 'Raporty i analizy', icon: BarChart3, description: 'Statystyki i raporty' },
+    { path: '/help', label: 'Instrukcja obsługi', icon: HelpCircle, description: 'Podręcznik użytkownika' }
   ];
 
-  const isSalesperson = ['Dyrektor', 'Kierownik', 'Specjalista'].includes(user.role);
-  const isMagazyn = ['wsparcie', 'magazyn'].includes(user.role?.toLowerCase());
+  const isSalesperson = ['Dyrektor', 'Kierownik', 'Specjalista', 'Wsparcie'].includes(user.role) || ['dyrektor', 'kierownik', 'specjalista', 'wsparcie'].includes(user.role?.toLowerCase());
+  const isMagazyn = ['magazyn'].includes(user.role?.toLowerCase());
   
   const filteredMenuItems = menuItems
     .filter(item => {
@@ -100,7 +101,7 @@ const AdminNavbar = ({
       supervisor: { label: 'Koordynator', icon: Shield, gradient: 'from-blue-600 to-blue-800' },
       Dyrektor: { label: 'Dyrektor', icon: Crown, gradient: 'from-red-600 to-red-800' },
       Kierownik: { label: 'Kierownik Rynku', icon: Shield, gradient: 'from-blue-500 to-indigo-700' },
-      Wsparcie: { label: 'Magazyn', icon: Package, gradient: 'from-emerald-500 to-teal-700' },
+      Wsparcie: { label: 'Wsparcie', icon: Shield, gradient: 'from-blue-500 to-indigo-700' },
       Magazyn: { label: 'Magazyn', icon: Package, gradient: 'from-emerald-500 to-teal-700' },
       Specjalista: { label: 'Specjalista', icon: UserCheck, gradient: 'from-indigo-500 to-purple-700' }
     };

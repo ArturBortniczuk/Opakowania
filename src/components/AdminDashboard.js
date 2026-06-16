@@ -23,8 +23,8 @@ import {
 } from 'lucide-react';
 
 const AdminDashboard = ({ user, onNavigate }) => {
-  const isSalesperson = user && ['dyrektor', 'kierownik', 'specjalista'].includes(user.role?.toLowerCase());
-  const isMagazyn = user && ['wsparcie', 'magazyn'].includes(user.role?.toLowerCase());
+  const isSalesperson = user && ['dyrektor', 'kierownik', 'specjalista', 'wsparcie'].includes(user.role?.toLowerCase());
+  const isMagazyn = user && ['magazyn'].includes(user.role?.toLowerCase());
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   const [stats, setStats] = useState({

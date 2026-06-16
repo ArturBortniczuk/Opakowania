@@ -57,7 +57,15 @@ const Dashboard = ({ user, profile }) => {
           companiesAPI.getCompany(user.nip)
         ]);
 
-        setCompanyData(companyDetails);
+        let salespersonEmail = 'wsparcie@opakowania.pl';
+        if (companyDetails?.salesperson_name) {
+          const fetchedEmail = await companiesAPI.getSalespersonEmail(companyDetails.salesperson_name);
+          if (fetchedEmail) {
+            salespersonEmail = fetchedEmail;
+          }
+        }
+        
+        setCompanyData({ ...companyDetails, salespersonEmail });
 
         // 1. Zidentyfikuj zgłoszone bębny (identycznie jak w widoku DrumsList)
         const reportedDrums = new Set();
@@ -732,7 +740,7 @@ const Dashboard = ({ user, profile }) => {
                   <span>Zadzwoń</span>
                 </a>
                 <a 
-                  href="mailto:wsparcie@opakowania.pl" 
+                  href={`mailto:${companyData.salespersonEmail || 'wsparcie@opakowania.pl'}`} 
                   className="px-6 py-3 bg-white text-blue-600 rounded-xl hover:bg-blue-50 transition-all duration-300 font-extrabold text-sm flex items-center space-x-2 shadow-lg hover:shadow-xl"
                 >
                   <Mail className="w-4 h-4" />

@@ -1345,6 +1345,31 @@ export const companiesAPI = {
   },
 
   /**
+   * Pobiera adres email handlowca po imieniu i nazwisku.
+   * @param {string} salespersonName - Imię i nazwisko opiekuna.
+   * @returns {Promise<string|null>} Email opiekuna.
+   */
+  async getSalespersonEmail(salespersonName) {
+    if (!salespersonName) return null;
+    try {
+      const { data, error } = await supabase
+        .from('salespeople')
+        .select('email')
+        .eq('name', salespersonName)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error('Błąd pobierania emaila handlowca:', error);
+        return null;
+      }
+      return data?.email || null;
+    } catch (err) {
+      console.error('Błąd getSalespersonEmail:', err);
+      return null;
+    }
+  },
+
+  /**
    * Aktualizuje dane firmy.
    * @param {string} nip - NIP firmy do aktualizacji.
    * @param {object} updates - Obiekt z danymi do aktualizacji.
