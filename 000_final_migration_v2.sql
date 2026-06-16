@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS public.drums (
   cena_netto_bebna TEXT,
   data_wydania DATE,
   lokalizacja_wms TEXT,
+  magazyn TEXT,
   latitude NUMERIC,
   longitude NUMERIC,
   UNIQUE (kod_bebna, nip)
