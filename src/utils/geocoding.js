@@ -14,7 +14,9 @@ export async function geocodeAddress(address) {
   }
 
   try {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
+    // Dodajemy "Polska" na końcu jeśli brakuje, żeby ułatwić Google odnalezienie małych miejscowości
+    const searchAddress = address.toLowerCase().includes('polska') ? address : `${address}, Polska`;
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(searchAddress)}&components=country:PL&key=${apiKey}`;
     const response = await fetch(url);
     const data = await response.json();
 

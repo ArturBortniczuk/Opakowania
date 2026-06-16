@@ -9,6 +9,29 @@ const GeocodeMigration = () => {
 
   const addLog = (msg) => setLogs(prev => [msg, ...prev].slice(0, 100));
 
+  const retryFailedAddresses = async () => {
+    if (!window.confirm("Czy na pewno chcesz spróbować ponownie zlokalizować adresy, które wcześniej nie zostały znalezione? (Spowoduje to wyczyszczenie błędów z cache)")) return;
+    
+    setIsProcessing(true);
+    addLog('Czyszczenie cache dla nieznalezionych adresów...');
+    
+    try {
+      const { error } = await supabase
+        .from('address_coordinates_cache')
+        .delete()
+        .eq('is_not_found', true);
+        
+      if (error) throw error;
+      
+      addLog('Wyjaśniono błędy. Rozpoczynam ponowną migrację...');
+      await runMigration();
+    } catch (error) {
+      console.error('Błąd czyszczenia cache:', error);
+      addLog(`BŁĄD: Nie udało się wyczyścić cache - ${error.message}`);
+      setIsProcessing(false);
+    }
+  };
+
   const runMigration = async () => {
     setIsProcessing(true);
     setLogs([]);
@@ -143,13 +166,21 @@ const GeocodeMigration = () => {
         Wyniki zapisywane są do trwałego "słownika", dzięki czemu codzienna aktualizacja systemu ERP nie zużywa limitów API.
       </p>
       
-      <div className="flex items-center space-x-4 mb-6">
+      <div className="flex flex-wrap items-center gap-4 mb-6">
         <button
           onClick={runMigration}
           disabled={isProcessing}
           className={`px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all ${isProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-md'}`}
         >
           {isProcessing ? 'Przetwarzanie zapytań...' : 'Geokoduj Nowe Adresy'}
+        </button>
+
+        <button
+          onClick={retryFailedAddresses}
+          disabled={isProcessing}
+          className={`px-4 py-2 rounded-lg text-white font-medium shadow-sm transition-all ${isProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600 hover:shadow-md'}`}
+        >
+          Ponów dla nieznalezionych
         </button>
         
         {progress.total > 0 && (
