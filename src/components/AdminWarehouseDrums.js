@@ -88,6 +88,7 @@ const AdminWarehouseDrums = () => {
   useEffect(() => {
     const fetchSizes = async () => {
       const sizes = await drumsAPI.getWarehouseDrumSizes();
+      sizes.sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
       setAvailableSizes(sizes);
     };
     fetchSizes();
@@ -289,7 +290,7 @@ const AdminWarehouseDrums = () => {
           </div>
 
           {/* Search and Filters */}
-          <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-emerald-100 mb-6">
+          <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-emerald-100 mb-6 relative z-50">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
@@ -326,7 +327,7 @@ const AdminWarehouseDrums = () => {
                 </button>
                 
                 {showSizesMenu && (
-                  <div className="absolute z-10 mt-2 w-full max-h-60 overflow-auto bg-white border border-gray-200 rounded-xl shadow-xl p-2">
+                  <div className="absolute z-50 mt-2 w-full max-h-60 overflow-auto bg-white border border-gray-200 rounded-xl shadow-xl p-2">
                     {availableSizes.length > 0 ? (
                       availableSizes.map(size => (
                         <label key={size} className="flex items-center p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
