@@ -449,6 +449,7 @@ const LogisticsMap = () => {
                   <h4 className="font-bold text-yellow-800 flex items-center">
                     <MapPin className="w-5 h-5 mr-1" /> Tryb Ręcznego Przypisywania
                   </h4>
+                  <p className="text-sm text-yellow-700 mt-1">
                     Kliknij miejsce na mapie dla klienta: <br/><strong>{assigningLocation.companyName}</strong> <br/><span className="text-xs">({assigningLocation.address})</span>
                   </p>
                 </div>
