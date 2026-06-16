@@ -466,7 +466,8 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     input.click();
   };
 
-  const [globalStats, setGlobalStats] = useState({
+  const [allAdminDrums, setAllAdminDrums] = useState([]);
+  const [dynamicStats, setDynamicStats] = useState({
     total: '-',
     overdue: '-',
     dueSoon: '-',
@@ -475,31 +476,70 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
   });
 
   useEffect(() => {
-    const fetchGlobalStats = async () => {
+    const fetchAllDrums = async () => {
       try {
         const allDrums = await drumsAPI.getAllDrums();
-        
-        const overdue = allDrums.filter(d => d.status === 'overdue').length;
-        const dueSoon = allDrums.filter(d => d.status === 'due-soon').length;
-        const active = allDrums.filter(d => d.status === 'active').length;
-        const extended = allDrums.filter(d => d.isExtended).length;
-        
-        setGlobalStats({
-          total: allDrums.length,
-          overdue,
-          dueSoon,
-          active,
-          extended
-        });
+        setAllAdminDrums(allDrums || []);
       } catch (err) {
-        console.error('Error fetching global stats:', err);
+        console.error('Error fetching all drums for stats:', err);
       }
     };
-    
-    fetchGlobalStats();
+    fetchAllDrums();
   }, []);
 
-  const stats = globalStats;
+  useEffect(() => {
+    if (!allAdminDrums || allAdminDrums.length === 0) return;
+
+    let filtered = allAdminDrums;
+
+    // 1. Wyszukiwanie (Search)
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(d => 
+        (d.cecha || '').toLowerCase().includes(term) ||
+        (d.kod_bebna || '').toLowerCase().includes(term) ||
+        (d.nazwa || '').toLowerCase().includes(term) ||
+        (d.pelna_nazwa_kontrahenta || d.company || '').toLowerCase().includes(term) ||
+        (d.adres_dostawy || '').toLowerCase().includes(term) ||
+        (d.nazwa_punktu_dostawy || '').toLowerCase().includes(term) ||
+        (d.numer_faktury || '').toLowerCase().includes(term)
+      );
+    }
+
+    // 2. Filtr stanu magazynowego (Status)
+    if (filterStatus !== 'all') {
+      if (filterStatus === 'zagubione') {
+        filtered = filtered.filter(d => d.status === 'Lost' || d.db_status === 'Lost');
+      } else {
+        filtered = filtered.filter(d => d.status !== 'Lost' && d.db_status !== 'Lost');
+        if (filterStatus === 'magazyn') {
+          filtered = filtered.filter(d => d.kontrahent === 'Nie wydany' || (d.kontrahent && d.kontrahent.toLowerCase().includes('magazyn')));
+        } else if (filterStatus === 'wydane') {
+          filtered = filtered.filter(d => d.kontrahent !== 'Nie wydany' && !(d.kontrahent && d.kontrahent.toLowerCase().includes('magazyn')));
+        }
+      }
+    }
+
+    // 3. Filtr terminu (Date Range)
+    if (filterDateRange !== 'all') {
+      if (filterDateRange === 'extended') {
+        filtered = filtered.filter(d => d.isExtended);
+      } else {
+        // 'active', 'due-soon', 'overdue' pokrywa się z polem status
+        filtered = filtered.filter(d => d.status === filterDateRange);
+      }
+    }
+
+    setDynamicStats({
+      total: filtered.length,
+      overdue: filtered.filter(d => d.status === 'overdue').length,
+      dueSoon: filtered.filter(d => d.status === 'due-soon').length,
+      active: filtered.filter(d => d.status === 'active').length,
+      extended: filtered.filter(d => d.isExtended).length
+    });
+  }, [allAdminDrums, searchTerm, filterStatus, filterDateRange]);
+
+  const stats = dynamicStats;
 
   // ZACHOWANE: DrumCard z twojego kodu
   const DrumCard = ({ drum, index }) => (
@@ -1118,80 +1158,82 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                   </div>
                 </div>
 
-                {/* Indywidualne przedłużenie terminu zwrotu */}
-                <div className="mt-6 pt-6 border-t border-indigo-100 bg-indigo-50/30 -mx-6 -mb-6 p-6 rounded-b-2xl">
-                  <h3 className="text-lg font-bold text-indigo-900 mb-3 flex items-center space-x-2">
-                    <Calendar className="w-5 h-5 text-indigo-600" />
-                    <span>Indywidualne przedłużenie terminu zwrotu</span>
-                  </h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Nowy termin zwrotu
-                      </label>
-                      <DatePicker
-                        selected={customReturnDate}
-                        onChange={(date) => setCustomReturnDate(date)}
-                        dateFormat="dd.MM.yyyy"
-                        locale="pl"
-                        className="w-full p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer bg-white"
-                        placeholderText="Wybierz nową datę"
-                        minDate={selectedDrum.data_wydania ? new Date(selectedDrum.data_wydania) : new Date()}
-                      />
+                {/* Indywidualne przedłużenie terminu zwrotu (Tylko dla Admina) */}
+                {currentUser?.role?.toLowerCase() === 'admin' && (
+                  <div className="mt-6 pt-6 border-t border-indigo-100 bg-indigo-50/30 -mx-6 -mb-6 p-6 rounded-b-2xl">
+                    <h3 className="text-lg font-bold text-indigo-900 mb-3 flex items-center space-x-2">
+                      <Calendar className="w-5 h-5 text-indigo-600" />
+                      <span>Indywidualne przedłużenie terminu zwrotu</span>
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Nowy termin zwrotu
+                        </label>
+                        <DatePicker
+                          selected={customReturnDate}
+                          onChange={(date) => setCustomReturnDate(date)}
+                          dateFormat="dd.MM.yyyy"
+                          locale="pl"
+                          className="w-full p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer bg-white"
+                          placeholderText="Wybierz nową datę"
+                          minDate={selectedDrum.data_wydania ? new Date(selectedDrum.data_wydania) : new Date()}
+                        />
+                      </div>
+                      
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Uzasadnienie / Notatka
+                        </label>
+                        <input
+                          type="text"
+                          value={extensionNotes}
+                          onChange={(e) => setExtensionNotes(e.target.value)}
+                          className="w-full p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white text-sm"
+                          placeholder="np. Ustalone z klientem, opóźnienie inwestycji do końca roku."
+                        />
+                      </div>
                     </div>
                     
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Uzasadnienie / Notatka
-                      </label>
-                      <input
-                        type="text"
-                        value={extensionNotes}
-                        onChange={(e) => setExtensionNotes(e.target.value)}
-                        className="w-full p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white text-sm"
-                        placeholder="np. Ustalone z klientem, opóźnienie inwestycji do końca roku."
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div>
-                      {selectedDrum.isExtended && (
-                        <p className="text-xs text-gray-500">
-                          Wprowadził: <span className="font-semibold">{selectedDrum.extensionCreatedBy || "Brak"}</span>
-                          {selectedDrum.extensionCreatedAt && ` (${new Date(selectedDrum.extensionCreatedAt).toLocaleDateString('pl-PL')})`}
-                        </p>
-                      )}
-                    </div>
-                    
-                    <div className="flex space-x-3 justify-end">
-                      {selectedDrum.isExtended && (
-                        <button
-                          onClick={handleClearExtension}
-                          disabled={savingExtension}
-                          className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-xl font-medium hover:bg-red-100 transition-colors duration-200 text-sm disabled:opacity-50"
-                        >
-                          Przywróć domyślny termin
-                        </button>
-                      )}
-                      <button
-                        onClick={handleSaveExtension}
-                        disabled={savingExtension || !customReturnDate}
-                        className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-all duration-200 text-sm shadow-md hover:shadow-lg flex items-center space-x-2 disabled:opacity-50"
-                      >
-                        {savingExtension ? (
-                          <>
-                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                            <span>Zapisywanie...</span>
-                          </>
-                        ) : (
-                          <span>Zapisywanie</span>
+                    <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div>
+                        {selectedDrum.isExtended && (
+                          <p className="text-xs text-gray-500">
+                            Wprowadził: <span className="font-semibold">{selectedDrum.extensionCreatedBy || "Brak"}</span>
+                            {selectedDrum.extensionCreatedAt && ` (${new Date(selectedDrum.extensionCreatedAt).toLocaleDateString('pl-PL')})`}
+                          </p>
                         )}
-                      </button>
+                      </div>
+                      
+                      <div className="flex space-x-3 justify-end">
+                        {selectedDrum.isExtended && (
+                          <button
+                            onClick={handleClearExtension}
+                            disabled={savingExtension}
+                            className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-xl font-medium hover:bg-red-100 transition-colors duration-200 text-sm disabled:opacity-50"
+                          >
+                            Przywróć domyślny termin
+                          </button>
+                        )}
+                        <button
+                          onClick={handleSaveExtension}
+                          disabled={savingExtension || !customReturnDate}
+                          className="px-5 py-2 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-all duration-200 text-sm shadow-md hover:shadow-lg flex items-center space-x-2 disabled:opacity-50"
+                        >
+                          {savingExtension ? (
+                            <>
+                              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                              <span>Zapisywanie...</span>
+                            </>
+                          ) : (
+                            <span>Zapisywanie</span>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
