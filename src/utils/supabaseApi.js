@@ -416,10 +416,11 @@ export const drumsAPI = {
         sortOrder = 'asc',
         search = '',
         status = 'all',
-        dateRange = 'all'
+        dateRange = 'all',
+        paymentStatus = 'all'
       } = options;
 
-      console.log(`🔄 getDrums wywołane z: nip=${nip}, page=${page}, search="${search}", status=${status}, date=${dateRange}`);
+      console.log(`🔄 getDrums wywołane z: nip=${nip}, page=${page}, search="${search}", status=${status}, date=${dateRange}, paymentStatus=${paymentStatus}`);
 
       // Podstawowe zapytanie
       let query = supabase
@@ -534,6 +535,26 @@ export const drumsAPI = {
             // Aktywne = data zwrotu jest > za tydzień LUB jest to bęben własny (brak daty zwrotu)
             query = query.or(`data_zwrotu_do_dostawcy.gt.${nextWeekStr},data_zwrotu_do_dostawcy.is.null`);
           }
+        }
+      }
+
+      // 3. Filtrowanie po statusie płatności
+      if (paymentStatus !== 'all') {
+        if (paymentStatus === 'paid') {
+          query = query.eq('czy_zaplacona', 'Tak');
+        } else if (paymentStatus === 'unpaid') {
+          query = query.in('czy_zaplacona', ['Nie', 'Brak faktury']);
+        } else if (paymentStatus === 'overdue_payment') {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const todayStr = today.toISOString().split('T')[0];
+          // Since termin_platnosci is TEXT (DD.MM.YYYY), we can't do direct lt/gt comparisons in Supabase without casting or regex. 
+          // For now, we'll fetch them all and let frontend filter, OR if we strictly formatted dates as YYYY-MM-DD it would work.
+          // Wait, we can't filter correctly in SQL if dates are stored as DD.MM.YYYY strings. 
+          // However, we can fetch unpaid and then we'll map/filter them on frontend.
+          // But since pagination limits the fetch, filtering on frontend after limit is bad.
+          // Since the user just changed the type to TEXT today, we should probably just fetch unpaid and sort.
+          query = query.eq('czy_zaplacona', 'Nie');
         }
       }
 

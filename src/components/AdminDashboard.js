@@ -42,7 +42,8 @@ const AdminDashboard = ({ user, onNavigate }) => {
     totalValue: 0,
     ourValue: 0,
     inReturnBaseValue: 0,
-    inReturnClientValue: 0
+    inReturnClientValue: 0,
+    overduePaymentValue: 0
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -81,6 +82,16 @@ const AdminDashboard = ({ user, onNavigate }) => {
           return isNaN(parsed) ? 0 : parsed;
         };
 
+        const parsePaymentDate = (dateStr) => {
+          if (!dateStr) return null;
+          const parts = dateStr.split('.');
+          if (parts.length === 3) {
+            return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+          }
+          const d = new Date(dateStr);
+          return isNaN(d.getTime()) ? null : d;
+        };
+
         // Obliczamy wartość ogólną i wartość własną z allDrums
         allDrums.forEach(drum => {
           const priceRaw = parsePriceRaw(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
@@ -107,6 +118,16 @@ const AdminDashboard = ({ user, onNavigate }) => {
 
             if (isOurDrum) {
               ourVal += priceRaw;
+            }
+
+            // Przeterminowane płatności
+            if (drum.czy_zaplacona === 'Nie' && drum.termin_platnosci) {
+              const paymentDeadline = parsePaymentDate(drum.termin_platnosci);
+              const now = new Date();
+              now.setHours(0,0,0,0);
+              if (paymentDeadline && paymentDeadline < now) {
+                overduePaymentVal += priceRaw;
+              }
             }
           }
         });
@@ -151,7 +172,8 @@ const AdminDashboard = ({ user, onNavigate }) => {
           totalValue: totalVal,
           ourValue: ourVal,
           inReturnBaseValue: returnBaseVal,
-          inReturnClientValue: returnClientVal
+          inReturnClientValue: returnClientVal,
+          overduePaymentValue: overduePaymentVal
         });
         
       } catch (err) {
@@ -422,7 +444,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Wartość wszystkich bębnów */}
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 border border-blue-100/80 shadow-sm hover:shadow-md transition-all duration-300 flex items-start space-x-4">
               <div className="p-3 bg-blue-100 text-blue-700 rounded-xl">
@@ -448,6 +470,21 @@ const AdminDashboard = ({ user, onNavigate }) => {
                   {financialStats.ourValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
                 </p>
                 <p className="text-xs text-gray-500">Wycena bębnów należących do Eltron</p>
+              </div>
+            </div>
+
+            {/* Przeterminowane płatności */}
+            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 border border-red-100/80 shadow-sm hover:shadow-md transition-all duration-300 flex items-start space-x-4 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-16 h-16 bg-red-400/10 rounded-bl-full -z-10"></div>
+              <div className="p-3 bg-red-100 text-red-700 rounded-xl shadow-inner">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Przeterminowane faktury</p>
+                <p className="text-2xl font-extrabold text-red-700">
+                  {financialStats.overduePaymentValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
+                </p>
+                <p className="text-xs text-gray-500">Niezapłacone bębny po terminie</p>
               </div>
             </div>
 

@@ -52,6 +52,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
   const initialStatus = urlFilterStatus || 'all';
   const [filterStatus, setFilterStatus] = useState(initialStatus);
   const [filterDateRange, setFilterDateRange] = useState('all');
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState('all');
   const [selectedDrum, setSelectedDrum] = useState(null);
   const [showDrumDetails, setShowDrumDetails] = useState(false);
 
@@ -92,6 +93,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         search: searchTerm,
         status: filterStatus,
         dateRange: filterDateRange,
+        paymentStatus: filterPaymentStatus,
         ...options
       };
 
@@ -110,7 +112,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     } finally {
       setLoading(false);
     }
-  }, [sortBy, sortOrder, searchTerm, filterStatus, filterDateRange]);
+  }, [sortBy, sortOrder, searchTerm, filterStatus, filterDateRange, filterPaymentStatus]);
 
 
   // DODANE: Debounce dla wyszukiwania
@@ -124,7 +126,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
 
   useEffect(() => {
     fetchDrums({ page: 1 }); // Resetuj do pierwszej strony przy zmianie filtrów
-  }, [sortBy, sortOrder, searchTerm, filterStatus, filterDateRange]);
+  }, [sortBy, sortOrder, searchTerm, filterStatus, filterDateRange, filterPaymentStatus]);
   useEffect(() => {
     if (initialFilter && initialFilter.status) {
       setFilterStatus(initialFilter.status);
@@ -638,6 +640,42 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
             {drum.daysInPossession}
           </span>
         </div>
+
+        {drum.czy_zaplacona && (
+          <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+            <span className="text-sm text-gray-500">Opłacony?</span>
+            <span className={`text-sm font-bold ${drum.czy_zaplacona === 'Tak' ? 'text-green-600' : drum.czy_zaplacona === 'Nie' ? 'text-red-600' : 'text-gray-600'}`}>
+              {drum.czy_zaplacona}
+            </span>
+          </div>
+        )}
+
+        {drum.termin_platnosci && (
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">Termin płatności</span>
+            <span className="text-sm font-medium text-gray-900">
+              {drum.termin_platnosci}
+            </span>
+          </div>
+        )}
+
+        {drum.nawiniety_kabel && (
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">Kabel na bębnie</span>
+            <span className="text-sm font-medium text-gray-900 truncate max-w-[150px]" title={drum.nawiniety_kabel}>
+              {drum.nawiniety_kabel}
+            </span>
+          </div>
+        )}
+
+        {drum.ilosc_kabla && (
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">Ilość kabla</span>
+            <span className="text-sm font-medium text-gray-900">
+              {drum.ilosc_kabla} m
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex space-x-2 mt-4">
@@ -854,7 +892,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
 
           {/* Search and Filters */}
           <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <input
@@ -887,6 +925,17 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                 <option value="due-soon">Zbliża się termin</option>
                 <option value="overdue">Przeterminowane</option>
                 <option value="extended">Przedłużone terminy</option>
+              </select>
+
+              <select
+                value={filterPaymentStatus}
+                onChange={(e) => setFilterPaymentStatus(e.target.value)}
+                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">Wszystkie płatności</option>
+                <option value="paid">Tylko opłacone (Tak)</option>
+                <option value="unpaid">Tylko nieopłacone (Nie / Brak)</option>
+                <option value="overdue_payment">Zaległe po terminie</option>
               </select>
             </div>
           </div>

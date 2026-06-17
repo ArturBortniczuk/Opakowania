@@ -68,6 +68,10 @@ CREATE TABLE IF NOT EXISTS public.drums (
   magazyn TEXT,
   latitude NUMERIC,
   longitude NUMERIC,
+  nawiniety_kabel TEXT,
+  ilosc_kabla TEXT,
+  czy_zaplacona VARCHAR(50),
+  termin_platnosci TEXT,
   UNIQUE (kod_bebna, nip)
 );
 
