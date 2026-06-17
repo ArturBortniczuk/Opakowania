@@ -529,6 +529,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
       } else {
         // 'active', 'due-soon', 'overdue' pokrywa się z polem status
         filtered = filtered.filter(d => d.status === filterDateRange);
+      }
     }
 
     setDynamicStats({
