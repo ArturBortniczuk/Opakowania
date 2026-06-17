@@ -657,7 +657,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500">Kabel na bębnie</span>
                 <span className="text-sm font-medium text-gray-900 truncate max-w-[150px]" title={drum.nawiniety_kabel || 'Brak informacji'}>
-                  {drum.nawiniety_kabel || 'Brak informacji o kablu'}
+                  {drum.nawiniety_kabel || 'Brak informacji'}
                 </span>
               </div>
 
@@ -1164,7 +1164,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium text-gray-500">Kabel na bębnie</span>
-                          <span className="text-sm font-medium text-gray-900 text-right max-w-[200px] truncate" title={selectedDrum.nawiniety_kabel}>{selectedDrum.nawiniety_kabel || 'Brak informacji o kablu'}</span>
+                          <span className="text-sm font-medium text-gray-900 text-right max-w-[200px] truncate" title={selectedDrum.nawiniety_kabel}>{selectedDrum.nawiniety_kabel || 'Brak informacji'}</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium text-gray-500">Ilość kabla</span>
