@@ -671,7 +671,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
 
         <div className="flex space-x-2 mt-4">
           <button
-            onClick={() => handleOpenModal(drum)}
+            onClick={() => handleViewDrum(drum)}
             className="flex-1 px-4 py-2 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 transition-colors duration-200 font-medium text-sm flex items-center justify-center space-x-2"
           >
             <span>Szczegóły</span>
