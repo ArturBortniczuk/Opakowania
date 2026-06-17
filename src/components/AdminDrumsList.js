@@ -933,8 +933,9 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                 className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">Wszystkie płatności</option>
-                <option value="paid">Tylko opłacone (Tak)</option>
-                <option value="unpaid">Tylko nieopłacone (Nie / Brak)</option>
+                <option value="paid">Opłacone (Tak)</option>
+                <option value="unpaid">Nieopłacone (Nie)</option>
+                <option value="no_invoice">Brak faktury</option>
                 <option value="overdue_payment">Zaległe po terminie</option>
               </select>
             </div>

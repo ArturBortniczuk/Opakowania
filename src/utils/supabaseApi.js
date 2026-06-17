@@ -543,7 +543,9 @@ export const drumsAPI = {
         if (paymentStatus === 'paid') {
           query = query.eq('czy_zaplacona', 'Tak');
         } else if (paymentStatus === 'unpaid') {
-          query = query.in('czy_zaplacona', ['Nie', 'Brak faktury']);
+          query = query.eq('czy_zaplacona', 'Nie');
+        } else if (paymentStatus === 'no_invoice') {
+          query = query.eq('czy_zaplacona', 'Brak faktury');
         } else if (paymentStatus === 'overdue_payment') {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
