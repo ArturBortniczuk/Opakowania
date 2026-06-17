@@ -252,8 +252,8 @@ const AdminUsersManager = ({ user: currentUser }) => {
                           {roleDef.label}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{u.company_name || '-'}</div>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900 max-w-xs truncate" title={u.company_name || '-'}>{u.company_name || '-'}</div>
                         <div className="text-sm text-gray-500">{u.nip || '-'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
