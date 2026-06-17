@@ -530,162 +530,13 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         // 'active', 'due-soon', 'overdue' pokrywa się z polem status
         filtered = filtered.filter(d => d.status === filterDateRange);
       }
-    }
-
-    setDynamicStats({
-      total: filtered.length,
-      overdue: filtered.filter(d => d.status === 'overdue').length,
-      dueSoon: filtered.filter(d => d.status === 'due-soon').length,
+h: filtered.filter(d => d.status === 'due-soon').length,
       active: filtered.filter(d => d.status === 'active').length,
       extended: filtered.filter(d => d.isExtended).length
     });
   }, [allAdminDrums, searchTerm, filterStatus, filterDateRange]);
 
   const stats = dynamicStats;
-
-  // ZACHOWANE: DrumCard z twojego kodu
-  const DrumCard = ({ drum, index }) => (
-    <div
-      className={`bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] h-full flex flex-col ${drum.borderColor || 'border-gray-200'}`}
-      style={{ animationDelay: `${index * 50}ms` }}
-    >
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center space-x-3 min-w-0 flex-1">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
-            <Package className="w-6 h-6 text-white" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="font-bold text-gray-900 truncate text-lg">{drum.cecha || drum.kod_bebna}</h3>
-            <p className="text-gray-600 text-sm truncate">
-              {drum.cecha ? `${drum.kod_bebna} • ${drum.nazwa}` : drum.nazwa}
-            </p>
-          </div>
-        </div>
-        <div 
-          className={`w-4 h-4 rounded-full shadow-sm cursor-help ${drum.color?.replace('text-', 'bg-') || 'bg-gray-400'}`}
-          title={drum.text || drum.status}
-        />
-      </div>
-
-      <div className="space-y-3 flex-1">
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Firma</span>
-          <span className="text-sm font-medium text-gray-900 truncate ml-2">
-            {drum.company || drum.pelna_nazwa_kontrahenta}
-          </span>
-        </div>
-
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">NIP</span>
-          <span className="text-sm font-medium text-gray-900">{drum.nip}</span>
-        </div>
-
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Dostawca</span>
-          <span className="text-sm font-medium text-gray-900 truncate ml-2" title={drum.kon_dostawca}>
-            {drum.kon_dostawca || 'Brak'}
-          </span>
-        </div>
-
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Nr faktury</span>
-          <span className="text-sm font-medium text-gray-900 truncate ml-2">
-            {drum.numer_faktury || 'Brak'}
-          </span>
-        </div>
-
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Lokalizacja</span>
-          <span className="text-sm font-medium text-gray-900 truncate ml-2" title={drum.adres_dostawy || drum.nazwa_punktu_dostawy}>
-            {drum.adres_dostawy || drum.nazwa_punktu_dostawy || 'Brak'}
-          </span>
-        </div>
-
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Zwrot do dostawcy</span>
-          <span className="text-sm font-medium text-gray-900">
-            {drum.DATA_ZWROTU_DO_DOSTAWCY ?
-              new Date(drum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL') :
-              <span className="text-indigo-600 font-semibold">Własny</span>
-            }
-          </span>
-        </div>
-
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Zwrot od klienta</span>
-          <span className="text-sm font-medium text-gray-900 flex items-center space-x-1">
-            {drum.clientReturnDeadline ? (
-              <>
-                <span className={drum.isExtended ? "text-indigo-600 font-semibold" : ""}>
-                  {new Date(drum.clientReturnDeadline).toLocaleDateString('pl-PL')}
-                </span>
-                {drum.isExtended && (
-                  <span 
-                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 border border-indigo-200 text-indigo-700 cursor-help"
-                    title={drum.extensionNotes || "Indywidualny termin zwrotu"}
-                  >
-                    Przedłużony
-                  </span>
-                )}
-              </>
-            ) : (
-              'Brak'
-            )}
-          </span>
-        </div>
-
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Dni w posiadaniu</span>
-          <span className="text-sm font-medium text-gray-900">
-            {drum.daysInPossession}
-          </span>
-        </div>
-
-        {drum.czy_zaplacona && (
-          <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-            <span className="text-sm text-gray-500">Opłacony?</span>
-            <span className={`text-sm font-bold ${drum.czy_zaplacona === 'Tak' ? 'text-green-600' : drum.czy_zaplacona === 'Nie' ? 'text-red-600' : 'text-gray-600'}`}>
-              {drum.czy_zaplacona}
-            </span>
-          </div>
-        )}
-
-        {drum.termin_platnosci && (
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Termin płatności</span>
-            <span className="text-sm font-medium text-gray-900">
-              {drum.termin_platnosci}
-            </span>
-          </div>
-        )}
-
-        {drum.nawiniety_kabel && (
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Kabel na bębnie</span>
-            <span className="text-sm font-medium text-gray-900 truncate max-w-[150px]" title={drum.nawiniety_kabel}>
-              {drum.nawiniety_kabel}
-            </span>
-          </div>
-        )}
-
-        {drum.ilosc_kabla && (
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Ilość kabla</span>
-            <span className="text-sm font-medium text-gray-900">
-              {drum.ilosc_kabla} m
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="flex space-x-2 mt-4">
-        <button
-          onClick={() => handleViewDrum(drum)}
-          className="flex-1 bg-blue-600 text-white py-2 px-3 rounded-xl font-medium hover:bg-blue-700 transition-all duration-200 flex items-center justify-center space-x-2 text-sm"
-        >
-          <Eye className="w-4 h-4" />
-          <span>Szczegóły</span>
-        </button>
 
         <button
           onClick={() => navigate(`/admin/clients?clientNip=${drum.nip}`)}
@@ -1096,114 +947,124 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
               <div className="p-6 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacje o bębnie</h3>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Kod bębna</label>
-                        <p className="text-gray-900">{selectedDrum.kod_bebna}</p>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2 border-gray-100">Informacje o bębnie</h3>
+                    <div className="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Kod bębna</span>
+                        <span className="text-sm font-medium text-gray-900">{selectedDrum.kod_bebna || 'Brak'}</span>
                       </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Nazwa</label>
-                        <p className="text-gray-900">{selectedDrum.nazwa}</p>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Nazwa</span>
+                        <span className="text-sm font-medium text-gray-900 text-right max-w-[200px] truncate" title={selectedDrum.nazwa}>{selectedDrum.nazwa || 'Brak'}</span>
                       </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Cecha</label>
-                        <p className="text-gray-900 font-medium">{selectedDrum.cecha || 'Brak'}</p>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Rozmiar</span>
+                        <span className="text-sm font-medium text-gray-900">{selectedDrum.rozmiar_bebna || 'Brak'}</span>
                       </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Dostawca</label>
-                        <p className="text-gray-900">{selectedDrum.kon_dostawca}</p>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Cecha</span>
+                        <span className="text-sm font-medium text-gray-900">{selectedDrum.cecha || 'Brak'}</span>
                       </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Dokument</label>
-                        <p className="text-gray-900">{selectedDrum.nr_dokumentupz}</p>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Dostawca</span>
+                        <span className="text-sm font-medium text-gray-900 text-right max-w-[200px] truncate" title={selectedDrum.kon_dostawca}>{selectedDrum.kon_dostawca || 'Brak'}</span>
                       </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Lokalizacja</label>
-                        <p className="text-gray-900">
-                          {selectedDrum.adres_dostawy || 'Brak informacji o adresie'}
-                        </p>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Dokument</span>
+                        <span className="text-sm font-medium text-gray-900 text-right max-w-[200px] truncate" title={selectedDrum.nr_dokumentupz}>{selectedDrum.nr_dokumentupz || 'Brak'}</span>
                       </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Numer faktury</label>
-                        <p className="text-gray-900">{selectedDrum.numer_faktury || 'Brak danych'}</p>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Lokalizacja</span>
+                        <span className="text-sm font-medium text-gray-900 text-right max-w-[200px] truncate" title={selectedDrum.adres_dostawy || selectedDrum.nazwa_punktu_dostawy}>{selectedDrum.adres_dostawy || selectedDrum.nazwa_punktu_dostawy || 'Brak adresu'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Nr faktury</span>
+                        <span className="text-sm font-medium text-gray-900 text-right max-w-[200px] truncate" title={selectedDrum.numer_faktury}>{selectedDrum.numer_faktury || 'Brak'}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacje o kliencie</h3>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Nazwa firmy</label>
-                        <p className="text-gray-900">{selectedDrum.company || selectedDrum.pelna_nazwa_kontrahenta}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">NIP</label>
-                        <p className="text-gray-900">{selectedDrum.nip}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Status</label>
-                        <p className="text-gray-900">{selectedDrum.db_status}</p>
-                      </div>
-                      {selectedDrum.companyEmail && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Email</label>
-                          <p className="text-gray-900">{selectedDrum.companyEmail}</p>
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2 border-gray-100">Informacje o kliencie</h3>
+                      <div className="space-y-3 bg-blue-50/30 p-4 rounded-xl border border-blue-100/50">
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Firma</span>
+                          <span className="text-sm font-medium text-gray-900 text-right max-w-[200px] truncate" title={selectedDrum.company || selectedDrum.pelna_nazwa_kontrahenta}>{selectedDrum.company || selectedDrum.pelna_nazwa_kontrahenta || 'Brak'}</span>
                         </div>
-                      )}
-                      {selectedDrum.companyPhone && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Telefon</label>
-                          <p className="text-gray-900">{selectedDrum.companyPhone}</p>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">NIP</span>
+                          <span className="text-sm font-medium text-gray-900">{selectedDrum.nip || 'Brak'}</span>
                         </div>
-                      )}
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Email</span>
+                          <span className="text-sm font-medium text-gray-900">{selectedDrum.companyEmail || 'Brak'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Telefon</span>
+                          <span className="text-sm font-medium text-gray-900">{selectedDrum.companyPhone || 'Brak'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2 border-gray-100">Płatności i kable</h3>
+                      <div className="space-y-3 bg-emerald-50/30 p-4 rounded-xl border border-emerald-100/50">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium text-gray-500">Opłacony?</span>
+                          <span className={`text-sm font-bold ${selectedDrum.czy_zaplacona === 'Tak' ? 'text-emerald-600' : selectedDrum.czy_zaplacona === 'Nie' ? 'text-red-600' : 'text-gray-600'}`}>
+                            {selectedDrum.czy_zaplacona || 'Brak danych'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium text-gray-500">Termin płatności</span>
+                          <span className="text-sm font-medium text-gray-900">{selectedDrum.termin_platnosci || 'Brak terminu'}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium text-gray-500">Kabel na bębnie</span>
+                          <span className="text-sm font-medium text-gray-900 text-right max-w-[200px] truncate" title={selectedDrum.nawiniety_kabel}>{selectedDrum.nawiniety_kabel || 'Brak kabla'}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium text-gray-500">Ilość kabla</span>
+                          <span className="text-sm font-medium text-gray-900">{selectedDrum.ilosc_kabla ? `${selectedDrum.ilosc_kabla} m` : 'Brak'}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Timeline</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Data wydania</span>
-                      <span className="font-medium">
-                        {selectedDrum.data_wydania
-                          ? new Date(selectedDrum.data_wydania).toLocaleDateString('pl-PL')
-                          : 'Brak'
-                        }
-                      </span>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2 border-gray-100">Harmonogram / Timeline</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 text-center">
+                      <p className="text-xs text-gray-500 mb-1">Wydanie</p>
+                      <p className="font-semibold text-sm text-gray-900">
+                        {selectedDrum.data_wydania ? new Date(selectedDrum.data_wydania).toLocaleDateString('pl-PL') : 'Brak'}
+                      </p>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Data przyjęcia na stan</span>
-                      <span className="font-medium">
-                        {selectedDrum.data_przyjecia_na_stan
-                          ? new Date(selectedDrum.data_przyjecia_na_stan).toLocaleDateString('pl-PL')
-                          : 'Brak'
-                        }
-                      </span>
+                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 text-center">
+                      <p className="text-xs text-gray-500 mb-1">Przyjęcie</p>
+                      <p className="font-semibold text-sm text-gray-900">
+                        {selectedDrum.data_przyjecia_na_stan ? new Date(selectedDrum.data_przyjecia_na_stan).toLocaleDateString('pl-PL') : 'Brak'}
+                      </p>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Zwrot do dostawcy</span>
-                      <span className="font-medium">
-                        {selectedDrum.data_zwrotu_do_dostawcy
-                          ? new Date(selectedDrum.data_zwrotu_do_dostawcy).toLocaleDateString('pl-PL')
-                          : <span className="text-indigo-600">Własny</span>
-                        }
-                      </span>
+                    <div className="bg-indigo-50/50 p-3 rounded-lg border border-indigo-100 text-center">
+                      <p className="text-xs text-indigo-500/80 mb-1">Zwrot (klient)</p>
+                      <p className="font-semibold text-sm text-indigo-900">
+                        {selectedDrum.clientReturnDeadline ? new Date(selectedDrum.clientReturnDeadline).toLocaleDateString('pl-PL') : 'Brak'}
+                      </p>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Zwrot od klienta</span>
-                      <span className="font-medium">
-                        {selectedDrum.clientReturnDeadline
-                          ? new Date(selectedDrum.clientReturnDeadline).toLocaleDateString('pl-PL')
-                          : 'Brak'
-                        }
-                      </span>
+                    <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100 text-center">
+                      <p className="text-xs text-blue-500/80 mb-1">Zwrot (dostawca)</p>
+                      <p className="font-semibold text-sm text-blue-900">
+                        {selectedDrum.data_zwrotu_do_dostawcy ? new Date(selectedDrum.data_zwrotu_do_dostawcy).toLocaleDateString('pl-PL') : <span className="text-indigo-600">Własny</span>}
+                      </p>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Dni w posiadaniu</span>
-                      <span className="font-medium">{selectedDrum.daysInPossession} dni</span>
+                    <div className="bg-gray-900 p-3 rounded-lg border border-gray-800 text-center shadow-md">
+                      <p className="text-xs text-gray-400 mb-1">W posiadaniu</p>
+                      <p className="font-bold text-sm text-white">
+                        {selectedDrum.daysInPossession || 0} dni
+                      </p>
                     </div>
                   </div>
                 </div>
