@@ -559,7 +559,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
             <div className="min-w-0 flex-1">
               <h3 className="font-bold text-gray-900 truncate text-lg">{drum.cecha || drum.kod_bebna || 'Brak cechy'}</h3>
               <p className="text-gray-600 text-sm truncate">
-                {drum.cecha ? `${drum.kod_bebna} • ${drum.rozmiar_bebna || 'Brak rozmiaru'}` : (drum.rozmiar_bebna || 'Brak rozmiaru')}
+                {drum.cecha ? `${drum.kod_bebna} • ${drum.rozmiar_bebna ? `FI ${drum.rozmiar_bebna}` : 'Brak rozmiaru'}` : (drum.rozmiar_bebna ? `FI ${drum.rozmiar_bebna}` : 'Brak rozmiaru')}
               </p>
             </div>
           </div>
@@ -596,15 +596,17 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
             </span>
           </div>
 
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Zwrot do dostawcy</span>
-            <span className="text-sm font-medium text-gray-900">
-              {drum.DATA_ZWROTU_DO_DOSTAWCY ?
-                new Date(drum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL') :
-                <span className="text-indigo-600 font-semibold">Własny</span>
-              }
-            </span>
-          </div>
+          {isAdmin && (
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Zwrot do dostawcy</span>
+              <span className="text-sm font-medium text-gray-900">
+                {drum.DATA_ZWROTU_DO_DOSTAWCY ?
+                  new Date(drum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL') :
+                  <span className="text-indigo-600 font-semibold">Własny</span>
+                }
+              </span>
+            </div>
+          )}
 
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Zwrot od klienta</span>
@@ -654,15 +656,15 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
 
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500">Kabel na bębnie</span>
-                <span className="text-sm font-medium text-gray-900 truncate max-w-[150px]" title={drum.nawiniety_kabel || 'Brak'}>
-                  {drum.nawiniety_kabel || 'Brak kabla'}
+                <span className="text-sm font-medium text-gray-900 truncate max-w-[150px]" title={drum.nawiniety_kabel || 'Brak informacji'}>
+                  {drum.nawiniety_kabel || 'Brak informacji o kablu'}
                 </span>
               </div>
 
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500">Ilość kabla</span>
                 <span className="text-sm font-medium text-gray-900">
-                  {drum.ilosc_kabla ? `${drum.ilosc_kabla} m` : 'Brak'}
+                  {drum.ilosc_kabla ? `${drum.ilosc_kabla} m` : 'Brak informacji'}
                 </span>
               </div>
             </div>
@@ -1099,7 +1101,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm font-medium text-gray-500">Rozmiar</span>
-                        <span className="text-sm font-medium text-gray-900">{selectedDrum.rozmiar_bebna || 'Brak'}</span>
+                        <span className="text-sm font-medium text-gray-900">{selectedDrum.rozmiar_bebna ? `FI ${selectedDrum.rozmiar_bebna}` : 'Brak'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm font-medium text-gray-500">Cecha</span>
@@ -1162,11 +1164,11 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium text-gray-500">Kabel na bębnie</span>
-                          <span className="text-sm font-medium text-gray-900 text-right max-w-[200px] truncate" title={selectedDrum.nawiniety_kabel}>{selectedDrum.nawiniety_kabel || 'Brak kabla'}</span>
+                          <span className="text-sm font-medium text-gray-900 text-right max-w-[200px] truncate" title={selectedDrum.nawiniety_kabel}>{selectedDrum.nawiniety_kabel || 'Brak informacji o kablu'}</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium text-gray-500">Ilość kabla</span>
-                          <span className="text-sm font-medium text-gray-900">{selectedDrum.ilosc_kabla ? `${selectedDrum.ilosc_kabla} m` : 'Brak'}</span>
+                          <span className="text-sm font-medium text-gray-900">{selectedDrum.ilosc_kabla ? `${selectedDrum.ilosc_kabla} m` : 'Brak informacji'}</span>
                         </div>
                       </div>
                     </div>
