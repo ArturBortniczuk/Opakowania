@@ -72,6 +72,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
         let ourVal = 0;
         let returnBaseVal = 0;
         let returnClientVal = 0;
+        let overduePaymentVal = 0;
 
         // Bezpieczny parser cen z plików Excela (usuwa spacje tysięcy i zamienia przecinki na kropki)
         const parsePriceRaw = (val) => {
