@@ -57,7 +57,8 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
   
   const initialStatus = urlFilterStatus || 'all';
   const [filterStatus, setFilterStatus] = useState(initialStatus);
-  const [filterDateRange, setFilterDateRange] = useState('all');
+  const [filterSupplierDateRange, setFilterSupplierDateRange] = useState('all');
+  const [filterClientDateRange, setFilterClientDateRange] = useState('all');
   const [filterPaymentStatus, setFilterPaymentStatus] = useState('all');
   const [selectedDrum, setSelectedDrum] = useState(null);
   const [showDrumDetails, setShowDrumDetails] = useState(false);
@@ -99,7 +100,8 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         search: searchTerm,
         companySearch: companySearchTerm,
         status: filterStatus,
-        dateRange: filterDateRange,
+        supplierDateRange: filterSupplierDateRange,
+        clientDateRange: filterClientDateRange,
         paymentStatus: filterPaymentStatus,
         selectedSizes,
         ...options
@@ -120,7 +122,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     } finally {
       setLoading(false);
     }
-  }, [sortBy, sortOrder, searchTerm, companySearchTerm, filterStatus, filterDateRange, filterPaymentStatus, selectedSizes]);
+  }, [sortBy, sortOrder, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, filterPaymentStatus, selectedSizes]);
 
 
   // DODANE: Debounce dla wyszukiwania
@@ -143,7 +145,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
 
   useEffect(() => {
     fetchDrums({ page: 1 }); // Resetuj do pierwszej strony przy zmianie filtrów
-  }, [sortBy, sortOrder, searchTerm, companySearchTerm, filterStatus, filterDateRange, filterPaymentStatus, selectedSizes]);
+  }, [sortBy, sortOrder, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, filterPaymentStatus, selectedSizes]);
   useEffect(() => {
     if (initialFilter && initialFilter.status) {
       setFilterStatus(initialFilter.status);
@@ -904,109 +906,126 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
 
           {/* Search and Filters */}
           <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 mb-6 relative z-40">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Dane bębna (cecha, faktura)..."
-                  value={localSearchTerm}
-                  onChange={(e) => setLocalSearchTerm(e.target.value)}
-                  className="pl-10 w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                />
+            <div className="space-y-4">
+              {/* Row 1 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Dane bębna (cecha, faktura)..."
+                    value={localSearchTerm}
+                    onChange={(e) => setLocalSearchTerm(e.target.value)}
+                    className="pl-10 w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                </div>
+
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Dane firmy (nazwa, NIP)..."
+                    value={localCompanySearchTerm}
+                    onChange={(e) => setLocalCompanySearchTerm(e.target.value)}
+                    className="pl-10 w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                </div>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowSizesMenu(!showSizesMenu)}
+                    className="w-full flex items-center justify-between p-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 bg-white text-sm"
+                  >
+                    <div className="flex items-center">
+                      <Filter className="w-4 h-4 mr-2 text-blue-500" />
+                      <span className="truncate">Rozmiary ({selectedSizes.length > 0 ? selectedSizes.length : 'Wszystkie'})</span>
+                    </div>
+                    <ChevronLeft className={`w-4 h-4 transition-transform flex-shrink-0 ml-1 ${showSizesMenu ? '-rotate-90' : ''}`} />
+                  </button>
+                  
+                  {showSizesMenu && (
+                    <div className="absolute z-50 mt-2 w-full max-h-60 overflow-auto bg-white border border-gray-200 rounded-xl shadow-xl p-2">
+                      {availableSizes.length > 0 ? (
+                        availableSizes.map(size => (
+                          <label key={size} className="flex items-center p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedSizes.includes(size)}
+                              onChange={() => {
+                                setSelectedSizes(prev => 
+                                  prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
+                                );
+                              }}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="ml-2 text-sm font-medium text-gray-700">{size}</span>
+                          </label>
+                        ))
+                      ) : (
+                        <div className="p-2 text-sm text-gray-500 text-center">Brak rozmiarów do wyboru</div>
+                      )}
+                      {selectedSizes.length > 0 && (
+                        <button 
+                          onClick={() => setSelectedSizes([])}
+                          className="w-full mt-2 p-2 text-sm text-red-600 hover:bg-red-50 rounded-lg font-medium"
+                        >
+                          Wyczyść wybór
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="relative">
-                <Building2 className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Dane firmy (nazwa, NIP)..."
-                  value={localCompanySearchTerm}
-                  onChange={(e) => setLocalCompanySearchTerm(e.target.value)}
-                  className="pl-10 w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                />
-              </div>
-
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowSizesMenu(!showSizesMenu)}
-                  className="w-full flex items-center justify-between p-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 bg-white text-sm"
+              {/* Row 2 */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 >
-                  <div className="flex items-center">
-                    <Filter className="w-4 h-4 mr-2 text-blue-500" />
-                    <span className="truncate">Rozmiary ({selectedSizes.length > 0 ? selectedSizes.length : 'Wszystkie'})</span>
-                  </div>
-                  <ChevronLeft className={`w-4 h-4 transition-transform flex-shrink-0 ml-1 ${showSizesMenu ? '-rotate-90' : ''}`} />
-                </button>
-                
-                {showSizesMenu && (
-                  <div className="absolute z-50 mt-2 w-full max-h-60 overflow-auto bg-white border border-gray-200 rounded-xl shadow-xl p-2">
-                    {availableSizes.length > 0 ? (
-                      availableSizes.map(size => (
-                        <label key={size} className="flex items-center p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
-                          <input 
-                            type="checkbox" 
-                            checked={selectedSizes.includes(size)}
-                            onChange={() => {
-                              setSelectedSizes(prev => 
-                                prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
-                              );
-                            }}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                          <span className="ml-2 text-sm font-medium text-gray-700">{size}</span>
-                        </label>
-                      ))
-                    ) : (
-                      <div className="p-2 text-sm text-gray-500 text-center">Brak rozmiarów do wyboru</div>
-                    )}
-                    {selectedSizes.length > 0 && (
-                      <button 
-                        onClick={() => setSelectedSizes([])}
-                        className="w-full mt-2 p-2 text-sm text-red-600 hover:bg-red-50 rounded-lg font-medium"
-                      >
-                        Wyczyść wybór
-                      </button>
-                    )}
-                  </div>
-                )}
+                  <option value="all">Status: Wszystkie</option>
+                  <option value="wydane">Wydane u klientów</option>
+                  <option value="magazyn">Na magazynie</option>
+                  <option value="zagubione">Zagubione / Inne</option>
+                </select>
+
+                <select
+                  value={filterSupplierDateRange}
+                  onChange={(e) => setFilterSupplierDateRange(e.target.value)}
+                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                >
+                  <option value="all">Termin do kablowni: Wszystkie</option>
+                  <option value="active">Bez przekroczeń</option>
+                  <option value="due-soon">Zbliża się termin</option>
+                  <option value="overdue">Przeterminowane</option>
+                </select>
+
+                <select
+                  value={filterClientDateRange}
+                  onChange={(e) => setFilterClientDateRange(e.target.value)}
+                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                >
+                  <option value="all">Termin od klienta: Wszystkie</option>
+                  <option value="active">Bez przekroczeń</option>
+                  <option value="due-soon">Zbliża się termin</option>
+                  <option value="overdue">Przeterminowane</option>
+                  <option value="extended">Przedłużone terminy</option>
+                </select>
+
+                <select
+                  value={filterPaymentStatus}
+                  onChange={(e) => setFilterPaymentStatus(e.target.value)}
+                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                >
+                  <option value="all">Płatność: Wszystkie</option>
+                  <option value="paid">Opłacone</option>
+                  <option value="unpaid">Nieopłacone</option>
+                  <option value="no_invoice">Brak faktury</option>
+                  <option value="overdue_payment">Zaległe po terminie</option>
+                </select>
               </div>
-
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">Wszystkie stany magazynowe</option>
-                <option value="wydane">Wydane u klientów</option>
-                <option value="magazyn">Na magazynie</option>
-                <option value="zagubione">Zagubione / Inne</option>
-              </select>
-
-              <select
-                value={filterDateRange}
-                onChange={(e) => setFilterDateRange(e.target.value)}
-                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">Wszystkie terminy</option>
-                <option value="active">Bez przekroczeń (Aktywne)</option>
-                <option value="due-soon">Zbliża się termin</option>
-                <option value="overdue">Przeterminowane</option>
-                <option value="extended">Przedłużone terminy</option>
-              </select>
-
-              <select
-                value={filterPaymentStatus}
-                onChange={(e) => setFilterPaymentStatus(e.target.value)}
-                className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">Wszystkie płatności</option>
-                <option value="paid">Opłacone (Tak)</option>
-                <option value="unpaid">Nieopłacone (Nie)</option>
-                <option value="no_invoice">Brak faktury</option>
-                <option value="overdue_payment">Zaległe po terminie</option>
-              </select>
             </div>
           </div>
         </div>

@@ -433,12 +433,13 @@ export const drumsAPI = {
         search = '',
         companySearch = '',
         status = 'all',
-        dateRange = 'all',
+        supplierDateRange = 'all',
+        clientDateRange = 'all',
         paymentStatus = 'all',
         selectedSizes = []
       } = options;
 
-      console.log(`🔄 getDrums wywołane z: nip=${nip}, page=${page}, search="${search}", companySearch="${companySearch}", status=${status}, date=${dateRange}, paymentStatus=${paymentStatus}`);
+      console.log(`🔄 getDrums wywołane z: nip=${nip}, page=${page}, search="${search}", companySearch="${companySearch}", status=${status}, supplierDateRange=${supplierDateRange}, clientDateRange=${clientDateRange}, paymentStatus=${paymentStatus}`);
 
       // Podstawowe zapytanie
       let query = supabase
@@ -501,9 +502,30 @@ export const drumsAPI = {
         }
       }
 
-      // 2. Filtrowanie po Terminie (dateRange)
-      if (dateRange !== 'all') {
-        if (dateRange === 'extended') {
+      // 2. Filtrowanie po Terminie Kablowni (supplierDateRange)
+      if (supplierDateRange !== 'all') {
+        query = query.neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%');
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayStr = today.toISOString().split('T')[0];
+
+        const nextWeek = new Date(today);
+        nextWeek.setDate(today.getDate() + 7);
+        const nextWeekStr = nextWeek.toISOString().split('T')[0];
+
+        if (supplierDateRange === 'overdue') {
+          query = query.lt('data_zwrotu_do_dostawcy', todayStr);
+        } else if (supplierDateRange === 'due-soon') {
+          query = query.gte('data_zwrotu_do_dostawcy', todayStr).lte('data_zwrotu_do_dostawcy', nextWeekStr);
+        } else if (supplierDateRange === 'active') {
+          query = query.or(`data_zwrotu_do_dostawcy.gt.${nextWeekStr},data_zwrotu_do_dostawcy.is.null`);
+        }
+      }
+
+      // 3. Filtrowanie po Terminie Klienta (clientDateRange)
+      if (clientDateRange !== 'all') {
+        if (clientDateRange === 'extended') {
           const { data: extData, error: extError } = await supabase
             .from('custom_drum_deadlines')
             .select('kod_bebna');
@@ -512,46 +534,29 @@ export const drumsAPI = {
             const cechas = extData.map(e => e.kod_bebna);
             query = query.in('cecha', cechas);
           } else {
-            // Brak bębnów o przedłużonym terminie - zwracamy puste wyniki paginacji
-            return {
-              data: [],
-              pagination: {
-                page,
-                limit,
-                total: 0,
-                totalPages: 0,
-                hasNext: false,
-                hasPrev: false
-              },
-              meta: {
-                sortBy,
-                sortOrder,
-                search,
-                status,
-                dateRange,
-                nip
-              }
-            };
+            return { data: [], pagination: { page, limit, total: 0, totalPages: 0, hasNext: false, hasPrev: false }, meta: { sortBy, sortOrder, search, status, supplierDateRange, clientDateRange, nip } };
           }
         } else {
-          // Tylko dla bębnów 'wydanych' ma sens filtr terminu w głównej mierze
           query = query.neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%');
-
+          
           const today = new Date();
           today.setHours(0, 0, 0, 0);
-          const todayStr = today.toISOString().split('T')[0];
+          
+          // Uproszczone zapytanie dla DB bazujące na domyślnym 120 dni. Dokładne terminy klienta są liczone w JS.
+          const thresholdOverdue = new Date(today);
+          thresholdOverdue.setDate(thresholdOverdue.getDate() - 120);
+          const thresholdOverdueStr = thresholdOverdue.toISOString().split('T')[0];
 
-          const nextWeek = new Date(today);
-          nextWeek.setDate(today.getDate() + 7);
-          const nextWeekStr = nextWeek.toISOString().split('T')[0];
+          const thresholdDueSoon = new Date(today);
+          thresholdDueSoon.setDate(thresholdDueSoon.getDate() - 120 + 7);
+          const thresholdDueSoonStr = thresholdDueSoon.toISOString().split('T')[0];
 
-          if (dateRange === 'overdue') {
-            query = query.lt('data_zwrotu_do_dostawcy', todayStr);
-          } else if (dateRange === 'due-soon') {
-            query = query.gte('data_zwrotu_do_dostawcy', todayStr).lte('data_zwrotu_do_dostawcy', nextWeekStr);
-          } else if (dateRange === 'active') {
-            // Aktywne = data zwrotu jest > za tydzień LUB jest to bęben własny (brak daty zwrotu)
-            query = query.or(`data_zwrotu_do_dostawcy.gt.${nextWeekStr},data_zwrotu_do_dostawcy.is.null`);
+          if (clientDateRange === 'overdue') {
+            query = query.lt('data_wydania', thresholdOverdueStr);
+          } else if (clientDateRange === 'due-soon') {
+            query = query.gte('data_wydania', thresholdOverdueStr).lte('data_wydania', thresholdDueSoonStr);
+          } else if (clientDateRange === 'active') {
+            query = query.gt('data_wydania', thresholdDueSoonStr);
           }
         }
       }
