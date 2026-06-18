@@ -31,6 +31,19 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
   const priceRaw = parsePriceRaw(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
   const clientPrice = priceRaw > 0 ? priceRaw * 1.2 : null;
 
+  const parsePaymentDate = (dateStr) => {
+    if (!dateStr) return null;
+    const parts = dateStr.split('.');
+    if (parts.length === 3) {
+      return new Date(parts[2], parts[1] - 1, parts[0]);
+    }
+    return new Date(dateStr);
+  };
+  const paymentDeadline = parsePaymentDate(drum.termin_platnosci);
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  const isUnpaidOverdue = drum.czy_zaplacona === 'Nie' && paymentDeadline && paymentDeadline < now;
+
   const handleSaveNote = async (e) => {
     e.stopPropagation();
     setIsSaving(true);
@@ -52,11 +65,11 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
     >
       <div 
         className="w-full transition-transform duration-500 ease-in-out"
-        style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)', minHeight: '450px' }}
+        style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)', minHeight: '480px' }}
       >
         {/* FRONT */}
         <div 
-          className={`absolute inset-0 w-full bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl cursor-pointer hover:border-blue-300 ${drum.borderColor || 'border-gray-200'}`}
+          className={`absolute inset-0 w-full bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl cursor-pointer hover:border-blue-300 ${isUnpaidOverdue ? 'border-red-300 shadow-red-100' : (drum.borderColor || 'border-gray-200')}`}
           style={{ backfaceVisibility: 'hidden' }}
           onClick={() => setIsFlipped(true)}
         >
@@ -170,6 +183,16 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
                 {drum.ilosc_kabla ? `${drum.ilosc_kabla} m` : 'Brak informacji'}
               </span>
             </div>
+
+            {isUnpaidOverdue && (
+              <div className="flex justify-between items-center bg-red-50 p-2.5 rounded-xl border border-red-200 mt-1">
+                <span className="text-xs font-bold text-red-600 flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4" />
+                  Niezapłacona faktura
+                </span>
+                <span className="text-xs font-bold text-red-700">Po terminie płatności</span>
+              </div>
+            )}
 
             <div className="flex justify-between items-center mt-1 pt-1 border-t border-gray-50">
               <span className="text-sm text-gray-500">Status</span>

@@ -102,11 +102,23 @@ const Dashboard = ({ user, profile }) => {
         const overdueCount = mappedDrums.filter(d => d.status === 'overdue').length;
         const reportedCount = mappedDrums.filter(d => d.status === 'reported').length;
         
+        // Helper do parsowania daty płatności
+        const parsePaymentDate = (dateStr) => {
+          if (!dateStr) return null;
+          const parts = dateStr.split('.');
+          if (parts.length === 3) {
+            return new Date(parts[2], parts[1] - 1, parts[0]);
+          }
+          return new Date(dateStr);
+        };
+
         // Obliczenia Finansowe na podstawie ceny netto + 20% marży
         let totalVal = 0;
         let activeVal = 0;
         let overdueVal = 0;
         let lostValTotal = 0;
+        let overduePaymentVal = 0;
+
         mappedDrums.forEach(drum => {
           const priceRaw = parsePriceRaw(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
           if (priceRaw > 0) {
@@ -133,6 +145,16 @@ const Dashboard = ({ user, profile }) => {
 
             const lostPercent = 100 - returnPercentage;
             lostValTotal += clientPrice * (lostPercent / 100);
+            
+            // Niezapłacone i po terminie
+            if (drum.czy_zaplacona === 'Nie' && drum.termin_platnosci) {
+              const paymentDeadline = parsePaymentDate(drum.termin_platnosci);
+              const now = new Date();
+              now.setHours(0,0,0,0);
+              if (paymentDeadline && paymentDeadline < now) {
+                overduePaymentVal += (priceRaw * 1.2 * 1.23); // Marża 20% + VAT 23%
+              }
+            }
           }
         });
 
@@ -150,7 +172,8 @@ const Dashboard = ({ user, profile }) => {
           totalValue: totalVal,
           activeValue: activeVal,
           overdueValue: overdueVal,
-          lostValue: lostValTotal
+          lostValue: lostValTotal,
+          overduePaymentValue: overduePaymentVal
         });
 
         // 3. Oblicz procentowy podział dla wykresu
@@ -501,41 +524,53 @@ const Dashboard = ({ user, profile }) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {/* Active Value */}
-            <div className="bg-white/60 backdrop-blur-md rounded-2xl p-5 border border-blue-100/80 hover:border-emerald-300 hover:shadow-md transition-all duration-300 group">
+            <div className="bg-white/60 backdrop-blur-md rounded-2xl p-5 border border-blue-100/80 hover:border-emerald-300 hover:shadow-md transition-all duration-300 group flex flex-col">
               <div className="flex justify-between items-start mb-3">
                 <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider block">W terminie (Pełny zwrot)</span>
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-extrabold uppercase">100% zwrotu</span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-extrabold uppercase whitespace-nowrap ml-2">100% zwrotu</span>
               </div>
               <p className="text-2xl font-black text-emerald-900 group-hover:text-emerald-700 transition-colors duration-200">
                 {financialStats.activeValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
               </p>
-              <p className="text-xs text-slate-500 mt-2">Bębny z aktywnym terminem, bezpieczne do zwrotu.</p>
+              <p className="text-xs text-slate-500 mt-auto pt-2">Bębny z aktywnym terminem, bezpieczne do zwrotu.</p>
             </div>
 
             {/* Overdue Value */}
-            <div className="bg-white/60 backdrop-blur-md rounded-2xl p-5 border border-blue-100/80 hover:border-amber-300 hover:shadow-md transition-all duration-300 group">
+            <div className="bg-white/60 backdrop-blur-md rounded-2xl p-5 border border-blue-100/80 hover:border-amber-300 hover:shadow-md transition-all duration-300 group flex flex-col">
               <div className="flex justify-between items-start mb-3">
-                <span className="text-xs font-bold text-amber-700 uppercase tracking-wider block">Przeterminowane</span>
-                <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-extrabold uppercase">Zmniejszony zwrot</span>
+                <span className="text-xs font-bold text-amber-700 uppercase tracking-wider block">Przeterminowane zwroty</span>
+                <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-extrabold uppercase whitespace-nowrap ml-2">Zmniejszony zwrot</span>
               </div>
               <p className="text-2xl font-black text-amber-900 group-hover:text-amber-700 transition-colors duration-200">
                 {financialStats.overdueValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
               </p>
-              <p className="text-xs text-slate-500 mt-2">Bębny po terminie możliwe do zwrotu za zmniejszoną wartość.</p>
+              <p className="text-xs text-slate-500 mt-auto pt-2">Bębny po terminie możliwe do zwrotu za zmniejszoną wartość.</p>
             </div>
 
             {/* Lost Value */}
-            <div className="bg-white/60 backdrop-blur-md rounded-2xl p-5 border border-blue-100/80 hover:border-rose-300 hover:shadow-md transition-all duration-300 group">
+            <div className="bg-white/60 backdrop-blur-md rounded-2xl p-5 border border-blue-100/80 hover:border-rose-300 hover:shadow-md transition-all duration-300 group flex flex-col">
               <div className="flex justify-between items-start mb-3">
                 <span className="text-xs font-bold text-rose-700 uppercase tracking-wider block">Utracona kaucja (Strata)</span>
-                <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-extrabold uppercase">Bezpowrotne</span>
+                <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded font-extrabold uppercase whitespace-nowrap ml-2">Bezpowrotne</span>
               </div>
               <p className="text-2xl font-black text-rose-700 group-hover:text-rose-600 transition-colors duration-200">
                 {financialStats.lostValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
               </p>
-              <p className="text-xs text-slate-500 mt-2">Kwota utracona w związku z przekroczonymi terminami zwrotów.</p>
+              <p className="text-xs text-slate-500 mt-auto pt-2">Kwota utracona w związku z przekroczonymi terminami zwrotów.</p>
+            </div>
+
+            {/* Unpaid Overdue Value */}
+            <div className="bg-white/60 backdrop-blur-md rounded-2xl p-5 border border-blue-100/80 hover:border-red-300 hover:shadow-md transition-all duration-300 group flex flex-col">
+              <div className="flex justify-between items-start mb-3">
+                <span className="text-xs font-bold text-red-700 uppercase tracking-wider block">Niezapłacone faktury</span>
+                <span className="text-[10px] bg-red-100 text-red-800 px-2 py-0.5 rounded font-extrabold uppercase whitespace-nowrap ml-2">Do zapłaty</span>
+              </div>
+              <p className="text-2xl font-black text-red-700 group-hover:text-red-600 transition-colors duration-200">
+                {financialStats.overduePaymentValue?.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0,00'} PLN
+              </p>
+              <p className="text-xs text-slate-500 mt-auto pt-2">Niezapłacone bębny po terminie płatności (z VAT i marżą).</p>
             </div>
           </div>
         </div>
