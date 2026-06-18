@@ -296,6 +296,22 @@ export const drumsAPI = {
     }
   },
 
+  /**
+   * Pobiera unikalną listę wszystkich rozmiarów bębnów.
+   */
+  async getAllDrumSizes() {
+    try {
+      const { data, error } = await supabase
+        .from('drums')
+        .select('rozmiar_bebna');
+      if (error) throw error;
+      return [...new Set(data.map(d => d.rozmiar_bebna).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+    } catch (error) {
+      console.error('Błąd pobierania rozmiarów:', error);
+      return [];
+    }
+  },
+
   async getWarehouseDrumMagazyny() {
     try {
       const { data, error } = await supabase
@@ -415,12 +431,14 @@ export const drumsAPI = {
         sortBy = 'cecha',
         sortOrder = 'asc',
         search = '',
+        companySearch = '',
         status = 'all',
         dateRange = 'all',
-        paymentStatus = 'all'
+        paymentStatus = 'all',
+        selectedSizes = []
       } = options;
 
-      console.log(`🔄 getDrums wywołane z: nip=${nip}, page=${page}, search="${search}", status=${status}, date=${dateRange}, paymentStatus=${paymentStatus}`);
+      console.log(`🔄 getDrums wywołane z: nip=${nip}, page=${page}, search="${search}", companySearch="${companySearch}", status=${status}, date=${dateRange}, paymentStatus=${paymentStatus}`);
 
       // Podstawowe zapytanie
       let query = supabase
@@ -560,11 +578,22 @@ export const drumsAPI = {
         }
       }
 
-      // Filtrowanie po wyszukiwaniu - PRIORYTET DLA CECHY
+      // Filtrowanie po wyszukiwaniu - dane bębna
       if (search) {
         // PostgREST `ilike` z `or`: bezpieczniej przekazać surowy search, Supabase zepnie go przez URL encoding 
         const safeSearch = `%${search}%`;
-        query = query.or(`cecha.ilike.${safeSearch},kod_bebna.ilike.${safeSearch},nazwa.ilike.${safeSearch},pelna_nazwa_kontrahenta.ilike.${safeSearch},adres_dostawy.ilike.${safeSearch},nazwa_punktu_dostawy.ilike.${safeSearch},numer_faktury.ilike.${safeSearch},kon_dostawca.ilike.${safeSearch}`);
+        query = query.or(`cecha.ilike.${safeSearch},kod_bebna.ilike.${safeSearch},nazwa.ilike.${safeSearch},adres_dostawy.ilike.${safeSearch},nazwa_punktu_dostawy.ilike.${safeSearch},numer_faktury.ilike.${safeSearch},kon_dostawca.ilike.${safeSearch}`);
+      }
+
+      // Filtrowanie po wyszukiwaniu - dane firmy
+      if (companySearch) {
+        const safeSearch = `%${companySearch}%`;
+        query = query.or(`pelna_nazwa_kontrahenta.ilike.${safeSearch},nip.ilike.${safeSearch}`);
+      }
+
+      // Filtrowanie po rozmiarach
+      if (selectedSizes && selectedSizes.length > 0) {
+        query = query.in('rozmiar_bebna', selectedSizes);
       }
 
       // Sortowanie

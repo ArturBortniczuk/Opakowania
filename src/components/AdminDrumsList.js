@@ -45,9 +45,15 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
   const initialSearch = urlSearchTerm || initialFilter.searchTerm || '';
 
   const [searchTerm, setSearchTerm] = useState(initialSearch);
-  const [localSearchTerm, setLocalSearchTerm] = useState(initialSearch); // DODANE: Lokalny stan dla inputa
+  const [localSearchTerm, setLocalSearchTerm] = useState(initialSearch);
+  const [companySearchTerm, setCompanySearchTerm] = useState('');
+  const [localCompanySearchTerm, setLocalCompanySearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('cecha');
   const [sortOrder, setSortOrder] = useState('asc');
+
+  const [availableSizes, setAvailableSizes] = useState([]);
+  const [selectedSizes, setSelectedSizes] = useState([]);
+  const [showSizesMenu, setShowSizesMenu] = useState(false);
   
   const initialStatus = urlFilterStatus || 'all';
   const [filterStatus, setFilterStatus] = useState(initialStatus);
@@ -91,9 +97,11 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         sortBy,
         sortOrder,
         search: searchTerm,
+        companySearch: companySearchTerm,
         status: filterStatus,
         dateRange: filterDateRange,
         paymentStatus: filterPaymentStatus,
+        selectedSizes,
         ...options
       };
 
@@ -112,21 +120,30 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     } finally {
       setLoading(false);
     }
-  }, [sortBy, sortOrder, searchTerm, filterStatus, filterDateRange, filterPaymentStatus]);
+  }, [sortBy, sortOrder, searchTerm, companySearchTerm, filterStatus, filterDateRange, filterPaymentStatus, selectedSizes]);
 
 
   // DODANE: Debounce dla wyszukiwania
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchTerm(localSearchTerm);
+      setCompanySearchTerm(localCompanySearchTerm);
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [localSearchTerm]);
+  }, [localSearchTerm, localCompanySearchTerm]);
+
+  useEffect(() => {
+    const fetchSizes = async () => {
+      const sizes = await drumsAPI.getAllDrumSizes();
+      setAvailableSizes(sizes);
+    };
+    fetchSizes();
+  }, []);
 
   useEffect(() => {
     fetchDrums({ page: 1 }); // Resetuj do pierwszej strony przy zmianie filtrów
-  }, [sortBy, sortOrder, searchTerm, filterStatus, filterDateRange, filterPaymentStatus]);
+  }, [sortBy, sortOrder, searchTerm, companySearchTerm, filterStatus, filterDateRange, filterPaymentStatus, selectedSizes]);
   useEffect(() => {
     if (initialFilter && initialFilter.status) {
       setFilterStatus(initialFilter.status);
@@ -731,8 +748,10 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         sortBy,
         sortOrder,
         search: searchTerm,
+        companySearch: companySearchTerm,
         status: filterStatus,
-        dateRange: filterDateRange
+        dateRange: filterDateRange,
+        selectedSizes
       });
 
       if (!result.data || result.data.length === 0) {
@@ -884,17 +903,74 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
           </div>
 
           {/* Search and Filters */}
-          <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 mb-6 relative z-40">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Szukaj po kodzie, ceche, dostawcy, fakturze lub adresie..."
+                  placeholder="Dane bębna (cecha, faktura)..."
                   value={localSearchTerm}
                   onChange={(e) => setLocalSearchTerm(e.target.value)}
-                  className="pl-10 w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="pl-10 w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                 />
+              </div>
+
+              <div className="relative">
+                <Building2 className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Dane firmy (nazwa, NIP)..."
+                  value={localCompanySearchTerm}
+                  onChange={(e) => setLocalCompanySearchTerm(e.target.value)}
+                  className="pl-10 w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+              </div>
+
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowSizesMenu(!showSizesMenu)}
+                  className="w-full flex items-center justify-between p-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 bg-white text-sm"
+                >
+                  <div className="flex items-center">
+                    <Filter className="w-4 h-4 mr-2 text-blue-500" />
+                    <span className="truncate">Rozmiary ({selectedSizes.length > 0 ? selectedSizes.length : 'Wszystkie'})</span>
+                  </div>
+                  <ChevronLeft className={`w-4 h-4 transition-transform flex-shrink-0 ml-1 ${showSizesMenu ? '-rotate-90' : ''}`} />
+                </button>
+                
+                {showSizesMenu && (
+                  <div className="absolute z-50 mt-2 w-full max-h-60 overflow-auto bg-white border border-gray-200 rounded-xl shadow-xl p-2">
+                    {availableSizes.length > 0 ? (
+                      availableSizes.map(size => (
+                        <label key={size} className="flex items-center p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedSizes.includes(size)}
+                            onChange={() => {
+                              setSelectedSizes(prev => 
+                                prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
+                              );
+                            }}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="ml-2 text-sm font-medium text-gray-700">{size}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <div className="p-2 text-sm text-gray-500 text-center">Brak rozmiarów do wyboru</div>
+                    )}
+                    {selectedSizes.length > 0 && (
+                      <button 
+                        onClick={() => setSelectedSizes([])}
+                        className="w-full mt-2 p-2 text-sm text-red-600 hover:bg-red-50 rounded-lg font-medium"
+                      >
+                        Wyczyść wybór
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               <select
