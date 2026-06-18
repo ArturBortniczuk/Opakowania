@@ -541,14 +541,29 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
       }
     }
 
-    // 3. Filtr terminu (Date Range)
-    if (filterDateRange !== 'all') {
-      if (filterDateRange === 'extended') {
+    // 3. Filtry terminu
+    if (filterClientDateRange !== 'all') {
+      if (filterClientDateRange === 'extended') {
         filtered = filtered.filter(d => d.isExtended);
       } else {
-        // 'active', 'due-soon', 'overdue' pokrywa się z polem status
-        filtered = filtered.filter(d => d.status === filterDateRange);
+        filtered = filtered.filter(d => d.status === filterClientDateRange);
       }
+    }
+
+    if (filterSupplierDateRange !== 'all') {
+        const dzisiaj = new Date();
+        dzisiaj.setHours(0, 0, 0, 0);
+        const zaTydzien = new Date(dzisiaj);
+        zaTydzien.setDate(zaTydzien.getDate() + 7);
+        
+        filtered = filtered.filter(d => {
+            if (!d.data_zwrotu_do_dostawcy) return filterSupplierDateRange === 'active';
+            const supplierDate = new Date(d.data_zwrotu_do_dostawcy);
+            if (filterSupplierDateRange === 'overdue') return supplierDate < dzisiaj;
+            if (filterSupplierDateRange === 'due-soon') return supplierDate >= dzisiaj && supplierDate <= zaTydzien;
+            if (filterSupplierDateRange === 'active') return supplierDate > zaTydzien;
+            return true;
+        });
     }
 
     setDynamicStats({
@@ -558,7 +573,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
       active: filtered.filter(d => d.status === 'active').length,
       extended: filtered.filter(d => d.isExtended).length
     });
-  }, [allAdminDrums, searchTerm, filterStatus, filterDateRange]);
+  }, [allAdminDrums, searchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange]);
 
   const stats = dynamicStats;
 
@@ -752,7 +767,8 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         search: searchTerm,
         companySearch: companySearchTerm,
         status: filterStatus,
-        dateRange: filterDateRange,
+        supplierDateRange: filterSupplierDateRange,
+        clientDateRange: filterClientDateRange,
         selectedSizes
       });
 

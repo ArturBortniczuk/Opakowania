@@ -783,7 +783,8 @@ export const drumsAPI = {
           sortOrder,
           search,
           status,
-          dateRange,
+          supplierDateRange,
+          clientDateRange,
           nip
         }
       };
