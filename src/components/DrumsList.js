@@ -156,6 +156,21 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
                 ) : 'Brak adresu'}
               </div>
             </div>
+
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Kabel na bębnie</span>
+              <span className="text-sm font-medium text-gray-900 truncate max-w-[150px]" title={drum.nawiniety_kabel || 'Brak informacji'}>
+                {drum.nawiniety_kabel || 'Brak informacji'}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Ilość kabla</span>
+              <span className="text-sm font-medium text-gray-900">
+                {drum.ilosc_kabla ? `${drum.ilosc_kabla} m` : 'Brak informacji'}
+              </span>
+            </div>
+
             <div className="flex justify-between items-center mt-1 pt-1 border-t border-gray-50">
               <span className="text-sm text-gray-500">Status</span>
               <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.bgColor ? drum.bgColor + ' ' : ''}${drum.color || 'bg-gray-100 text-gray-600'}`}>
