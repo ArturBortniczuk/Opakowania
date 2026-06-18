@@ -284,12 +284,31 @@ export const drumsAPI = {
    */
   async getWarehouseDrumSizes() {
     try {
-      const { data, error } = await supabase
-        .from('drums')
-        .select('rozmiar_bebna')
-        .in('status', ['pusty na magazynie', 'na magazynie z towarem']);
-      if (error) throw error;
-      return [...new Set(data.map(d => d.rozmiar_bebna).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      const allSizes = new Set();
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('drums')
+          .select('rozmiar_bebna')
+          .in('status', ['pusty na magazynie', 'na magazynie z towarem'])
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          data.forEach(d => {
+            if (d.rozmiar_bebna) allSizes.add(d.rozmiar_bebna);
+          });
+          if (data.length < pageSize) hasMore = false;
+        } else {
+          hasMore = false;
+        }
+        page++;
+      }
+      return [...allSizes].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
     } catch (error) {
       console.error('Błąd pobierania rozmiarów:', error);
       return [];
@@ -301,11 +320,30 @@ export const drumsAPI = {
    */
   async getAllDrumSizes() {
     try {
-      const { data, error } = await supabase
-        .from('drums')
-        .select('rozmiar_bebna');
-      if (error) throw error;
-      return [...new Set(data.map(d => d.rozmiar_bebna).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+      const allSizes = new Set();
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('drums')
+          .select('rozmiar_bebna')
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          data.forEach(d => {
+            if (d.rozmiar_bebna) allSizes.add(d.rozmiar_bebna);
+          });
+          if (data.length < pageSize) hasMore = false;
+        } else {
+          hasMore = false;
+        }
+        page++;
+      }
+      return [...allSizes].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
     } catch (error) {
       console.error('Błąd pobierania rozmiarów:', error);
       return [];
