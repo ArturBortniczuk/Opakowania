@@ -65,7 +65,7 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
     >
       <div 
         className="w-full transition-transform duration-500 ease-in-out"
-        style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)', minHeight: '480px' }}
+        style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)', minHeight: '520px' }}
       >
         {/* FRONT */}
         <div 
@@ -181,6 +181,20 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
               <span className="text-sm text-gray-500">Ilość kabla</span>
               <span className="text-sm font-medium text-gray-900">
                 {drum.ilosc_kabla ? `${drum.ilosc_kabla} m` : 'Brak informacji'}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Opłacony?</span>
+              <span className={`text-sm font-bold ${drum.czy_zaplacona === 'Tak' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {drum.czy_zaplacona || 'Nie'}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Termin płatności</span>
+              <span className="text-sm font-medium text-gray-900">
+                {drum.termin_platnosci || 'Brak'}
               </span>
             </div>
 
@@ -418,6 +432,16 @@ const DrumsList = ({ user }) => {
       // 2b. Filtrowanie po Rozmiarze
       if (filterSize.length > 0) {
         filtered = filtered.filter(d => filterSize.includes(d.rozmiar_bebna));
+      }
+
+      // 2c. Filtrowanie po płatności
+      if (filterPayment.length > 0) {
+        filtered = filtered.filter(d => {
+          const isPaid = d.czy_zaplacona === 'Tak';
+          if (filterPayment.includes('Tak') && isPaid) return true;
+          if (filterPayment.includes('Nie') && !isPaid) return true;
+          return false;
+        });
       }
 
       // 3. Sortowanie
