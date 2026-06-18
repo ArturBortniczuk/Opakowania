@@ -445,7 +445,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Wartość wszystkich bębnów */}
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 border border-blue-100/80 shadow-sm hover:shadow-md transition-all duration-300 flex items-start space-x-4">
               <div className="p-3 bg-blue-100 text-blue-700 rounded-xl">
