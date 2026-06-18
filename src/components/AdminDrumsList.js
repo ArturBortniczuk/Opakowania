@@ -513,6 +513,10 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
 
     let filtered = allAdminDrums;
 
+    if (urlClientNip) {
+      filtered = filtered.filter(d => d.nip === urlClientNip);
+    }
+
     // 1. Wyszukiwanie (Search)
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -523,8 +527,29 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         (d.pelna_nazwa_kontrahenta || d.company || '').toLowerCase().includes(term) ||
         (d.adres_dostawy || '').toLowerCase().includes(term) ||
         (d.nazwa_punktu_dostawy || '').toLowerCase().includes(term) ||
-        (d.numer_faktury || '').toLowerCase().includes(term)
+        (d.numer_faktury || '').toLowerCase().includes(term) ||
+        (d.nip || '').toLowerCase().includes(term)
       );
+    }
+
+    if (companySearchTerm) {
+      const cTerm = companySearchTerm.toLowerCase();
+      filtered = filtered.filter(d =>
+        (d.pelna_nazwa_kontrahenta || d.company || '').toLowerCase().includes(cTerm) ||
+        (d.nip || '').toLowerCase().includes(cTerm)
+      );
+    }
+
+    if (selectedSizes && selectedSizes.length > 0) {
+      filtered = filtered.filter(d => selectedSizes.includes(d.rozmiar_bebna));
+    }
+
+    if (filterPaymentStatus && filterPaymentStatus !== 'all') {
+      filtered = filtered.filter(d => {
+        if (filterPaymentStatus === 'paid') return d.czy_zaplacona === 'Tak';
+        if (filterPaymentStatus === 'unpaid') return d.czy_zaplacona === 'Nie';
+        return true;
+      });
     }
 
     // 2. Filtr stanu magazynowego (Status)
