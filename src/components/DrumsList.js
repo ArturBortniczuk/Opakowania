@@ -286,6 +286,7 @@ const DrumsList = ({ user }) => {
     return Array.isArray(initial) ? initial : (initial === 'all' ? [] : [initial]);
   });
   const [filterSize, setFilterSize] = useState([]);
+  const [filterPayment, setFilterPayment] = useState([]);
   const [availableSizes, setAvailableSizes] = useState([]);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
 
@@ -497,7 +498,7 @@ const DrumsList = ({ user }) => {
 
   useEffect(() => {
     fetchDrums();
-  }, [user?.nip, page, sortBy, sortOrder, filterStatus, filterSize]); // Debounce search term ideally
+  }, [user?.nip, page, sortBy, sortOrder, filterStatus, filterSize, filterPayment]); // Debounce search term ideally
 
   // Debounce search
   useEffect(() => {
