@@ -598,7 +598,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
       active: filtered.filter(d => d.status === 'active').length,
       extended: filtered.filter(d => d.isExtended).length
     });
-  }, [allAdminDrums, searchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange]);
+  }, [allAdminDrums, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, selectedSizes, filterPaymentStatus, urlClientNip]);
 
   const stats = dynamicStats;
 
