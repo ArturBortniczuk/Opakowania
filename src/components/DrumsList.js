@@ -65,7 +65,7 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
     >
       <div 
         className="w-full transition-transform duration-500 ease-in-out"
-        style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)', minHeight: '520px' }}
+        style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)', minHeight: '480px' }}
       >
         {/* FRONT */}
         <div 
@@ -184,20 +184,6 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
               </span>
             </div>
 
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-500">Opłacony?</span>
-              <span className={`text-sm font-bold ${drum.czy_zaplacona === 'Tak' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                {drum.czy_zaplacona || 'Nie'}
-              </span>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-500">Termin płatności</span>
-              <span className="text-sm font-medium text-gray-900">
-                {drum.termin_platnosci || 'Brak'}
-              </span>
-            </div>
-
             {isUnpaidOverdue && (
               <div className="flex justify-between items-center bg-red-50 p-2.5 rounded-xl border border-red-200 mt-1">
                 <span className="text-xs font-bold text-red-600 flex items-center gap-1.5">
@@ -278,6 +264,40 @@ const DrumsList = ({ user }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('data_zwrotu_do_dostawcy');
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [filterStatus, setFilterStatus] = useState(() => {
+    const initial = (location.state && location.state.filterStatus) || [];
+    return Array.isArray(initial) ? initial : (initial === 'all' ? [] : [initial]);
+  });
+  const [filterSize, setFilterSize] = useState([]);
+  const [availableSizes, setAvailableSizes] = useState([]);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
+
+  // Dropdown States
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef(null);
+
+  const [isSizeDropdownOpen, setIsSizeDropdownOpen] = useState(false);
+  const sizeDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target)) {
+        setIsStatusDropdownOpen(false);
+      }
+      if (sizeDropdownRef.current && !sizeDropdownRef.current.contains(event.target)) {
+        setIsSizeDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleStatusToggle = (value) => {
+    setFilterStatus(prev => {
+      const newStatus = prev.includes(value) 
         ? prev.filter(s => s !== value)
         : [...prev, value];
       setPage(1);
