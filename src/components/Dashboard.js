@@ -524,7 +524,7 @@ const Dashboard = ({ user, profile }) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Active Value */}
             <div className="bg-white/60 backdrop-blur-md rounded-2xl p-5 border border-blue-100/80 hover:border-emerald-300 hover:shadow-md transition-all duration-300 group flex flex-col">
               <div className="flex justify-between items-start mb-3">
