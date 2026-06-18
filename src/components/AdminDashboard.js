@@ -122,12 +122,13 @@ const AdminDashboard = ({ user, onNavigate }) => {
             }
 
             // Przeterminowane płatności
-            if (drum.czy_zaplacona === 'Nie' && drum.termin_platnosci) {
+            const isWarehouse = !drum.kontrahent || drum.kontrahent === 'Nie wydany' || drum.kontrahent.toLowerCase().includes('magazyn');
+            if (!isWarehouse && drum.czy_zaplacona === 'Nie' && drum.termin_platnosci) {
               const paymentDeadline = parsePaymentDate(drum.termin_platnosci);
               const now = new Date();
               now.setHours(0,0,0,0);
               if (paymentDeadline && paymentDeadline < now) {
-                overduePaymentVal += priceRaw;
+                overduePaymentVal += (priceRaw * 1.2 * 1.23); // Marża 20% + VAT 23%
               }
             }
           }
@@ -481,11 +482,11 @@ const AdminDashboard = ({ user, onNavigate }) => {
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Przeterminowane faktury</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Przeterminowane faktury (Brutto)</p>
                 <p className="text-2xl font-extrabold text-red-700">
                   {financialStats.overduePaymentValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
                 </p>
-                <p className="text-xs text-gray-500">Niezapłacone bębny po terminie</p>
+                <p className="text-xs text-gray-500">Niezapłacone bębny po terminie (z VAT i marżą)</p>
               </div>
             </div>
 
