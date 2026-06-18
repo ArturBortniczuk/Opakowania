@@ -296,6 +296,8 @@ const DrumsList = ({ user }) => {
 
   const [isSizeDropdownOpen, setIsSizeDropdownOpen] = useState(false);
   const sizeDropdownRef = useRef(null);
+  const [isPaymentDropdownOpen, setIsPaymentDropdownOpen] = useState(false);
+  const paymentDropdownRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -304,6 +306,9 @@ const DrumsList = ({ user }) => {
       }
       if (sizeDropdownRef.current && !sizeDropdownRef.current.contains(event.target)) {
         setIsSizeDropdownOpen(false);
+      }
+      if (paymentDropdownRef.current && !paymentDropdownRef.current.contains(event.target)) {
+        setIsPaymentDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -327,6 +332,16 @@ const DrumsList = ({ user }) => {
         : [...prev, value];
       setPage(1);
       return newSize;
+    });
+  };
+
+  const handlePaymentToggle = (value) => {
+    setFilterPayment(prev => {
+      const newPayment = prev.includes(value) 
+        ? prev.filter(s => s !== value)
+        : [...prev, value];
+      setPage(1);
+      return newPayment;
     });
   };
 
