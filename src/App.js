@@ -34,8 +34,12 @@ const ProtectedRoute = ({ children, currentUser, isUserStaff, adminOnly = false,
   if (adminOnly && !isUserStaff) {
     return <Navigate to="/dashboard" replace />;
   }
-  if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
-    return <Navigate to={isUserStaff ? "/admin" : "/dashboard"} replace />;
+  if (allowedRoles && currentUser.role) {
+    const roleLower = currentUser.role.toLowerCase();
+    const hasRole = allowedRoles.some(r => r.toLowerCase() === roleLower);
+    if (!hasRole) {
+      return <Navigate to={isUserStaff ? "/admin" : "/dashboard"} replace />;
+    }
   }
   return children;
 };
@@ -416,7 +420,7 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/admin/clients" element={
-                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista']}>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista', 'Wsparcie']}>
                   <AdminClientsList
                     user={currentUser}
                     onNavigate={(page, state) => {
@@ -454,7 +458,7 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/admin/drums" element={
-                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista', 'Magazyn']}>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista', 'Magazyn', 'Wsparcie']}>
                   <AdminDrumsList user={currentUser} />
                 </ProtectedRoute>
               } />
@@ -464,7 +468,7 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/admin/returns" element={
-                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista', 'Magazyn']}>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista', 'Magazyn', 'Wsparcie']}>
                   <AdminReturnRequests user={currentUser} />
                 </ProtectedRoute>
               } />
@@ -474,7 +478,7 @@ const App = () => {
                 </ProtectedRoute>
               } />
               <Route path="/admin/reports" element={
-                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista']}>
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista', 'Wsparcie']}>
                   <AdminReports user={currentUser} />
                 </ProtectedRoute>
               } />
