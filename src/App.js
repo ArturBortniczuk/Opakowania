@@ -63,6 +63,12 @@ const App = () => {
     let isMounted = true;
     let subscription = null;
 
+    // Przechwytujemy obecność parametrów recovery/code natychmiast przy montowaniu,
+    // zanim Supabase client zdąży je wyczyścić z paska adresu.
+    const isRecoveryInUrl = window.location.href.includes('type=recovery') || 
+                            window.location.search.includes('code=') || 
+                            window.location.hash.includes('type=recovery');
+
     const initializeAuth = async () => {
       try {
         console.log("🔄 Inicjalizacja autoryzacji...");
@@ -104,8 +110,10 @@ const App = () => {
             setCurrentProfile(JSON.parse(savedProfile));
           }
 
-          if (location.pathname === '/') {
+           if (location.pathname === '/' && !isRecoveryInUrl) {
             navigate(isStaff(profile.role) ? '/admin' : '/dashboard', { replace: true });
+          } else if (location.pathname === '/' && isRecoveryInUrl) {
+            navigate('/set-password', { replace: true });
           }
         } else {
           // Fallback: jeśli Supabase nie odpowiada, ale mamy lokalnego użytkownika z poprzedniej sesji
@@ -205,10 +213,10 @@ const App = () => {
                       localStorage.setItem('currentUser', JSON.stringify(finalUser));
                       
                       // Jeśli to logowanie z linku resetującego hasło, nie przekierowuj na dashboard!
-                      if (location.pathname === '/' && !window.location.href.includes('type=recovery') && !window.location.search.includes('code=')) {
+                      if (location.pathname === '/' && !isRecoveryInUrl) {
                         navigate(isStaff(profile.role) ? '/admin' : '/dashboard', { replace: true });
-                      } else if (location.pathname === '/' && (window.location.href.includes('type=recovery') || window.location.search.includes('code='))) {
-                        // Awaryjne przechwycenie: jeśli Supabase zrzuciło nas na '/', a w URL jest code= lub type=recovery
+                      } else if (location.pathname === '/' && isRecoveryInUrl) {
+                        // Awaryjne przechwycenie: jeśli Supabase zrzuciło nas na '/', a w URL był/jest code lub type=recovery
                         navigate('/set-password', { replace: true });
                       }
                     })
