@@ -125,7 +125,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     } finally {
       setLoading(false);
     }
-  }, [sortBy, sortOrder, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, filterPaymentStatus, selectedSizes]);
+  }, [sortBy, sortOrder, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, filterPaymentStatus, selectedSizes, filterReportedOnly, drumsData.pagination.page]);
 
 
   // DODANE: Debounce dla wyszukiwania
