@@ -18,10 +18,13 @@ import {
   ArrowDown
 } from 'lucide-react';
 
-const AdminReturnRequests = ({ initialFilter = {} }) => {
+const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const urlClientNip = searchParams.get('clientNip');
+
+  const userRole = user?.role?.toLowerCase() || '';
+  const canChangeStatus = ['admin', 'supervisor', 'magazyn'].includes(userRole);
 
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +61,10 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
   };
 
   const handleStatusChange = async (requestId, newStatus) => {
+    if (!canChangeStatus) {
+      alert('Brak uprawnień do zmiany statusu.');
+      return;
+    }
     try {
       await returnsAPI.updateReturnStatus(requestId, newStatus);
       handleRefresh();
@@ -68,6 +75,10 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
   };
 
   const handleSetInTransit = async (requestId) => {
+    if (!canChangeStatus) {
+      alert('Brak uprawnień do zmiany statusu.');
+      return;
+    }
     const date = prompt("Podaj datę transportu (RRRR-MM-DD):", new Date().toISOString().split('T')[0]);
     if (!date) return;
 
@@ -84,6 +95,10 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
   };
 
   const handleAddCorrectionNumber = async (requestId) => {
+    if (!canChangeStatus) {
+      alert('Brak uprawnień do zmiany numeru korekty.');
+      return;
+    }
     const currentReq = requests.find(r => r.id === requestId);
     const number = prompt("Podaj numer(y) korekt (oddziel przecinkami):", currentReq?.correction_number || "");
     if (number === null) return;
@@ -325,7 +340,7 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
             Szczegóły
           </button>
 
-          {request.status === 'Pending' && (
+          {request.status === 'Pending' && canChangeStatus && (
             <button
               onClick={() => handleStatusChange(request.id, 'Approved')}
               className="flex-1 bg-emerald-600 text-white py-2.5 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors text-sm"
@@ -334,7 +349,7 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
             </button>
           )}
 
-          {request.status === 'Approved' && (
+          {request.status === 'Approved' && canChangeStatus && (
             <button
               onClick={() => handleSetInTransit(request.id)}
               className="flex-1 bg-indigo-600 text-white py-2.5 px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors text-sm"
@@ -343,7 +358,7 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
             </button>
           )}
 
-          {request.status === 'InTransit' && (
+          {request.status === 'InTransit' && canChangeStatus && (
             <button
               onClick={() => handleStatusChange(request.id, 'Completed')}
               className="flex-1 bg-emerald-600 text-white py-2.5 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors text-sm"
@@ -352,7 +367,7 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
             </button>
           )}
 
-          {request.status === 'Completed' && (
+          {request.status === 'Completed' && canChangeStatus && (
             <button
               onClick={() => handleAddCorrectionNumber(request.id)}
               className={`flex-1 py-2.5 px-4 rounded-xl font-bold transition-colors text-sm border ${
@@ -609,71 +624,73 @@ const AdminReturnRequests = ({ initialFilter = {} }) => {
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-4 mt-8">
-              {selectedRequest.status === 'Pending' && (
-                <>
+            {canChangeStatus && (
+              <div className="flex flex-col sm:flex-row gap-4 mt-8">
+                {selectedRequest.status === 'Pending' && (
+                  <>
+                    <button
+                      onClick={() => {
+                        handleStatusChange(selectedRequest.id, 'Approved');
+                        handleCloseModal();
+                      }}
+                      className="flex-1 bg-emerald-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle className="w-5 h-5" />
+                      <span>Zatwierdź zgłoszenie</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleStatusChange(selectedRequest.id, 'Rejected');
+                        handleCloseModal();
+                      }}
+                      className="bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-bold hover:bg-red-50 hover:text-red-600 transition-all flex items-center justify-center gap-2"
+                    >
+                      <XCircle className="w-5 h-5" />
+                      <span>Odrzuć</span>
+                    </button>
+                  </>
+                )}
+
+                {selectedRequest.status === 'Approved' && (
                   <button
                     onClick={() => {
-                      handleStatusChange(selectedRequest.id, 'Approved');
+                      handleSetInTransit(selectedRequest.id);
+                      handleCloseModal();
+                    }}
+                    className="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Truck className="w-5 h-5" />
+                    <span>Rozpocznij transport</span>
+                  </button>
+                )}
+
+                {selectedRequest.status === 'InTransit' && (
+                  <button
+                    onClick={() => {
+                      handleStatusChange(selectedRequest.id, 'Completed');
                       handleCloseModal();
                     }}
                     className="flex-1 bg-emerald-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
                   >
                     <CheckCircle className="w-5 h-5" />
-                    <span>Zatwierdź zgłoszenie</span>
+                    <span>Zakończ transport</span>
                   </button>
+                )}
+
+                {selectedRequest.status === 'Completed' && (
                   <button
                     onClick={() => {
-                      handleStatusChange(selectedRequest.id, 'Rejected');
+                      handleAddCorrectionNumber(selectedRequest.id);
                       handleCloseModal();
                     }}
-                    className="bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-bold hover:bg-red-50 hover:text-red-600 transition-all flex items-center justify-center gap-2"
+                    className="flex-1 bg-indigo-50 text-indigo-700 py-3 px-4 rounded-xl font-bold hover:bg-indigo-100 border border-indigo-100 transition-colors flex items-center justify-center gap-2"
                   >
-                    <XCircle className="w-5 h-5" />
-                    <span>Odrzuć</span>
+                    <Edit className="w-5 h-5" />
+                    <span>{selectedRequest.correction_number ? 'Edytuj numer korekty' : 'Dodaj numer korekty'}</span>
                   </button>
-                </>
-              )}
-
-              {selectedRequest.status === 'Approved' && (
-                <button
-                  onClick={() => {
-                    handleSetInTransit(selectedRequest.id);
-                    handleCloseModal();
-                  }}
-                  className="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
-                >
-                  <Truck className="w-5 h-5" />
-                  <span>Rozpocznij transport</span>
-                </button>
-              )}
-
-              {selectedRequest.status === 'InTransit' && (
-                <button
-                  onClick={() => {
-                    handleStatusChange(selectedRequest.id, 'Completed');
-                    handleCloseModal();
-                  }}
-                  className="flex-1 bg-emerald-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
-                >
-                  <CheckCircle className="w-5 h-5" />
-                  <span>Zakończ transport</span>
-                </button>
-              )}
-
-              {selectedRequest.status === 'Completed' && (
-                <button
-                  onClick={() => {
-                    handleAddCorrectionNumber(selectedRequest.id);
-                    handleCloseModal();
-                  }}
-                  className="flex-1 bg-indigo-50 text-indigo-700 py-3 px-4 rounded-xl font-bold hover:bg-indigo-100 border border-indigo-100 transition-colors flex items-center justify-center gap-2"
-                >
-                  <Edit className="w-5 h-5" />
-                  <span>{selectedRequest.correction_number ? 'Edytuj numer korekty' : 'Dodaj numer korekty'}</span>
-                </button>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

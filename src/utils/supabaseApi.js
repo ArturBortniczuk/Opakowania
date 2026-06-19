@@ -474,15 +474,75 @@ export const drumsAPI = {
         supplierDateRange = 'all',
         clientDateRange = 'all',
         paymentStatus = 'all',
-        selectedSizes = []
+        selectedSizes = [],
+        reportedOnly = false
       } = options;
 
-      console.log(`🔄 getDrums wywołane z: nip=${nip}, page=${page}, search="${search}", companySearch="${companySearch}", status=${status}, supplierDateRange=${supplierDateRange}, clientDateRange=${clientDateRange}, paymentStatus=${paymentStatus}`);
+      console.log(`🔄 getDrums wywołane z: nip=${nip}, page=${page}, search="${search}", companySearch="${companySearch}", status=${status}, supplierDateRange=${supplierDateRange}, clientDateRange=${clientDateRange}, paymentStatus=${paymentStatus}, reportedOnly=${reportedOnly}`);
 
       // Podstawowe zapytanie
       let query = supabase
         .from('drums')
         .select(`*, companies (name, email, phone, address, custom_return_periods(return_period_days))`, { count: 'exact' });
+
+      // Filtrowanie po zgłoszonych bębnach w aktywnych zleceniach zwrotu
+      if (reportedOnly) {
+        let reqQuery = supabase
+          .from('return_requests')
+          .select('selected_drums')
+          .in('status', ['Pending', 'Approved', 'InTransit']);
+        
+        if (nip) {
+          reqQuery = reqQuery.eq('user_nip', nip);
+        }
+
+        const { data: activeRequests, error: reqError } = await reqQuery;
+        if (reqError) {
+          console.error('Błąd pobierania zgłoszeń do filtra:', reqError);
+          throw reqError;
+        }
+
+        const reportedCechas = new Set();
+        if (activeRequests) {
+          activeRequests.forEach(req => {
+            const drums = req.selected_drums;
+            if (Array.isArray(drums)) {
+              drums.forEach(d => {
+                const cecha = typeof d === 'object' ? d.cecha : d;
+                if (cecha) reportedCechas.add(cecha);
+              });
+            }
+          });
+        }
+
+        const cechaArray = Array.from(reportedCechas);
+        if (cechaArray.length === 0) {
+          // Brak zgłoszonych bębnów - zwracamy pustą listę bezpośrednio
+          return {
+            data: [],
+            pagination: {
+              page,
+              limit,
+              total: 0,
+              totalPages: 0,
+              hasNext: false,
+              hasPrev: false
+            },
+            meta: {
+              sortBy,
+              sortOrder,
+              search,
+              status,
+              supplierDateRange,
+              clientDateRange,
+              nip,
+              reportedOnly
+            }
+          };
+        }
+        
+        query = query.in('cecha', cechaArray);
+      }
 
       // Filtrowanie po NIP — używamy bezpiecznego cache, NIE localStorage
       const currentUser = _currentUserCache;

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { drumsAPI, companiesAPI, getCurrentUserFromCache } from '../utils/supabaseApi';
+import { drumsAPI, companiesAPI, returnsAPI, getCurrentUserFromCache } from '../utils/supabaseApi';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { pl } from 'date-fns/locale/pl';
@@ -60,6 +60,8 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
   const [filterSupplierDateRange, setFilterSupplierDateRange] = useState('all');
   const [filterClientDateRange, setFilterClientDateRange] = useState('all');
   const [filterPaymentStatus, setFilterPaymentStatus] = useState('all');
+  const [filterReportedOnly, setFilterReportedOnly] = useState(false);
+  const [reportedCechas, setReportedCechas] = useState(new Set());
   const [selectedDrum, setSelectedDrum] = useState(null);
   const [showDrumDetails, setShowDrumDetails] = useState(false);
 
@@ -104,6 +106,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         clientDateRange: filterClientDateRange,
         paymentStatus: filterPaymentStatus,
         selectedSizes,
+        reportedOnly: filterReportedOnly,
         ...options
       };
 
@@ -145,7 +148,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
 
   useEffect(() => {
     fetchDrums({ page: 1 }); // Resetuj do pierwszej strony przy zmianie filtrów
-  }, [sortBy, sortOrder, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, filterPaymentStatus, selectedSizes]);
+  }, [sortBy, sortOrder, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, filterPaymentStatus, selectedSizes, filterReportedOnly]);
   useEffect(() => {
     if (initialFilter && initialFilter.status) {
       setFilterStatus(initialFilter.status);
@@ -300,7 +303,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
   };
 
   const handleRefresh = async () => {
-    await fetchDrums();
+    await Promise.all([fetchDrums(), fetchStatsData()]);
   };
 
   // ZACHOWANE: Funkcja importu z twojego kodu
@@ -496,17 +499,35 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     extended: '-'
   });
 
-  useEffect(() => {
-    const fetchAllDrums = async () => {
-      try {
-        const allDrums = await drumsAPI.getAllDrums();
-        setAllAdminDrums(allDrums || []);
-      } catch (err) {
-        console.error('Error fetching all drums for stats:', err);
-      }
-    };
-    fetchAllDrums();
+  const fetchStatsData = useCallback(async () => {
+    try {
+      const [allDrums, activeReqs] = await Promise.all([
+        drumsAPI.getAllDrums(),
+        returnsAPI.getReturns()
+      ]);
+      setAllAdminDrums(allDrums || []);
+
+      const cechas = new Set();
+      activeReqs.forEach(req => {
+        if (['Pending', 'Approved', 'InTransit'].includes(req.status)) {
+          const drums = req.selected_drums;
+          if (Array.isArray(drums)) {
+            drums.forEach(d => {
+              const cecha = typeof d === 'object' ? d.cecha : d;
+              if (cecha) cechas.add(cecha);
+            });
+          }
+        }
+      });
+      setReportedCechas(cechas);
+    } catch (err) {
+      console.error('Error fetching data for stats:', err);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchStatsData();
+  }, [fetchStatsData]);
 
   useEffect(() => {
     if (!allAdminDrums || allAdminDrums.length === 0) return;
@@ -515,6 +536,10 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
 
     if (urlClientNip) {
       filtered = filtered.filter(d => d.nip === urlClientNip);
+    }
+
+    if (filterReportedOnly) {
+      filtered = filtered.filter(d => reportedCechas.has(d.cecha));
     }
 
     // 1. Wyszukiwanie (Search)
@@ -598,7 +623,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
       active: filtered.filter(d => d.status === 'active').length,
       extended: filtered.filter(d => d.isExtended).length
     });
-  }, [allAdminDrums, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, selectedSizes, filterPaymentStatus, urlClientNip]);
+  }, [allAdminDrums, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, selectedSizes, filterPaymentStatus, urlClientNip, filterReportedOnly, reportedCechas]);
 
   const stats = dynamicStats;
 
@@ -1020,7 +1045,18 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
               </div>
 
               {/* Row 2 */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="flex items-center p-3 border border-gray-300 rounded-xl bg-white hover:bg-gray-50 transition-colors text-sm">
+                  <label className="flex items-center w-full cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={filterReportedOnly}
+                      onChange={(e) => setFilterReportedOnly(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="ml-2 text-xs font-semibold text-gray-700 leading-tight">Tylko zgłoszone zwroty</span>
+                  </label>
+                </div>
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
