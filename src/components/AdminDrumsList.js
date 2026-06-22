@@ -1065,7 +1065,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
               </div>
 
               {/* Row 2 */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div className={`grid grid-cols-1 ${isSalesperson ? 'md:grid-cols-4' : 'md:grid-cols-5'} gap-4`}>
                 <div className="flex items-center p-3 border border-gray-300 rounded-xl bg-white hover:bg-gray-50 transition-colors text-sm">
                   <label className="flex items-center w-full cursor-pointer select-none">
                     <input
