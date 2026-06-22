@@ -573,6 +573,19 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
       filtered = filtered.filter(d => {
         if (filterPaymentStatus === 'paid') return d.czy_zaplacona === 'Tak';
         if (filterPaymentStatus === 'unpaid') return d.czy_zaplacona === 'Nie';
+        if (filterPaymentStatus === 'no_invoice') return d.czy_zaplacona === 'Brak faktury';
+        if (filterPaymentStatus === 'overdue_payment') {
+          if (d.czy_zaplacona !== 'Nie') return false;
+          if (!d.termin_platnosci) return false;
+          const parts = d.termin_platnosci.split('.');
+          if (parts.length === 3) {
+            const date = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return date < today;
+          }
+          return false;
+        }
         return true;
       });
     }
@@ -819,6 +832,8 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
         status: filterStatus,
         supplierDateRange: filterSupplierDateRange,
         clientDateRange: filterClientDateRange,
+        paymentStatus: filterPaymentStatus,
+        reportedOnly: filterReportedOnly,
         selectedSizes
       });
 
@@ -830,17 +845,29 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
       const exportData = result.data.map(drum => ({
         'Kod bębna / Cecha': drum.cecha || drum.kod_bebna,
         'Nazwa bębna': drum.nazwa,
-        'Firma': drum.pelna_nazwa_kontrahenta,
+        'Firma': drum.pelna_nazwa_kontrahenta || drum.company,
         'NIP': drum.nip,
-        'Status': drum.status,
-        'Data wydania': drum.data_wydania || drum.data_przyjecia_na_stan,
-        'Termin zwrotu': drum.data_zwrotu_do_dostawcy,
+        'E-mail klienta': drum.companyEmail || '',
+        'Telefon klienta': drum.companyPhone || '',
+        'Status (Terminowość)': drum.status,
+        'Stan magazynowy': drum.db_status || drum.status,
+        'Rozmiar': drum.rozmiar_bebna ? `FI ${drum.rozmiar_bebna}` : '',
+        'Dostawca': drum.kon_dostawca,
+        'Data wydania': drum.data_wydania,
+        'Data przyjęcia na stan': drum.data_przyjecia_na_stan,
+        'Termin zwrotu (klient)': drum.clientReturnDeadline,
+        'Termin zwrotu (dostawca)': drum.data_zwrotu_do_dostawcy,
+        'Przedłużony': drum.isExtended ? 'Tak' : 'Nie',
         'Dni w posiadaniu': drum.daysInPossession,
+        'Opłacony': drum.czy_zaplacona,
+        'Termin płatności': drum.termin_platnosci,
         'Cena netto': drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA,
-        'Adres dostawy': drum.adres_dostawy,
+        'Kabel na bębnie': drum.nawiniety_kabel,
+        'Ilość kabla [m]': drum.ilosc_kabla,
+        'Adres dostawy': drum.adres_dostawy || drum.nazwa_punktu_dostawy,
+        'Dokument PZ': drum.nr_dokumentupz,
         'Numer faktury': drum.numer_faktury,
-        'Notatka': drum.clientNote || '',
-        'Przedłużony': drum.isExtended ? 'Tak' : 'Nie'
+        'Notatka': drum.clientNote || ''
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);

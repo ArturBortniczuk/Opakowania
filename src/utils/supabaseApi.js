@@ -550,8 +550,8 @@ export const drumsAPI = {
 
       if (nip) {
         query = query.eq('nip', nip);
-        // Ukryj bębny, które zostały już zwrócone (status kontrahenta: 'Nie wydany')
-        query = query.neq('kontrahent', 'Nie wydany');
+        // Ukryj bębny, które zostały już zwrócone (status kontrahenta: 'Nie wydany' lub 'magazyn')
+        query = query.neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%');
 
         if (isClient) {
           const maxDate = new Date(Date.now() - 456 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -578,11 +578,13 @@ export const drumsAPI = {
                 status,
                 supplierDateRange,
                 clientDateRange,
-                nip
+                nip,
+                reportedOnly
               }
             };
           }
           query = query.in('nip', allowedNips);
+          query = query.neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%');
         }
       }
 
@@ -987,7 +989,7 @@ export const drumsAPI = {
 
         if (nip) {
           chunkQuery = chunkQuery.eq('nip', nip);
-          chunkQuery = chunkQuery.neq('kontrahent', 'Nie wydany');
+          chunkQuery = chunkQuery.neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%');
 
           if (isClient) {
             const maxDate = new Date(Date.now() - 456 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -998,6 +1000,7 @@ export const drumsAPI = {
             break;
           }
           chunkQuery = chunkQuery.in('nip', allowedNips);
+          chunkQuery = chunkQuery.neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%');
         }
 
         const { data, error } = await chunkQuery;
