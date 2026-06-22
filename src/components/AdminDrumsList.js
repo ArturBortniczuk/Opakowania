@@ -189,7 +189,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
       alert('Zapisano pomyślnie nowy termin zwrotu!');
       
       // Odśwież dane na liście
-      await fetchDrums();
+      await fetchStatsData();
       
       // Zaktualizuj selectedDrum
       setSelectedDrum(prev => ({
@@ -223,7 +223,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
       alert('Usunięto przedłużenie i przywrócono domyślny termin.');
       
       // Odśwież dane na liście
-      await fetchDrums();
+      await fetchStatsData();
       
       // Zaktualizuj selectedDrum
       setSelectedDrum(prev => {
