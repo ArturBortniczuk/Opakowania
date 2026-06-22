@@ -36,6 +36,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentUser = getCurrentUserFromCache();
+  const isSalesperson = ['Dyrektor', 'Kierownik', 'Specjalista', 'Wsparcie'].includes(currentUser?.role) || ['dyrektor', 'kierownik', 'specjalista', 'wsparcie'].includes(currentUser?.role?.toLowerCase());
 
   const urlSearchTerm = searchParams.get('searchTerm');
   const urlOpenModal = searchParams.get('openModal') === 'true';
@@ -70,12 +71,12 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
   const [extensionNotes, setExtensionNotes] = useState('');
   const [savingExtension, setSavingExtension] = useState(false);
 
-  // DODANE: Stan paginacji
+  const [currentPage, setCurrentPage] = useState(1);
   const [drumsData, setDrumsData] = useState({
     data: [],
     pagination: {
       page: 1,
-      limit: 99, // 99 na stronę dla adminów (podzielne przez 3)
+      limit: 99,
       total: 0,
       totalPages: 1,
       hasNext: false,
@@ -83,50 +84,9 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
     }
   });
 
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
-
-  // DODANE: Funkcja pobierająca bębny z paginacją
-  const fetchDrums = useCallback(async (options = {}) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const requestOptions = {
-        page: drumsData.pagination.page,
-        limit: 99,
-        sortBy,
-        sortOrder,
-        search: searchTerm,
-        companySearch: companySearchTerm,
-        status: filterStatus,
-        supplierDateRange: filterSupplierDateRange,
-        clientDateRange: filterClientDateRange,
-        paymentStatus: filterPaymentStatus,
-        selectedSizes,
-        reportedOnly: filterReportedOnly,
-        ...options
-      };
-
-      console.log(`🔄 Admin pobiera bębny, strona: ${requestOptions.page}`);
-
-      // Admin pobiera WSZYSTKIE bębny (bez filtra NIP)
-      const result = await drumsAPI.getDrums(null, requestOptions);
-
-      console.log(`✅ Admin pobrał ${result.data.length} bębnów ze strony ${result.pagination.page}/${result.pagination.totalPages}`);
-      console.log(`📊 Łącznie w bazie: ${result.pagination.total} bębnów`);
-
-      setDrumsData(result);
-    } catch (err) {
-      console.error('❌ Błąd podczas pobierania bębnów:', err);
-      setError('Nie udało się pobrać listy bębnów. Spróbuj ponownie.');
-    } finally {
-      setLoading(false);
-    }
-  }, [sortBy, sortOrder, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, filterPaymentStatus, selectedSizes, filterReportedOnly, drumsData.pagination.page]);
-
 
   // DODANE: Debounce dla wyszukiwania
   useEffect(() => {
@@ -147,7 +107,7 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
   }, []);
 
   useEffect(() => {
-    fetchDrums({ page: 1 }); // Resetuj do pierwszej strony przy zmianie filtrów
+    setCurrentPage(1); // Resetuj do pierwszej strony przy zmianie filtrów
   }, [sortBy, sortOrder, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, filterPaymentStatus, selectedSizes, filterReportedOnly]);
   useEffect(() => {
     if (initialFilter && initialFilter.status) {
@@ -179,25 +139,15 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
   };
 
   // DODANE: Funkcje nawigacji po stronach
-  const goToPage = (page) => {
-    setDrumsData(prev => ({ ...prev, pagination: { ...prev.pagination, page } }));
-    fetchDrums({ page });
-  };
-
+  const goToPage = (page) => setCurrentPage(page);
   const nextPage = () => {
-    if (drumsData.pagination.hasNext) {
-      goToPage(drumsData.pagination.page + 1);
-    }
+    if (drumsData.pagination.hasNext) setCurrentPage(prev => prev + 1);
   };
-
   const prevPage = () => {
-    if (drumsData.pagination.hasPrev) {
-      goToPage(drumsData.pagination.page - 1);
-    }
+    if (drumsData.pagination.hasPrev) setCurrentPage(prev => prev - 1);
   };
-
-  const firstPage = () => goToPage(1);
-  const lastPage = () => goToPage(drumsData.pagination.totalPages);
+  const firstPage = () => setCurrentPage(1);
+  const lastPage = () => setCurrentPage(drumsData.pagination.totalPages);
 
   const handleSort = (field) => {
     if (sortBy === field) {
@@ -303,7 +253,9 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
   };
 
   const handleRefresh = async () => {
-    await Promise.all([fetchDrums(), fetchStatsData()]);
+    setLoading(true);
+    await fetchStatsData();
+    setLoading(false);
   };
 
   // ZACHOWANE: Funkcja importu z twojego kodu
@@ -636,7 +588,47 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
       active: filtered.filter(d => d.status === 'active').length,
       extended: filtered.filter(d => d.isExtended).length
     });
-  }, [allAdminDrums, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, selectedSizes, filterPaymentStatus, urlClientNip, filterReportedOnly, reportedCechas]);
+
+    // NOWE: Sortowanie i paginacja lokalna dla widoku
+    let sorted = [...filtered];
+    if (sortBy) {
+      sorted.sort((a, b) => {
+        let valA = a[sortBy] || a[sortBy.toLowerCase()] || '';
+        let valB = b[sortBy] || b[sortBy.toLowerCase()] || '';
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+        
+        if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+        if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    const total = sorted.length;
+    const limit = 99;
+    const totalPages = Math.ceil(total / limit) || 1;
+    let newPage = currentPage;
+    if (newPage > totalPages && totalPages > 0) newPage = 1;
+
+    // Jeżeli zmieniliśmy stronę bo była poza zakresem, zaaktualizuj stan żeby UI się zgadzał
+    if (newPage !== currentPage) {
+      setCurrentPage(newPage);
+    }
+
+    setDrumsData({
+      data: sorted.slice((newPage - 1) * limit, newPage * limit),
+      pagination: {
+        page: newPage,
+        limit,
+        total,
+        totalPages,
+        hasNext: newPage < totalPages,
+        hasPrev: newPage > 1
+      }
+    });
+
+    setLoading(false);
+  }, [allAdminDrums, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, selectedSizes, filterPaymentStatus, urlClientNip, filterReportedOnly, reportedCechas, currentPage, sortBy, sortOrder]);
 
   const stats = dynamicStats;
 
@@ -1084,16 +1076,18 @@ const AdminDrumsList = ({ initialFilter = {} }) => {
                     <span className="ml-2 text-xs font-semibold text-gray-700 leading-tight">Tylko zgłoszone zwroty</span>
                   </label>
                 </div>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                >
-                  <option value="all">Status: Wszystkie</option>
-                  <option value="wydane">Wydane u klientów</option>
-                  <option value="magazyn">Na magazynie</option>
-                  <option value="zagubione">Zagubione / Inne</option>
-                </select>
+                {!isSalesperson && (
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  >
+                    <option value="all">Status: Wszystkie</option>
+                    <option value="wydane">Wydane u klientów</option>
+                    <option value="magazyn">Na magazynie</option>
+                    <option value="zagubione">Zagubione / Inne</option>
+                  </select>
+                )}
 
                 <select
                   value={filterSupplierDateRange}
