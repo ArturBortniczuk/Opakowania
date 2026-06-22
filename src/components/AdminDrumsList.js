@@ -32,11 +32,12 @@ import {
 
 registerLocale('pl', pl);
 
-const AdminDrumsList = ({ initialFilter = {} }) => {
+const AdminDrumsList = ({ user, initialFilter = {} }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const currentUser = getCurrentUserFromCache();
-  const isSalesperson = ['Dyrektor', 'Kierownik', 'Specjalista', 'Wsparcie'].includes(currentUser?.role) || ['dyrektor', 'kierownik', 'specjalista', 'wsparcie'].includes(currentUser?.role?.toLowerCase());
+  const currentUser = user || getCurrentUserFromCache();
+  const roleStr = currentUser?.role?.toLowerCase() || '';
+  const isSalesperson = ['dyrektor', 'kierownik', 'specjalista', 'wsparcie'].some(r => roleStr.includes(r));
 
   const urlSearchTerm = searchParams.get('searchTerm');
   const urlOpenModal = searchParams.get('openModal') === 'true';
