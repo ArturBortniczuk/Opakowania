@@ -2001,7 +2001,7 @@ export const getSalespersonMpk = async (salespersonName) => {
 export const transportAPI = {
   createTransportOrder: async (transportData) => {
     // Adres docelowy aplikacji transportowej.
-    const transportApiUrl = process.env.REACT_APP_TRANSPORT_API_URL || 'https://system-transportowy.vercel.app/api/spedycje/webhook';
+    const transportApiUrl = process.env.REACT_APP_TRANSPORT_API_URL || 'https://transport.grupaeltron.pl/api/spedycje/webhook';
     const secretKey = 'eltron-opakowania-integration-secret-key-2026';
 
     try {
