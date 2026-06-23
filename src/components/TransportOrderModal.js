@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Truck, X, MapPin, Package, Building2, User } from 'lucide-react';
 import { calculatorAPI } from '../utils/calculatorApi';
 import { getSalespersonMpk } from '../utils/supabaseApi';
+import { supabase } from '../lib/supabase';
 
 const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   const [destination, setDestination] = useState('Magazyn Białystok');
@@ -20,12 +21,24 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   }, [isOpen, request]);
 
   const fetchUserMpk = async () => {
-    // Najpierw sprawdzamy MPK handlowca przypisanego do zgłoszenia
-    if (request?.salesperson) {
-      const salespersonMpk = await getSalespersonMpk(request.salesperson);
-      if (salespersonMpk) {
-        setMpk(salespersonMpk);
-        return;
+    // Sprawdzamy klienta i jego przypisanego handlowca
+    if (request?.user_nip) {
+      try {
+        const { data: companyData } = await supabase
+          .from('companies')
+          .select('salesperson_name')
+          .eq('nip', request.user_nip)
+          .single();
+          
+        if (companyData?.salesperson_name) {
+          const salespersonMpk = await getSalespersonMpk(companyData.salesperson_name);
+          if (salespersonMpk) {
+            setMpk(salespersonMpk);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('Błąd pobierania mpk firmy:', e);
       }
     }
     // Proste pobieranie z profilu, ew. fallback na 'Brak MPK'
