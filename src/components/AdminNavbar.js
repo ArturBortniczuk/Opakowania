@@ -82,7 +82,7 @@ const AdminNavbar = ({
                item.path !== '/admin/warehouse-drums';
       }
       if (isMagazyn) {
-        return item.path === '/admin' || item.path === '/admin/map' || item.path === '/admin/warehouse-drums' || item.path === '/admin/drums' || item.path === '/admin/returns';
+        return item.path === '/admin' || item.path === '/admin/map' || item.path === '/admin/warehouse-drums' || item.path === '/admin/drums' || item.path === '/admin/returns' || item.path === '/admin/calculator';
       }
       return true;
     })
