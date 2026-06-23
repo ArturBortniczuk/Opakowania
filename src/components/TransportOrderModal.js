@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Truck, X, MapPin, Package, Building2, User } from 'lucide-react';
-import { calculatorApi } from '../utils/calculatorApi';
+import { calculatorAPI } from '../utils/calculatorApi';
 
 const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   const [destination, setDestination] = useState('Magazyn Białystok');
@@ -32,7 +32,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
     setCalculatingWeight(true);
     try {
       let calcWeight = 0;
-      const allDimensions = await calculatorApi.getDrumDimensions();
+      const allDimensions = await calculatorAPI.getDrumDimensions();
       
       drums.forEach(drum => {
         // drum może być obiektem lub stringiem
