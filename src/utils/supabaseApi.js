@@ -1982,3 +1982,33 @@ export const handleAPIError = (error, setError = null) => {
   }
   return errorMessage;
 };
+
+export const transportAPI = {
+  createTransportOrder: async (transportData) => {
+    // Adres docelowy aplikacji transportowej.
+    const transportApiUrl = process.env.REACT_APP_TRANSPORT_API_URL || 'https://system-transportowy.vercel.app/api/spedycje/webhook';
+    const secretKey = 'eltron-opakowania-integration-secret-key-2026';
+
+    try {
+      const response = await fetch(transportApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${secretKey}`
+        },
+        body: JSON.stringify(transportData)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Błąd tworzenia zlecenia w systemie Transport');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Błąd integracji z Transportem:', error);
+      throw error;
+    }
+  }
+};

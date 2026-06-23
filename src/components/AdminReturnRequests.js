@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { returnsAPI, companiesAPI, drumsAPI } from '../utils/supabaseApi';
+import { returnsAPI, companiesAPI, drumsAPI, transportAPI } from '../utils/supabaseApi';
+import TransportOrderModal from './TransportOrderModal';
 import {
   Truck,
   Search,
@@ -37,6 +38,8 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showRequestDetails, setShowRequestDetails] = useState(false);
   const [enriching, setEnriching] = useState(false);
+  const [showTransportModal, setShowTransportModal] = useState(false);
+  const [requestForTransport, setRequestForTransport] = useState(null);
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
@@ -71,6 +74,53 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     } catch (err) {
       console.error('Błąd zmiany statusu:', err);
       alert('Nie udało się zmienić statusu.');
+    }
+  };
+
+  const handleTransportConfirm = async (transportData) => {
+    try {
+      // 1. Wyślij do systemu Transport
+      const spedycjaPayload = {
+        createdBy: user?.name || 'Admin Opakowania',
+        createdByEmail: user?.email || 'admin@grupaeltron.pl',
+        responsiblePerson: user?.name || 'Admin Opakowania',
+        responsibleEmail: user?.email || 'admin@grupaeltron.pl',
+        mpk: transportData.mpk,
+        location: 'Odbiory własne',
+        producerAddress: {
+          city: requestForTransport.city,
+          postalCode: requestForTransport.postal_code,
+          street: requestForTransport.street
+        },
+        delivery: transportData.deliveryAddress,
+        loadingContact: `${requestForTransport.profile_name || ''} ${requestForTransport.profile_phone || ''}`.trim(),
+        unloadingContact: '',
+        deliveryDate: transportData.transportDate,
+        notes: `Zgłoszenie z Opakowań #${requestForTransport.id}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}\n${requestForTransport.notes || ''}`,
+        clientName: requestForTransport.company_name,
+        sourceClientName: requestForTransport.company_name,
+        goodsDescription: [
+          {
+            name: `Bębny z kablowni (${requestForTransport.selected_drums?.length || 0} szt.)`,
+            weight: transportData.totalWeight,
+            type: 'Bębny'
+          }
+        ]
+      };
+
+      await transportAPI.createTransportOrder(spedycjaPayload);
+
+      // 2. Zmień status w Opakowaniach na Approved
+      await returnsAPI.updateReturnStatus(requestForTransport.id, 'Approved');
+      
+      setShowTransportModal(false);
+      setRequestForTransport(null);
+      if (showRequestDetails) setShowRequestDetails(false);
+      handleRefresh();
+      alert('Zlecenie spedycyjne zostało pomyślnie wysłane do systemu Transport!');
+    } catch (err) {
+      console.error('Błąd wysyłania zlecenia:', err);
+      alert('Nie udało się wysłać zlecenia: ' + err.message);
     }
   };
 
@@ -342,7 +392,10 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
           {request.status === 'Pending' && canChangeStatus && (
             <button
-              onClick={() => handleStatusChange(request.id, 'Approved')}
+              onClick={() => {
+                setRequestForTransport(request);
+                setShowTransportModal(true);
+              }}
               className="flex-1 bg-emerald-600 text-white py-2.5 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors text-sm"
             >
               Zatwierdź
@@ -630,8 +683,8 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                   <>
                     <button
                       onClick={() => {
-                        handleStatusChange(selectedRequest.id, 'Approved');
-                        handleCloseModal();
+                        setRequestForTransport(selectedRequest);
+                        setShowTransportModal(true);
                       }}
                       className="flex-1 bg-emerald-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
                     >
@@ -853,6 +906,17 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
         )}
 
         <RequestDetailsModal />
+
+        <TransportOrderModal
+          isOpen={showTransportModal}
+          onClose={() => {
+            setShowTransportModal(false);
+            setRequestForTransport(null);
+          }}
+          onConfirm={handleTransportConfirm}
+          request={requestForTransport}
+          user={user}
+        />
       </div>
     </div>
   );
