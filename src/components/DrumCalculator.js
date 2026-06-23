@@ -264,7 +264,7 @@ const DrumCalculator = () => {
                   </div>
                   <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
                     <span className="block text-xs font-bold text-blue-400 uppercase tracking-wider mb-1">Polecany Bęben</span>
-                    <span className="block text-xl font-black text-blue-700">{results.bestDrum.drum.type}</span>
+                    <span className="block text-xl font-black text-blue-700">Bęben {results.bestDrum.drum.outer_diameter}</span>
                     <span className="block text-sm text-blue-600 font-medium">Suma wagi: {results.bestDrum.totalWeight.toFixed(1)} kg</span>
                   </div>
                 </div>
@@ -298,7 +298,7 @@ const DrumCalculator = () => {
                       <tbody>
                         {results.allSuitable.slice(1, 5).map((option, idx) => (
                           <tr key={idx} className="bg-white border-b hover:bg-gray-50">
-                            <td className="px-4 py-3 font-medium text-gray-900">{option.drum.type}</td>
+                            <td className="px-4 py-3 font-medium text-gray-900">Bęben {option.drum.outer_diameter}</td>
                             <td className="px-4 py-3">{option.maxCapacity.toFixed(0)} m</td>
                             <td className="px-4 py-3">{option.layersCount}</td>
                             <td className="px-4 py-3">{option.utilizationPercent.toFixed(1)}%</td>

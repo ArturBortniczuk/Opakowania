@@ -3,6 +3,11 @@ CREATE TABLE IF NOT EXISTS public.cables_catalog (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     cross_section TEXT NOT NULL,
+    shape TEXT,
+    working_core_diameter NUMERIC,
+    insulation_thickness NUMERIC,
+    insulated_core_diameter NUMERIC,
+    outer_sheath_thickness NUMERIC,
     outer_diameter NUMERIC,
     bending_radius NUMERIC,
     weight_kg_km NUMERIC,
@@ -12,10 +17,9 @@ CREATE TABLE IF NOT EXISTS public.cables_catalog (
 -- Tworzenie tabeli wymiarów bębnów
 CREATE TABLE IF NOT EXISTS public.drum_dimensions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    type TEXT NOT NULL,
     outer_diameter NUMERIC,
-    inner_diameter NUMERIC,
     width NUMERIC,
+    inner_diameter NUMERIC,
     weight NUMERIC,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
