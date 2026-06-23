@@ -85,23 +85,38 @@ const DrumCalculator = () => {
       return;
     }
 
+    const parseNumber = (val) => {
+      if (!val) return 0;
+      if (typeof val === 'number') return val;
+      return parseFloat(val.toString().replace(',', '.'));
+    };
+
     // Przeliczenia z mm na cm (w zależności od tego jak trzymane są dane w bazie).
     // Załóżmy, że plik python używał dzielenia przez 10 dla mm->cm
-    let cableDiameterCm = (selectedCable.outer_diameter || 0) / 10;
-    let bendingRadiusCm = (selectedCable.bending_radius || 0) / 10;
+    let cableDiameterCm = parseNumber(selectedCable.outer_diameter) / 10;
+    let bendingRadiusCm = parseNumber(selectedCable.bending_radius) / 10;
     
     // Logika zaczerpnięta z pythona
     if (length < 400) {
       bendingRadiusCm -= 5;
     }
 
-    const cableWeightKm = selectedCable.weight_kg_km || 0;
+    const cableWeightKm = parseNumber(selectedCable.weight_kg_km);
+
+    // Bębny też mogą mieć przecinki, więc musimy je przeparsować przed logiką!
+    const parsedDrums = drums.map(d => ({
+      ...d,
+      outer_diameter: parseNumber(d.outer_diameter),
+      inner_diameter: parseNumber(d.inner_diameter),
+      width: parseNumber(d.width),
+      weight: parseNumber(d.weight)
+    }));
 
     const suitableDrums = findSuitableDrums(
       cableDiameterCm, 
       bendingRadiusCm, 
       length, 
-      drums, 
+      parsedDrums, 
       cableWeightKm
     );
 

@@ -4,23 +4,23 @@ CREATE TABLE IF NOT EXISTS public.cables_catalog (
     name TEXT NOT NULL,
     cross_section TEXT NOT NULL,
     shape TEXT,
-    working_core_diameter NUMERIC,
-    insulation_thickness NUMERIC,
-    insulated_core_diameter NUMERIC,
-    outer_sheath_thickness NUMERIC,
-    outer_diameter NUMERIC,
-    bending_radius NUMERIC,
-    weight_kg_km NUMERIC,
+    working_core_diameter TEXT,
+    insulation_thickness TEXT,
+    insulated_core_diameter TEXT,
+    outer_sheath_thickness TEXT,
+    outer_diameter TEXT,
+    bending_radius TEXT,
+    weight_kg_km TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Tworzenie tabeli wymiarów bębnów
 CREATE TABLE IF NOT EXISTS public.drum_dimensions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    outer_diameter NUMERIC,
-    width NUMERIC,
-    inner_diameter NUMERIC,
-    weight NUMERIC,
+    outer_diameter TEXT,
+    width TEXT,
+    inner_diameter TEXT,
+    weight TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
