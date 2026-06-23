@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Truck, X, MapPin, Package, Building2, User } from 'lucide-react';
 import { calculatorAPI } from '../utils/calculatorApi';
+import { getSalespersonMpk } from '../utils/supabaseApi';
 
 const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   const [destination, setDestination] = useState('Magazyn Białystok');
@@ -19,6 +20,14 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   }, [isOpen, request]);
 
   const fetchUserMpk = async () => {
+    // Najpierw sprawdzamy MPK handlowca przypisanego do zgłoszenia
+    if (request?.salesperson) {
+      const salespersonMpk = await getSalespersonMpk(request.salesperson);
+      if (salespersonMpk) {
+        setMpk(salespersonMpk);
+        return;
+      }
+    }
     // Proste pobieranie z profilu, ew. fallback na 'Brak MPK'
     setMpk(user?.mpk || 'Brak przypisanego MPK');
   };

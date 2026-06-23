@@ -1983,6 +1983,21 @@ export const handleAPIError = (error, setError = null) => {
   return errorMessage;
 };
 
+export const getSalespersonMpk = async (salespersonName) => {
+  try {
+    const { data, error } = await supabase
+      .from('salespeople')
+      .select('mpk')
+      .eq('name', salespersonName)
+      .single();
+    if (error && error.code !== 'PGRST116') throw error;
+    return data?.mpk || null;
+  } catch (err) {
+    console.error('Błąd pobierania mpk handlowca:', err);
+    return null;
+  }
+};
+
 export const transportAPI = {
   createTransportOrder: async (transportData) => {
     // Adres docelowy aplikacji transportowej.
