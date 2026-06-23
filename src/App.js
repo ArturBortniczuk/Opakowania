@@ -21,6 +21,7 @@ import AdminUsersManager from './components/AdminUsersManager';
 import HelpGuide from './components/HelpGuide';
 import LogisticsMap from './components/LogisticsMap';
 import AdminWarehouseDrums from './components/AdminWarehouseDrums';
+import DrumCalculator from './components/DrumCalculator';
 import './App.css';
 
 import { supabase } from './lib/supabase';
@@ -410,7 +411,8 @@ const App = () => {
                         'admin-returns': '/admin/returns',
                         'admin-return-periods': '/admin/return-periods',
                         'admin-supplier-rules': '/admin/supplier-rules',
-                        'admin-reports': '/admin/reports'
+                        'admin-reports': '/admin/reports',
+                        'admin-calculator': '/admin/calculator'
                       };
                       if (routes[page]) {
                         if (state && Object.keys(state).length > 0) {
@@ -438,7 +440,8 @@ const App = () => {
                         'admin-returns': '/admin/returns',
                         'admin-return-periods': '/admin/return-periods',
                         'admin-supplier-rules': '/admin/supplier-rules',
-                        'admin-reports': '/admin/reports'
+                        'admin-reports': '/admin/reports',
+                        'admin-calculator': '/admin/calculator'
                       };
                       if (routes[page]) {
                         if (state && Object.keys(state).length > 0) {
@@ -498,6 +501,11 @@ const App = () => {
               <Route path="/admin/supplier-rules" element={
                 <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor']}>
                   <AdminSupplierRules user={currentUser} />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/calculator" element={
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly>
+                  <DrumCalculator />
                 </ProtectedRoute>
               } />
 
