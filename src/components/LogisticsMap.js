@@ -602,7 +602,7 @@ const LogisticsMap = () => {
                             <div className="flex justify-between items-center mt-2 pt-2 border-t border-purple-200">
                               <span className="text-sm text-purple-800 font-medium">Zgłoszone bębny: <span className="font-bold">{selectedLocation.drumsCount}</span></span>
                               <a 
-                                href={`/admin/returns?searchTerm=${selectedLocation.requestId}`}
+                                href={`/admin/returns?searchTerm=${selectedLocation.requestId}&openModalId=${selectedLocation.requestId}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="px-2 py-1 bg-purple-600 text-white hover:bg-purple-700 rounded text-xs font-medium transition-colors flex items-center"

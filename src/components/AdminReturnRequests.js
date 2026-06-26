@@ -40,6 +40,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   const [enriching, setEnriching] = useState(false);
   const [showTransportModal, setShowTransportModal] = useState(false);
   const [requestForTransport, setRequestForTransport] = useState(null);
+  const [hasOpenedFromUrl, setHasOpenedFromUrl] = useState(false);
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
@@ -158,7 +159,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     }
   };
 
-  const handleViewRequest = async (request) => {
+  const handleViewRequest = useCallback(async (request) => {
     setSelectedRequest(request);
     setShowRequestDetails(true);
     setEnriching(true);
@@ -187,7 +188,18 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     } finally {
       setEnriching(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const openModalId = searchParams.get('openModalId');
+    if (openModalId && requests.length > 0 && !hasOpenedFromUrl) {
+      const requestToOpen = requests.find(r => r.id.toString() === openModalId);
+      if (requestToOpen) {
+        handleViewRequest(requestToOpen);
+        setHasOpenedFromUrl(true);
+      }
+    }
+  }, [requests, searchParams, hasOpenedFromUrl, handleViewRequest]);
 
   const handleCloseModal = () => {
     setShowRequestDetails(false);
