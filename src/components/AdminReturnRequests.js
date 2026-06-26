@@ -110,8 +110,11 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
       await transportAPI.createTransportOrder(spedycjaPayload);
 
-      // 2. Zmień status w Opakowaniach na Approved
-      await returnsAPI.updateReturnStatus(requestForTransport.id, 'Approved');
+      // 2. Zmień status w Opakowaniach na InTransit i ustaw datę
+      await returnsAPI.updateReturnStatus(requestForTransport.id, {
+        status: 'InTransit',
+        transport_date: transportData.transportDate
+      });
       
       setShowTransportModal(false);
       setRequestForTransport(null);
@@ -124,25 +127,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     }
   };
 
-  const handleSetInTransit = async (requestId) => {
-    if (!canChangeStatus) {
-      alert('Brak uprawnień do zmiany statusu.');
-      return;
-    }
-    const date = prompt("Podaj datę transportu (RRRR-MM-DD):", new Date().toISOString().split('T')[0]);
-    if (!date) return;
 
-    try {
-      await returnsAPI.updateReturnStatus(requestId, {
-        status: 'InTransit',
-        transport_date: date
-      });
-      handleRefresh();
-    } catch (err) {
-      console.error('Błąd ustawiania transportu:', err);
-      alert('Nie udało się ustawić transportu.');
-    }
-  };
 
   const handleAddCorrectionNumber = async (requestId) => {
     if (!canChangeStatus) {
@@ -392,10 +377,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
           {request.status === 'Pending' && canChangeStatus && (
             <button
-              onClick={() => {
-                setRequestForTransport(request);
-                setShowTransportModal(true);
-              }}
+              onClick={() => handleStatusChange(request.id, 'Approved')}
               className="flex-1 bg-emerald-600 text-white py-2.5 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors text-sm"
             >
               Zatwierdź
@@ -404,7 +386,10 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
           {request.status === 'Approved' && canChangeStatus && (
             <button
-              onClick={() => handleSetInTransit(request.id)}
+              onClick={() => {
+                setRequestForTransport(request);
+                setShowTransportModal(true);
+              }}
               className="flex-1 bg-indigo-600 text-white py-2.5 px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors text-sm"
             >
               Transport
@@ -683,8 +668,8 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                   <>
                     <button
                       onClick={() => {
-                        setRequestForTransport(selectedRequest);
-                        setShowTransportModal(true);
+                        handleStatusChange(selectedRequest.id, 'Approved');
+                        handleCloseModal();
                       }}
                       className="flex-1 bg-emerald-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
                     >
@@ -707,8 +692,8 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                 {selectedRequest.status === 'Approved' && (
                   <button
                     onClick={() => {
-                      handleSetInTransit(selectedRequest.id);
-                      handleCloseModal();
+                      setRequestForTransport(selectedRequest);
+                      setShowTransportModal(true);
                     }}
                     className="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
                   >
