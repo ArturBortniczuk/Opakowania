@@ -177,27 +177,64 @@ const LogisticsMap = () => {
         overdueCount: loc.drums.filter(d => new Date(d.data_zwrotu_do_dostawcy) < new Date()).length
       }));
 
+      // 2. Pobieramy aktywne zwroty
+      const retRes = await returnsAPI.getReturns();
+      const validPickups = [];
+
+      (retRes || [])
+        .filter(r => r.status === 'Pending' || r.status === 'Approved')
+        .forEach(r => {
+          let lat = r.latitude;
+          let lng = r.longitude;
+          const address = `${r.street || ''}, ${r.postal_code || ''} ${r.city || ''}`.trim();
+          const companyName = (r.company_name || '').trim();
+
+          // Próba znalezienia koordynatów w cache, jeśli nie ma ich na obiekcie
+          if (!lat || !lng) {
+            if (address && cacheMap[address.toLowerCase()]) {
+              lat = cacheMap[address.toLowerCase()].latitude;
+              lng = cacheMap[address.toLowerCase()].longitude;
+            } else if (companyName && cacheMap[companyName.toLowerCase()]) {
+              lat = cacheMap[companyName.toLowerCase()].latitude;
+              lng = cacheMap[companyName.toLowerCase()].longitude;
+            }
+          }
+
+          if (lat && lng) {
+            validPickups.push({
+              id: `ret_${r.id}`,
+              lat: parseFloat(lat),
+              lng: parseFloat(lng),
+              title: `Zgłoszenie Odbioru #${r.id}`,
+              type: 'pickup',
+              companyName: companyName,
+              address: address,
+              drumsCount: r.selected_drums ? r.selected_drums.length : 0,
+              status: r.status,
+              date: r.collection_date
+            });
+          } else {
+            // Dodaj do listy brakujących adresów, by można było przypisać ręcznie
+            const missingKey = `${companyName}___${address}`;
+            if (!missingByLoc[missingKey]) {
+              missingByLoc[missingKey] = {
+                address: address || 'Brak adresu',
+                companyName: companyName || 'Nieznany klient',
+                count: 0,
+                drumIds: [],
+                pickupIds: []
+              };
+            }
+            missingByLoc[missingKey].count++;
+            if (!missingByLoc[missingKey].pickupIds) missingByLoc[missingKey].pickupIds = [];
+            missingByLoc[missingKey].pickupIds.push(r.id);
+          }
+        });
+
       const missingList = Object.values(missingByLoc).sort((a, b) => b.count - a.count);
       setMissingAddresses(missingList);
 
-      // 2. Pobieramy aktywne zwroty
-      const retRes = await returnsAPI.getReturns();
-      const pickups = (retRes || []).filter(r => r.status === 'Pending' || r.status === 'Approved')
-        .filter(r => r.latitude && r.longitude)
-        .map(r => ({
-          id: `ret_${r.id}`,
-          lat: parseFloat(r.latitude),
-          lng: parseFloat(r.longitude),
-          title: `Zgłoszenie Odbioru`,
-          type: 'pickup',
-          companyName: r.company_name,
-          address: `${r.street || ''}, ${r.postal_code || ''} ${r.city || ''}`,
-          drumsCount: r.selected_drums ? r.selected_drums.length : 0,
-          status: r.status,
-          date: r.collection_date
-        }));
-
-      setLocations([...groupedDrums, ...pickups]);
+      setLocations([...groupedDrums, ...validPickups]);
     } catch (error) {
       console.error('Błąd pobierania danych do mapy:', error);
     }
@@ -285,7 +322,16 @@ const LogisticsMap = () => {
     });
 
     // Ukrywamy puste lokalizacje
-    return filtered.filter(loc => loc.type === 'pickup' || loc.visibleCount > 0);
+    return filtered.filter(loc => {
+      if (loc.type === 'pickup') {
+        const cQuery = clientSearch.trim().toLowerCase();
+        if (cQuery && loc.companyName && !loc.companyName.toLowerCase().includes(cQuery)) {
+          return false;
+        }
+        return true;
+      }
+      return loc.visibleCount > 0;
+    });
   }, [locations, filter, searchQuery, clientSearch, sizeFilter, supplierFilter, minAge, maxAge]);
 
   const handleMapClick = useCallback(async (e) => {
@@ -315,14 +361,24 @@ const LogisticsMap = () => {
         // Aktualizuj Bębny po ID - to najbezpieczniejsze i zapewnia, że nie zmienimy innych!
         // Supabase w in() przyjmuje max ok 1000 elementów, ale dla pewności dzielimy na chunki po 500
         const chunkSize = 500;
-        const ids = assigningLocation.drumIds;
-        for (let i = 0; i < ids.length; i += chunkSize) {
-          const chunkIds = ids.slice(i, i + chunkSize);
+        const drumIds = assigningLocation.drumIds || [];
+        for (let i = 0; i < drumIds.length; i += chunkSize) {
+          const chunkIds = drumIds.slice(i, i + chunkSize);
           const { error: drumsError } = await supabase
             .from('drums')
             .update({ latitude: lat, longitude: lng })
             .in('id', chunkIds);
           if (drumsError) throw drumsError;
+        }
+
+        const pickupIds = assigningLocation.pickupIds || [];
+        for (let i = 0; i < pickupIds.length; i += chunkSize) {
+          const chunkIds = pickupIds.slice(i, i + chunkSize);
+          const { error: pickupsError } = await supabase
+            .from('return_requests')
+            .update({ latitude: lat, longitude: lng })
+            .in('id', chunkIds);
+          if (pickupsError) throw pickupsError;
         }
 
         alert('Pomyślnie przypisano współrzędne!');
@@ -608,7 +664,8 @@ const LogisticsMap = () => {
                           setAssigningLocation({ 
                             address: m.address, 
                             companyName: m.companyName, 
-                            drumIds: m.drumIds 
+                            drumIds: m.drumIds,
+                            pickupIds: m.pickupIds
                           });
                           alert(`Kliknij na mapie w miejscu, gdzie znajduje się adres:\n${m.address} (Klient: ${m.companyName || 'Brak'})`);
                         }}
