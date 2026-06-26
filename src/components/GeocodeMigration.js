@@ -66,14 +66,22 @@ const GeocodeMigration = () => {
 
       const drums = allDrums;
 
-      if (!drums || drums.length === 0) {
-        addLog('Brak bębnów z adresem w bazie.');
-        setIsProcessing(false);
-        return;
+      // DODANE: Skanowanie adresów ze zgłoszeń odbioru
+      addLog('Skanowanie adresów ze zgłoszeń odbioru...');
+      const { data: requests, error: reqError } = await supabase
+        .from('return_requests')
+        .select('street, postal_code, city')
+        .not('street', 'is', null);
+      
+      let reqAddresses = [];
+      if (!reqError && requests) {
+        reqAddresses = requests.map(r => `${r.street || ''}, ${r.postal_code || ''} ${r.city || ''}`.trim());
       }
 
       // 2. Unikalne adresy (filtrujemy puste i śmieciowe, np. samo ",")
-      const uniqueAddresses = [...new Set(drums.map(d => d.adres_dostawy.trim()))].filter(a => {
+      const allAddresses = [...(drums || []).map(d => d.adres_dostawy?.trim()), ...reqAddresses];
+      
+      const uniqueAddresses = [...new Set(allAddresses)].filter(a => {
         if (!a || a === ',') return false;
         if (a.replace(/[^a-zA-Z0-9]/g, '').length < 2) return false;
         return true;

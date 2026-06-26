@@ -639,12 +639,20 @@ const LogisticsMap = () => {
               </div>
               
               <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                {missingAddresses.length === 0 ? (
+                {missingAddresses.filter(m => {
+                  if (filter === 'pickups') return m.pickupIds && m.pickupIds.length > 0;
+                  if (filter === 'drums') return m.drumIds && m.drumIds.length > 0;
+                  return true;
+                }).length === 0 ? (
                   <div className="p-4 text-center text-gray-500 text-sm">
-                    Wszystkie bębny posiadają współrzędne!
+                    Wszystkie pozycje posiadają współrzędne!
                   </div>
                 ) : (
-                  missingAddresses.map((m, idx) => (
+                  missingAddresses.filter(m => {
+                    if (filter === 'pickups') return m.pickupIds && m.pickupIds.length > 0;
+                    if (filter === 'drums') return m.drumIds && m.drumIds.length > 0;
+                    return true;
+                  }).map((m, idx) => (
                     <div 
                       key={idx} 
                       className={`p-3 rounded-lg border transition-all ${assigningLocation?.address === m.address ? 'bg-yellow-50 border-yellow-400 shadow-sm' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}`}
@@ -655,7 +663,12 @@ const LogisticsMap = () => {
                           <p className="text-xs text-gray-500">{m.address}</p>
                         </div>
                         <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-bold whitespace-nowrap ml-2">
-                          {m.count} {m.count === 1 ? 'bęben' : (m.count % 10 >= 2 && m.count % 10 <= 4 && (m.count % 100 < 10 || m.count % 100 >= 20) ? 'bębny' : 'bębnów')}
+                          {filter === 'pickups' 
+                            ? `${m.pickupIds?.length || 0} zgłoszeń` 
+                            : filter === 'drums' 
+                              ? `${m.drumIds?.length || 0} bębnów`
+                              : `${m.count} pozycje`
+                          }
                         </span>
                       </div>
                       
