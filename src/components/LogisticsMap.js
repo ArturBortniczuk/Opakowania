@@ -203,6 +203,7 @@ const LogisticsMap = () => {
           if (lat && lng) {
             validPickups.push({
               id: `ret_${r.id}`,
+              requestId: r.id,
               lat: parseFloat(lat),
               lng: parseFloat(lng),
               title: `Zgłoszenie Odbioru #${r.id}`,
@@ -210,6 +211,7 @@ const LogisticsMap = () => {
               companyName: companyName,
               address: address,
               drumsCount: r.selected_drums ? r.selected_drums.length : 0,
+              selected_drums: r.selected_drums,
               status: r.status,
               date: r.collection_date
             });
@@ -593,11 +595,45 @@ const LogisticsMap = () => {
                       )}
                       
                       {selectedLocation.type === 'pickup' && (
-                        <div className="bg-purple-50 p-2 rounded mb-3 border border-purple-100">
-                          <p className="text-sm text-gray-800 mb-1">Status: <strong>{selectedLocation.status}</strong></p>
-                          <p className="text-sm text-gray-800 mb-1">Planowana data: <strong>{selectedLocation.date}</strong></p>
-                          <p className="text-sm text-purple-800 font-medium mt-2">Bębny do odbioru: <span className="font-bold">{selectedLocation.drumsCount}</span></p>
-                        </div>
+                        <>
+                          <div className="bg-purple-50 p-2 rounded mb-3 border border-purple-100">
+                            <p className="text-sm text-gray-800 mb-1">Status: <strong>{selectedLocation.status}</strong></p>
+                            <p className="text-sm text-gray-800 mb-1">Planowana data: <strong>{selectedLocation.date ? new Date(selectedLocation.date).toLocaleDateString() : 'Brak'}</strong></p>
+                            <div className="flex justify-between items-center mt-2 pt-2 border-t border-purple-200">
+                              <span className="text-sm text-purple-800 font-medium">Zgłoszone bębny: <span className="font-bold">{selectedLocation.drumsCount}</span></span>
+                              <a 
+                                href={`/admin/returns?searchTerm=${selectedLocation.requestId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-2 py-1 bg-purple-600 text-white hover:bg-purple-700 rounded text-xs font-medium transition-colors flex items-center"
+                              >
+                                <Eye className="w-3.5 h-3.5 mr-1" /> Szczegóły zgłoszenia
+                              </a>
+                            </div>
+                          </div>
+                          
+                          {selectedLocation.selected_drums && selectedLocation.selected_drums.length > 0 && (
+                            <div className="max-h-56 overflow-y-auto pr-1 space-y-1.5 mb-3">
+                              {selectedLocation.selected_drums.map((drum, idx) => {
+                                const cecha = typeof drum === 'object' ? (drum.cecha || drum.kod_bebna) : drum;
+                                const isDamaged = typeof drum === 'object' && drum.isDamaged;
+                                return (
+                                  <div key={idx} className={`flex flex-col p-2 rounded border ${isDamaged ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'}`}>
+                                    <div className="flex justify-between items-start">
+                                      <span className={`font-mono text-sm font-bold ${isDamaged ? 'text-red-700' : 'text-gray-800'}`}>
+                                        {cecha || 'Brak cechy'}
+                                      </span>
+                                      {isDamaged && <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 ml-1" title="Zgłoszono uszkodzenie" />}
+                                    </div>
+                                    {typeof drum === 'object' && drum.description && (
+                                      <p className="text-[10px] text-gray-600 italic mt-1 truncate">{drum.description}</p>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
                       )}
 
                       <div className="mt-2">
@@ -633,7 +669,11 @@ const LogisticsMap = () => {
                   <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
                   <div>
                     <h3 className="font-bold text-gray-900">Brak współrzędnych</h3>
-                    <p className="text-xs text-red-600">Nie znaleziono w Google ({missingAddresses.length})</p>
+                    <p className="text-xs text-red-600">Nie znaleziono w Google ({missingAddresses.filter(m => {
+                      if (filter === 'pickups') return m.pickupIds && m.pickupIds.length > 0;
+                      if (filter === 'drums') return m.drumIds && m.drumIds.length > 0;
+                      return true;
+                    }).length})</p>
                   </div>
                 </div>
               </div>
