@@ -109,14 +109,30 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
                   </span>
                 </div>
                 {(() => {
-                  const days = drum.daysInPossession;
                   let returnPercentage = 100;
-                  if (days === undefined || isNaN(days) || days <= 120) returnPercentage = 100;
-                  else if (days <= 150) returnPercentage = 90;
-                  else if (days <= 180) returnPercentage = 75;
-                  else if (days <= 240) returnPercentage = 50;
-                  else if (days <= 340) returnPercentage = 25;
-                  else returnPercentage = 0;
+                  const deadline = drum.clientReturnDeadline ? new Date(drum.clientReturnDeadline) : null;
+                  
+                  if (deadline) {
+                    const now = new Date();
+                    now.setHours(0,0,0,0);
+                    deadline.setHours(0,0,0,0);
+                    const daysPastDeadline = Math.ceil((now - deadline) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysPastDeadline <= 0) returnPercentage = 100;
+                    else if (daysPastDeadline <= 30) returnPercentage = 90;
+                    else if (daysPastDeadline <= 60) returnPercentage = 75;
+                    else if (daysPastDeadline <= 120) returnPercentage = 50;
+                    else if (daysPastDeadline <= 220) returnPercentage = 25;
+                    else returnPercentage = 0;
+                  } else {
+                    const days = drum.daysInPossession;
+                    if (days === undefined || isNaN(days) || days <= 120) returnPercentage = 100;
+                    else if (days <= 150) returnPercentage = 90;
+                    else if (days <= 180) returnPercentage = 75;
+                    else if (days <= 240) returnPercentage = 50;
+                    else if (days <= 340) returnPercentage = 25;
+                    else returnPercentage = 0;
+                  }
 
                   const returnValue = clientPrice * (returnPercentage / 100);
 

@@ -725,7 +725,7 @@ export const drumsAPI = {
       let exceptions = [];
       let clientNotes = [];
       if (data && data.length > 0) {
-        const drumCechas = data.map(d => d.cecha).filter(Boolean);
+        const drumCechas = data.map(d => d.cecha || d.kod_bebna).filter(Boolean);
         const nips = [...new Set(data.map(d => d.nip).filter(Boolean))];
         
         // Terminy
@@ -760,7 +760,7 @@ export const drumsAPI = {
       // Mapowanie danych do spójnego formatu używanego w komponentach
       const mappedData = data.map(drum => {
         const extension = customDeadlines.find(
-          ext => ext.kod_bebna === drum.cecha && ext.nip === drum.nip
+          ext => (ext.kod_bebna === drum.cecha || ext.kod_bebna === drum.kod_bebna) && ext.nip === drum.nip
         );
 
         let finalReturnDate = drum.data_zwrotu_do_dostawcy;
@@ -794,7 +794,7 @@ export const drumsAPI = {
         let statusObj = supabaseHelpers.getDrumStatus(dateForStatus);
 
         // Nadpisanie statusu jeśli bęben jest w wyjątkach
-        const exception = exceptions.find(e => e.kod_bebna === drum.cecha && e.nip === drum.nip);
+        const exception = exceptions.find(e => (e.kod_bebna === drum.cecha || e.kod_bebna === drum.kod_bebna) && e.nip === drum.nip);
         if (exception) {
           if (exception.exception_type === 'lost') {
             statusObj = { status: 'Zagubiony', color: 'bg-red-100 text-red-800' };
@@ -803,7 +803,7 @@ export const drumsAPI = {
           }
         }
 
-        const clientNoteObj = clientNotes.find(n => n.kod_bebna === drum.cecha && n.nip === drum.nip);
+        const clientNoteObj = clientNotes.find(n => (n.kod_bebna === drum.cecha || n.kod_bebna === drum.kod_bebna) && n.nip === drum.nip);
         const clientNote = clientNoteObj ? clientNoteObj.note : null;
 
         return {
@@ -1024,7 +1024,7 @@ export const drumsAPI = {
       let exceptions = [];
       let clientNotes = [];
       if (allData && allData.length > 0) {
-        const drumCechas = allData.map(d => d.cecha).filter(Boolean);
+        const drumCechas = allData.map(d => d.cecha || d.kod_bebna).filter(Boolean);
         let deadlinesQuery = supabase.from('custom_drum_deadlines').select('*');
         let excQuery = supabase.from('drum_exceptions').select('*');
         
@@ -1075,7 +1075,7 @@ export const drumsAPI = {
       // Mapowanie danych (z mapowaniem wyjątków)
       return allData.map(drum => {
         const extension = customDeadlines.find(
-          ext => ext.kod_bebna === drum.cecha && ext.nip === drum.nip
+          ext => (ext.kod_bebna === drum.cecha || ext.kod_bebna === drum.kod_bebna) && ext.nip === drum.nip
         );
 
         // Obliczenie wirtualnej daty zwrotu dla bębnów 'Własnych' (120 dni od wydania)
@@ -1113,7 +1113,7 @@ export const drumsAPI = {
         let statusObj = supabaseHelpers.getDrumStatus(dateForStatus);
 
         // Nadpisanie statusu jeśli bęben jest w wyjątkach
-        const exception = exceptions.find(e => e.kod_bebna === drum.cecha && e.nip === drum.nip);
+        const exception = exceptions.find(e => (e.kod_bebna === drum.cecha || e.kod_bebna === drum.kod_bebna) && e.nip === drum.nip);
         if (exception) {
           if (exception.exception_type === 'lost') {
             statusObj = { status: 'Zagubiony', color: 'bg-red-100 text-red-800' };
@@ -1122,7 +1122,7 @@ export const drumsAPI = {
           }
         }
 
-        const clientNoteObj = clientNotes.find(n => n.kod_bebna === drum.cecha && n.nip === drum.nip);
+        const clientNoteObj = clientNotes.find(n => (n.kod_bebna === drum.cecha || n.kod_bebna === drum.kod_bebna) && n.nip === drum.nip);
         const clientNote = clientNoteObj ? clientNoteObj.note : null;
 
         return {

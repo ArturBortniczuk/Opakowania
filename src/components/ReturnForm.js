@@ -755,18 +755,34 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
                   const isSelected = !!selectedItem;
                   const isReported = drum.isReported; // Flaga zgłoszonego bębna
 
-                  // Obliczanie % zwrotu (zależny wyłącznie od ilości dni w posiadaniu)
+                  // Obliczanie % zwrotu
                   let returnPercentage = 100;
-                  const daysInPossession = drum.daysInPossession !== undefined 
-                    ? drum.daysInPossession 
-                    : (drum.data_wydania_z_magazynu ? Math.ceil((new Date() - new Date(drum.data_wydania_z_magazynu)) / (1000 * 60 * 60 * 24)) : 0);
+                  const deadline = drum.clientReturnDeadline ? new Date(drum.clientReturnDeadline) : null;
+                  
+                  if (deadline) {
+                    const now = new Date();
+                    now.setHours(0,0,0,0);
+                    deadline.setHours(0,0,0,0);
+                    const daysPastDeadline = Math.ceil((now - deadline) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysPastDeadline <= 0) returnPercentage = 100;
+                    else if (daysPastDeadline <= 30) returnPercentage = 90;
+                    else if (daysPastDeadline <= 60) returnPercentage = 75;
+                    else if (daysPastDeadline <= 120) returnPercentage = 50;
+                    else if (daysPastDeadline <= 220) returnPercentage = 25;
+                    else returnPercentage = 0;
+                  } else {
+                    const daysInPossession = drum.daysInPossession !== undefined 
+                      ? drum.daysInPossession 
+                      : (drum.data_wydania_z_magazynu ? Math.ceil((new Date() - new Date(drum.data_wydania_z_magazynu)) / (1000 * 60 * 60 * 24)) : 0);
 
-                  if (daysInPossession <= 120) returnPercentage = 100;
-                  else if (daysInPossession <= 150) returnPercentage = 90;
-                  else if (daysInPossession <= 180) returnPercentage = 75;
-                  else if (daysInPossession <= 240) returnPercentage = 50;
-                  else if (daysInPossession <= 340) returnPercentage = 25;
-                  else returnPercentage = 0;
+                    if (daysInPossession <= 120) returnPercentage = 100;
+                    else if (daysInPossession <= 150) returnPercentage = 90;
+                    else if (daysInPossession <= 180) returnPercentage = 75;
+                    else if (daysInPossession <= 240) returnPercentage = 50;
+                    else if (daysInPossession <= 340) returnPercentage = 25;
+                    else returnPercentage = 0;
+                  }
 
                   const drumPrice = parsePriceRaw(drum.cena_netto_bebna) * 1.2;
                   const refundValue = drumPrice * (returnPercentage / 100);
@@ -828,7 +844,18 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
                       </p>
 
                       <p className={`text-xs mb-3 font-medium ${isLateOrSoon && !isReported ? 'text-red-600' : 'text-gray-500'}`}>
-                        Termin zwrotu: {returnDate ? new Date(returnDate).toLocaleDateString('pl-PL') : 'Brak'}
+                        Termin zwrotu: {returnDate ? (
+                          <>
+                            <span className={drum.isExtended ? 'text-indigo-600 font-semibold' : ''}>
+                              {new Date(returnDate).toLocaleDateString('pl-PL')}
+                            </span>
+                            {drum.isExtended && (
+                              <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 border border-indigo-200 text-indigo-700" title={drum.extensionNotes}>
+                                Uzgodniony
+                              </span>
+                            )}
+                          </>
+                        ) : 'Brak'}
                         {!isReported && daysLeft !== null && ` (${daysLeft >= 0 ? `Pozostało: ${daysLeft} dni` : `Opóźnienie: ${Math.abs(daysLeft)} dni`})`}
                       </p>
 
