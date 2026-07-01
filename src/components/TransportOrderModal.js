@@ -13,6 +13,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   const [mpk, setMpk] = useState('');
   const [transportMethod, setTransportMethod] = useState('spedycja');
   const [checkedDrums, setCheckedDrums] = useState([]);
+  const [drumProviders, setDrumProviders] = useState({});
 
   useEffect(() => {
     if (isOpen && request) {
@@ -22,8 +23,26 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
       setCheckedDrums(allDrumCechas);
       fetchUserMpk();
       setTransportDate(request.collection_date ? request.collection_date.split('T')[0] : new Date().toISOString().split('T')[0]);
+      
+      const fetchProviders = async () => {
+        try {
+          const cechy = request.selected_drums?.map(d => typeof d === 'object' ? d.cecha || d.kod_bebna : d) || [];
+          if (cechy.length > 0) {
+            const { data } = await supabase.from('drums').select('cecha, kon_dostawca').in('cecha', cechy);
+            if (data) {
+              const pMap = {};
+              data.forEach(d => { pMap[d.cecha] = d.kon_dostawca; });
+              setDrumProviders(pMap);
+            }
+          }
+        } catch (e) {
+          console.error('Błąd pobierania dostawców', e);
+        }
+      };
+      fetchProviders();
     } else {
       setCheckedDrums([]);
+      setDrumProviders({});
     }
   }, [isOpen, request]);
 
@@ -184,7 +203,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
               {request.selected_drums?.filter(d => typeof d !== 'object' || d.transported !== true).map((drum, idx) => {
                 const cecha = typeof drum === 'object' ? drum.cecha || drum.kod_bebna : drum;
                 const nazwa = typeof drum === 'object' ? drum.nazwa || drum.rozmiar_bebna : '';
-                const dostawca = typeof drum === 'object' ? drum.kon_dostawca || 'KABLOWNI' : 'KABLOWNI';
+                const dostawca = drumProviders[cecha] || (typeof drum === 'object' ? drum.kon_dostawca : null) || 'Brak danych';
                 const isChecked = checkedDrums.includes(cecha);
                 
                 return (
