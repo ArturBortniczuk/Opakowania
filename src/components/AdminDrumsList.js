@@ -652,22 +652,21 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
     }
 
     const isAnyOverdue = isSupplierOverdue || isClientOverdue;
-    const titleColor = isAnyOverdue ? 'text-red-600' : 'text-gray-900';
-    const valueColor = isAnyOverdue ? 'text-red-600' : 'text-gray-900';
+    const isReturned = reportedCechas.has(drum.cecha) || reportedCechas.has(drum.kod_bebna) || drum.status === 'reported' || drum.status === 'Zgłoszone do zwrotu';
 
     return (
       <div
-        className={`bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] h-full flex flex-col ${isAnyOverdue ? 'border-red-200' : (drum.borderColor || 'border-gray-200')}`}
+        className={`bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] h-full flex flex-col ${drum.borderColor || 'border-gray-200'}`}
         style={{ animationDelay: `${index * 50}ms` }}
       >
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-3 min-w-0 flex-1">
-            <div className={`w-12 h-12 bg-gradient-to-br ${isAnyOverdue ? 'from-red-500 to-red-700' : 'from-blue-600 to-blue-700'} rounded-xl flex items-center justify-center shadow-lg`}>
+            <div className={`w-12 h-12 bg-gradient-to-br ${isReturned ? 'from-emerald-500 to-emerald-600' : 'from-blue-600 to-blue-700'} rounded-xl flex items-center justify-center shadow-lg`}>
               <Package className="w-6 h-6 text-white" />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className={`font-bold truncate text-lg ${titleColor}`}>{drum.cecha || drum.kod_bebna || 'Brak cechy'}</h3>
-              <p className={`text-sm truncate ${isAnyOverdue ? 'text-red-400' : 'text-gray-600'}`}>
+              <h3 className="font-bold text-gray-900 truncate text-lg">{drum.cecha || drum.kod_bebna || 'Brak cechy'}</h3>
+              <p className="text-gray-600 text-sm truncate">
                 {drum.cecha ? `${drum.kod_bebna} • ${drum.rozmiar_bebna ? `FI ${drum.rozmiar_bebna}` : 'Brak rozmiaru'}` : (drum.rozmiar_bebna ? `FI ${drum.rozmiar_bebna}` : 'Brak rozmiaru')}
               </p>
             </div>
@@ -677,26 +676,26 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
         <div className="space-y-3 flex-1">
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Firma</span>
-            <span className={`text-sm font-medium truncate ml-2 ${valueColor}`}>
+            <span className="text-sm font-medium text-gray-900 truncate ml-2">
               {drum.company || drum.pelna_nazwa_kontrahenta || 'Brak nazwy'}
             </span>
           </div>
 
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">NIP</span>
-            <span className={`text-sm font-medium ${valueColor}`}>{drum.nip || 'Brak NIP'}</span>
+            <span className="text-sm font-medium text-gray-900">{drum.nip || 'Brak NIP'}</span>
           </div>
 
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Nr faktury</span>
-            <span className={`text-sm font-medium truncate ml-2 ${valueColor}`}>
+            <span className="text-sm font-medium text-gray-900 truncate ml-2">
               {drum.numer_faktury || 'Brak faktury'}
             </span>
           </div>
 
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Lokalizacja</span>
-            <span className={`text-sm font-medium truncate ml-2 ${valueColor}`} title={drum.adres_dostawy || drum.nazwa_punktu_dostawy}>
+            <span className="text-sm font-medium text-gray-900 truncate ml-2" title={drum.adres_dostawy || drum.nazwa_punktu_dostawy}>
               {drum.adres_dostawy || drum.nazwa_punktu_dostawy || 'Brak lokalizacji'}
             </span>
           </div>
@@ -704,10 +703,10 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
           {isAdmin && (
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-500">Zwrot do dostawcy</span>
-              <span className={`text-sm font-medium ${isSupplierOverdue ? 'text-red-600 font-bold' : valueColor}`}>
+              <span className={`text-sm font-medium ${isSupplierOverdue ? 'text-red-600 font-bold' : 'text-gray-900'}`}>
                 {drum.DATA_ZWROTU_DO_DOSTAWCY ?
                   new Date(drum.DATA_ZWROTU_DO_DOSTAWCY).toLocaleDateString('pl-PL') :
-                  <span className={isAnyOverdue ? "text-red-600 font-bold" : "text-indigo-600 font-semibold"}>Własny</span>
+                  <span className="text-indigo-600 font-semibold">Własny</span>
                 }
               </span>
             </div>
@@ -715,7 +714,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
 
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Zwrot od klienta</span>
-            <span className={`text-sm font-medium flex items-center space-x-1 ${isClientOverdue ? 'text-red-600 font-bold' : valueColor}`}>
+            <span className={`text-sm font-medium flex items-center space-x-1 ${isClientOverdue ? 'text-red-600 font-bold' : 'text-gray-900'}`}>
               {drum.clientReturnDeadline ? (
                 <>
                   <span className={drum.isExtended ? (isClientOverdue ? "text-red-600 font-bold" : "text-indigo-600 font-semibold") : ""}>
@@ -723,7 +722,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
                   </span>
                   {drum.isExtended && (
                     <span 
-                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border cursor-help ${isAnyOverdue ? 'bg-red-50 border-red-200 text-red-700' : 'bg-indigo-50 border-indigo-200 text-indigo-700'}`}
+                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border cursor-help ${isClientOverdue ? 'bg-red-50 border-red-200 text-red-700' : 'bg-indigo-50 border-indigo-200 text-indigo-700'}`}
                       title={drum.extensionNotes || "Indywidualny termin zwrotu"}
                     >
                       Przedłużony
@@ -738,7 +737,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
 
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Dni w posiadaniu</span>
-            <span className={`text-sm font-medium ${valueColor}`}>
+            <span className="text-sm font-medium text-gray-900">
               {drum.daysInPossession || 0}
             </span>
           </div>
@@ -754,21 +753,21 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
 
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500">Termin płatności</span>
-                <span className={`text-sm font-medium ${valueColor}`}>
+                <span className="text-sm font-medium text-gray-900">
                   {drum.termin_platnosci || 'Brak terminu'}
                 </span>
               </div>
 
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500">Kabel na bębnie</span>
-                <span className={`text-sm font-medium truncate max-w-[150px] ${valueColor}`} title={drum.nawiniety_kabel || 'Brak informacji'}>
+                <span className="text-sm font-medium text-gray-900 truncate max-w-[150px]" title={drum.nawiniety_kabel || 'Brak informacji'}>
                   {drum.nawiniety_kabel || 'Brak informacji'}
                 </span>
               </div>
 
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500">Ilość kabla</span>
-                <span className={`text-sm font-medium ${valueColor}`}>
+                <span className="text-sm font-medium text-gray-900">
                   {drum.ilosc_kabla ? `${drum.ilosc_kabla} m` : 'Brak informacji'}
                 </span>
               </div>
