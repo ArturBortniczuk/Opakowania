@@ -80,36 +80,38 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
   const handleTransportConfirm = async (transportData) => {
     try {
-      // 1. Wyślij do systemu Transport
-      const spedycjaPayload = {
-        createdBy: user?.name || 'Admin Opakowania',
-        createdByEmail: user?.email || 'admin@grupaeltron.pl',
-        responsiblePerson: user?.name || 'Admin Opakowania',
-        responsibleEmail: user?.email || 'admin@grupaeltron.pl',
-        mpk: transportData.mpk,
-        location: 'Odbiory własne',
-        producerAddress: {
-          city: requestForTransport.city,
-          postalCode: requestForTransport.postal_code,
-          street: requestForTransport.street
-        },
-        delivery: transportData.deliveryAddress,
-        loadingContact: `${requestForTransport.profile_name || ''} ${requestForTransport.profile_phone || ''}`.trim(),
-        unloadingContact: '',
-        deliveryDate: transportData.transportDate,
-        notes: `Zgłoszenie z Opakowań #${requestForTransport.id}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}\n${requestForTransport.notes || ''}`,
-        clientName: requestForTransport.company_name,
-        sourceClientName: requestForTransport.company_name,
-        goodsDescription: [
-          {
-            name: `Bębny z kablowni (${requestForTransport.selected_drums?.length || 0} szt.)`,
-            weight: transportData.totalWeight,
-            type: 'Bębny'
-          }
-        ]
-      };
+      // 1. Wyślij do systemu Transport (tylko dla spedycji)
+      if (transportData.transportMethod === 'spedycja') {
+        const spedycjaPayload = {
+          createdBy: user?.name || 'Admin Opakowania',
+          createdByEmail: user?.email || 'admin@grupaeltron.pl',
+          responsiblePerson: user?.name || 'Admin Opakowania',
+          responsibleEmail: user?.email || 'admin@grupaeltron.pl',
+          mpk: transportData.mpk,
+          location: 'Odbiory własne',
+          producerAddress: {
+            city: requestForTransport.city,
+            postalCode: requestForTransport.postal_code,
+            street: requestForTransport.street
+          },
+          delivery: transportData.deliveryAddress,
+          loadingContact: `${requestForTransport.profile_name || ''} ${requestForTransport.profile_phone || ''}`.trim(),
+          unloadingContact: '',
+          deliveryDate: transportData.transportDate,
+          notes: `Zgłoszenie z Opakowań #${requestForTransport.id}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}\n${requestForTransport.notes || ''}`,
+          clientName: requestForTransport.company_name,
+          sourceClientName: requestForTransport.company_name,
+          goodsDescription: [
+            {
+              name: `Bębny z kablowni (${requestForTransport.selected_drums?.length || 0} szt.)`,
+              weight: transportData.totalWeight,
+              type: 'Bębny'
+            }
+          ]
+        };
 
-      await transportAPI.createTransportOrder(spedycjaPayload);
+        await transportAPI.createTransportOrder(spedycjaPayload);
+      }
 
       // 2. Zmień status w Opakowaniach na InTransit i ustaw datę
       await returnsAPI.updateReturnStatus(requestForTransport.id, {
@@ -121,7 +123,12 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
       setRequestForTransport(null);
       if (showRequestDetails) setShowRequestDetails(false);
       handleRefresh();
-      alert('Zlecenie spedycyjne zostało pomyślnie wysłane do systemu Transport!');
+      
+      if (transportData.transportMethod === 'spedycja') {
+        alert('Zlecenie spedycyjne zostało pomyślnie wysłane do systemu Transport!');
+      } else {
+        alert('Status zgłoszenia został zaktualizowany na Transport własny.');
+      }
     } catch (err) {
       console.error('Błąd wysyłania zlecenia:', err);
       alert('Nie udało się wysłać zlecenia: ' + err.message);

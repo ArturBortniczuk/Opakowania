@@ -11,6 +11,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   const [transportDate, setTransportDate] = useState('');
   const [calculatingWeight, setCalculatingWeight] = useState(false);
   const [mpk, setMpk] = useState('');
+  const [transportMethod, setTransportMethod] = useState('spedycja');
 
   useEffect(() => {
     if (isOpen && request) {
@@ -57,28 +58,41 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
       const allDimensions = await calculatorAPI.getDrumDimensions();
       
       drums.forEach(drum => {
-        // drum może być obiektem lub stringiem
-        const drumName = (typeof drum === 'object' ? (drum.nazwa || drum.cecha || drum.kod_bebna || '') : drum).toUpperCase();
+        let foundWeight = null;
         
-        // Szukamy pasującego wymiaru
-        let diameterCm = null;
-        const fiMatch = drumName.match(/FI\s*(\d+)/);
-        if (fiMatch) {
-          diameterCm = parseInt(fiMatch[1], 10) * 10; // Fi jest w dm, baza w cm
-        } else {
-          const numMatch = drumName.match(/(\d+)/);
-          if (numMatch) {
-            const val = parseInt(numMatch[1], 10);
-            diameterCm = val < 40 ? val * 10 : val; // Zgadywanie czy dm czy cm
-          }
+        // Sprawdzamy czy bęben ma już określoną wagę
+        if (typeof drum === 'object' && drum !== null) {
+           const explicitWeight = drum.waga_bebna || drum.WAGA_BEBNA || drum.waga || drum.weight || drum.waga_netto;
+           if (explicitWeight && !isNaN(parseFloat(explicitWeight))) {
+               foundWeight = parseFloat(explicitWeight);
+           }
         }
 
-        let foundWeight = 50; // Waga domyślna
-        
-        if (diameterCm) {
-          const matchedDim = allDimensions.find(d => parseFloat(d.outer_diameter) === diameterCm);
-          if (matchedDim && matchedDim.weight) {
-            foundWeight = parseFloat(matchedDim.weight);
+        if (foundWeight === null) {
+          // drum może być obiektem lub stringiem
+          const drumName = (typeof drum === 'object' ? (drum.nazwa || drum.cecha || drum.kod_bebna || '') : drum).toUpperCase();
+          
+          // Szukamy pasującego wymiaru
+          let diameterCm = null;
+          const fiMatch = drumName.match(/FI\s*(\d+)/);
+          if (fiMatch) {
+            const val = parseInt(fiMatch[1], 10);
+            diameterCm = val < 40 ? val * 10 : val; // Zgadywanie czy dm czy cm
+          } else {
+            const numMatch = drumName.match(/(\d+)/);
+            if (numMatch) {
+              const val = parseInt(numMatch[1], 10);
+              diameterCm = val < 40 ? val * 10 : val; // Zgadywanie czy dm czy cm
+            }
+          }
+
+          foundWeight = 50; // Waga domyślna
+          
+          if (diameterCm) {
+            const matchedDim = allDimensions.find(d => parseFloat(d.outer_diameter) === diameterCm);
+            if (matchedDim && matchedDim.weight) {
+              foundWeight = parseFloat(matchedDim.weight);
+            }
           }
         }
         calcWeight += foundWeight;
@@ -110,7 +124,8 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
       deliveryAddress,
       totalWeight,
       transportDate,
-      mpk
+      mpk,
+      transportMethod
     });
   };
 
@@ -145,6 +160,42 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
           </div>
 
           <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Sposób transportu
+              </label>
+              <div className="flex gap-4">
+                <label className={`flex-1 flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${transportMethod === 'spedycja' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                  <input
+                    type="radio"
+                    name="transportMethod"
+                    value="spedycja"
+                    checked={transportMethod === 'spedycja'}
+                    onChange={(e) => setTransportMethod(e.target.value)}
+                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <span className="block text-sm font-semibold text-gray-900">Spedycja</span>
+                    <span className="block text-xs text-gray-500">Zgłoszenie do systemu Transport</span>
+                  </div>
+                </label>
+                <label className={`flex-1 flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${transportMethod === 'wlasny' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                  <input
+                    type="radio"
+                    name="transportMethod"
+                    value="wlasny"
+                    checked={transportMethod === 'wlasny'}
+                    onChange={(e) => setTransportMethod(e.target.value)}
+                    className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <div>
+                    <span className="block text-sm font-semibold text-gray-900">Transport własny</span>
+                    <span className="block text-xs text-gray-500">Tylko zmiana statusu zgłoszenia</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
