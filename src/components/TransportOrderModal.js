@@ -12,14 +12,28 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   const [calculatingWeight, setCalculatingWeight] = useState(false);
   const [mpk, setMpk] = useState('');
   const [transportMethod, setTransportMethod] = useState('spedycja');
+  const [checkedDrums, setCheckedDrums] = useState([]);
 
   useEffect(() => {
     if (isOpen && request) {
-      calculateInitialWeight(request.selected_drums);
+      const allDrumCechas = request.selected_drums?.map(d => typeof d === 'object' ? d.cecha || d.kod_bebna : d) || [];
+      setCheckedDrums(allDrumCechas);
       fetchUserMpk();
       setTransportDate(request.collection_date ? request.collection_date.split('T')[0] : new Date().toISOString().split('T')[0]);
+    } else {
+      setCheckedDrums([]);
     }
   }, [isOpen, request]);
+
+  useEffect(() => {
+    if (isOpen && request) {
+      const selected = request.selected_drums?.filter(d => {
+        const cecha = typeof d === 'object' ? d.cecha || d.kod_bebna : d;
+        return checkedDrums.includes(cecha);
+      }) || [];
+      calculateInitialWeight(selected);
+    }
+  }, [checkedDrums, isOpen, request]);
 
   const fetchUserMpk = async () => {
     // Sprawdzamy klienta i jego przypisanego handlowca
@@ -125,7 +139,8 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
       totalWeight,
       transportDate,
       mpk,
-      transportMethod
+      transportMethod,
+      transportedDrumCechas: checkedDrums
     });
   };
 
@@ -156,6 +171,40 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
                 <span className="block text-sm text-blue-800">{request.company_name}</span>
                 <span className="block text-xs text-blue-600">{request.street}, {request.postal_code} {request.city}</span>
               </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Bębny do odebrania ({checkedDrums.length} z {request.selected_drums?.length || 0})
+            </label>
+            <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100 bg-white">
+              {request.selected_drums?.map((drum, idx) => {
+                const cecha = typeof drum === 'object' ? drum.cecha || drum.kod_bebna : drum;
+                const nazwa = typeof drum === 'object' ? drum.nazwa || drum.rozmiar_bebna : '';
+                const isChecked = checkedDrums.includes(cecha);
+                
+                return (
+                  <label key={idx} className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50 transition-colors ${!isChecked ? 'opacity-50' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setCheckedDrums(prev => [...prev, cecha]);
+                        } else {
+                          setCheckedDrums(prev => prev.filter(c => c !== cecha));
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-semibold text-gray-900">{cecha}</span>
+                      {nazwa && <span className="text-xs text-gray-500">{nazwa}</span>}
+                    </div>
+                  </label>
+                );
+              })}
             </div>
           </div>
 

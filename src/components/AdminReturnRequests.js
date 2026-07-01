@@ -80,6 +80,13 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
   const handleTransportConfirm = async (transportData) => {
     try {
+      const updatedDrums = requestForTransport.selected_drums.map(d => {
+        const cecha = typeof d === 'object' ? d.cecha || d.kod_bebna : d;
+        const isTransported = transportData.transportedDrumCechas.includes(cecha);
+        return typeof d === 'object' ? { ...d, transported: isTransported } : { cecha: d, transported: isTransported };
+      });
+      const transportedCount = transportData.transportedDrumCechas.length;
+
       // 1. Wyślij do systemu Transport (tylko dla spedycji)
       if (transportData.transportMethod === 'spedycja') {
         const spedycjaPayload = {
@@ -103,7 +110,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
           sourceClientName: requestForTransport.company_name,
           goodsDescription: [
             {
-              name: `Bębny z kablowni (${requestForTransport.selected_drums?.length || 0} szt.)`,
+              name: `Bębny z kablowni (${transportedCount} szt.)`,
               weight: transportData.totalWeight,
               type: 'Bębny'
             }
@@ -116,7 +123,8 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
       // 2. Zmień status w Opakowaniach na InTransit i ustaw datę
       await returnsAPI.updateReturnStatus(requestForTransport.id, {
         status: 'InTransit',
-        transport_date: transportData.transportDate
+        transport_date: transportData.transportDate,
+        selected_drums: updatedDrums
       });
       
       setShowTransportModal(false);
@@ -579,7 +587,9 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Wybrane bębny ({selectedRequest.selected_drums?.length || 0} szt.)</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Wybrane bębny ({selectedRequest.selected_drums?.filter(d => typeof d === 'object' && d.transported !== false)?.length || 0} z {selectedRequest.selected_drums?.length || 0} szt.)
+                </h3>
                 {enriching && (
                   <div className="flex items-center space-x-2 text-xs text-blue-600 font-medium animate-pulse">
                     <RefreshCw className="w-3 h-3 animate-spin" />
@@ -587,6 +597,17 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                   </div>
                 )}
               </div>
+              
+              {selectedRequest.selected_drums?.some(d => typeof d === 'object' && d.transported === false) && (
+                <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl text-sm font-medium flex items-start gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                  <div>
+                    <span className="block font-bold">Zgłoszenie częściowe</span>
+                    Niektóre z bębnów na tym zgłoszeniu nie zostały odebrane przez transport (zaznaczone na szaro). Ponownie stały się one dostępne na liście bębnów klienta, do zwrotu w ramach nowego zgłoszenia.
+                  </div>
+                </div>
+              )}
+              
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {Array.isArray(selectedRequest.selected_drums) && selectedRequest.selected_drums.map((drum, idx) => {
                   const label = getDrumLabel(drum);
@@ -619,12 +640,17 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                     daysLeftToReturn = Math.ceil((returnDeadline - new Date()) / (1000 * 60 * 60 * 24));
                   }
 
+                  const isNotTransported = drum.transported === false;
+                  
                   return (
-                    <div key={idx} className={`p-4 rounded-xl border flex flex-col ${damaged ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}`}>
+                    <div key={idx} className={`p-4 rounded-xl border flex flex-col ${isNotTransported ? 'bg-gray-100 border-gray-300 opacity-60 grayscale hover:grayscale-0 transition-all' : damaged ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}`}>
                       <div className="flex items-center justify-between mb-2">
-                        <span className={`font-bold text-lg ${damaged ? 'text-red-700' : 'text-blue-700'}`}>
-                          {label}
-                        </span>
+                        <div className="flex flex-col">
+                          <span className={`font-bold text-lg ${isNotTransported ? 'text-gray-500 line-through' : damaged ? 'text-red-700' : 'text-blue-700'}`}>
+                            {label}
+                          </span>
+                          {isNotTransported && <span className="text-[10px] font-bold text-red-600 uppercase">Nie zabrano / Odrzucono</span>}
+                        </div>
                         {damaged && <AlertTriangle className="w-5 h-5 text-red-500" title="Uszkodzony" />}
                       </div>
                       

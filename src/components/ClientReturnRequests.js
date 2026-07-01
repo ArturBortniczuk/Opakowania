@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { returnsAPI } from '../utils/supabaseApi';
-import { Truck, Clock, CheckCircle, XCircle, Calendar, Package, MapPin, Plus, RefreshCw, ChevronDown, ChevronUp, User } from 'lucide-react';
+import { Truck, Clock, CheckCircle, XCircle, Calendar, Package, MapPin, Plus, RefreshCw, ChevronDown, ChevronUp, User, AlertTriangle } from 'lucide-react';
 
 const ClientReturnRequests = ({ user }) => {
   const navigate = useNavigate();
@@ -353,24 +353,44 @@ const ClientReturnRequests = ({ user }) => {
                       {/* Pełna lista bębnów z uszkodzeniami */}
                       <div>
                         <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider block mb-2">Zgłoszone bębny w tym zleceniu</span>
+                        
+                        {req.selected_drums?.some(d => typeof d === 'object' && d.transported === false) && (
+                          <div className="mb-3 bg-amber-50/50 border border-amber-200/50 text-amber-800 p-2.5 rounded-lg text-xs flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-semibold">Część bębnów nie została odebrana.</span><br />
+                              Zaznaczone na szaro bębny wróciły na Twoją listę "Oczekujących na zwrot" i możesz je ponownie zgłosić.
+                            </div>
+                          </div>
+                        )}
+                        
                         <div className="flex flex-wrap gap-2">
                           {Array.isArray(req.selected_drums) && req.selected_drums.map((drum, idx) => {
                             const label = getDrumLabel(drum);
                             const damaged = isDrumDamaged(drum);
+                            const isNotTransported = typeof drum === 'object' && drum !== null && drum.transported === false;
+                            
                             return (
                               <div 
                                 key={idx} 
                                 className={`
                                   px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border flex items-center space-x-1.5 shadow-sm transition-all duration-200 hover:shadow-md
-                                  ${damaged 
-                                    ? 'bg-rose-50/80 text-rose-700 border-rose-200 hover:bg-rose-100' 
-                                    : 'bg-white text-gray-750 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                                  ${isNotTransported
+                                    ? 'bg-gray-100/50 text-gray-500 border-gray-200 line-through opacity-70'
+                                    : damaged 
+                                      ? 'bg-rose-50/80 text-rose-700 border-rose-200 hover:bg-rose-100' 
+                                      : 'bg-white text-gray-750 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
                                   }
                                 `}
                               >
-                                <Package className={`w-3.5 h-3.5 shrink-0 ${damaged ? 'text-rose-500' : 'text-gray-400'}`} />
+                                <Package className={`w-3.5 h-3.5 shrink-0 ${isNotTransported ? 'text-gray-400' : damaged ? 'text-rose-500' : 'text-gray-400'}`} />
                                 <span>{label}</span>
-                                {damaged && (
+                                {isNotTransported && (
+                                  <span className="text-[8px] uppercase font-extrabold bg-gray-200 text-gray-600 px-1 py-0.2 rounded shrink-0 line-through-none">
+                                    Nie odebrano
+                                  </span>
+                                )}
+                                {damaged && !isNotTransported && (
                                   <span className="text-[8px] uppercase font-extrabold bg-rose-200 text-rose-800 px-1 py-0.2 rounded shrink-0">
                                     Uszkodzony
                                   </span>
