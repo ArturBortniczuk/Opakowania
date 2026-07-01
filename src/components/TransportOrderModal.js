@@ -70,7 +70,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
 
         if (foundWeight === null) {
           // drum może być obiektem lub stringiem
-          const drumName = (typeof drum === 'object' ? (drum.nazwa || drum.cecha || drum.kod_bebna || '') : drum).toUpperCase();
+          const drumName = (typeof drum === 'object' ? (drum.rozmiar_bebna || drum.nazwa || drum.cecha || drum.kod_bebna || '') : String(drum)).toUpperCase();
           
           // Szukamy pasującego wymiaru
           let diameterCm = null;
