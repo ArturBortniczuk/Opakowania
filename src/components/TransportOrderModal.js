@@ -184,6 +184,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
               {request.selected_drums?.filter(d => typeof d !== 'object' || d.transported !== true).map((drum, idx) => {
                 const cecha = typeof drum === 'object' ? drum.cecha || drum.kod_bebna : drum;
                 const nazwa = typeof drum === 'object' ? drum.nazwa || drum.rozmiar_bebna : '';
+                const dostawca = typeof drum === 'object' ? drum.kon_dostawca || 'KABLOWNI' : 'KABLOWNI';
                 const isChecked = checkedDrums.includes(cecha);
                 
                 return (
@@ -201,7 +202,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
                       className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                     />
                     <div className="flex flex-col">
-                      <span className="text-sm font-semibold text-gray-900">{cecha}</span>
+                      <span className="text-sm font-semibold text-gray-900">{cecha} <span className="text-xs text-blue-600 ml-1">({dostawca})</span></span>
                       {nazwa && <span className="text-xs text-gray-500">{nazwa}</span>}
                     </div>
                   </label>

@@ -762,7 +762,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                   </button>
                 )}
 
-                {selectedRequest.status === 'Completed' && (
+                {(selectedRequest.status === 'Completed' || selectedRequest.status === 'InTransit') && (
                   <button
                     onClick={() => {
                       handleAddCorrectionNumber(selectedRequest.id);
