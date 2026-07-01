@@ -82,7 +82,9 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     try {
       const updatedDrums = requestForTransport.selected_drums.map(d => {
         const cecha = typeof d === 'object' ? d.cecha || d.kod_bebna : d;
-        const isTransported = transportData.transportedDrumCechas.includes(cecha);
+        const wasTransported = typeof d === 'object' && d.transported === true;
+        const isTransportedNow = transportData.transportedDrumCechas.includes(cecha);
+        const isTransported = wasTransported || isTransportedNow;
         return typeof d === 'object' ? { ...d, transported: isTransported } : { cecha: d, transported: isTransported };
       });
       const transportedCount = transportData.transportedDrumCechas.length;
@@ -602,8 +604,8 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                 <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl text-sm font-medium flex items-start gap-2">
                   <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
                   <div>
-                    <span className="block font-bold">Zgłoszenie częściowe</span>
-                    Niektóre z bębnów na tym zgłoszeniu nie zostały odebrane przez transport (zaznaczone na szaro). Ponownie stały się one dostępne na liście bębnów klienta, do zwrotu w ramach nowego zgłoszenia.
+                    <span className="block font-bold">Zgłoszenie w trakcie realizacji</span>
+                    Niektóre z bębnów na tym zgłoszeniu nie zostały odebrane podczas ostatniego transportu. Zgłoszenie pozostaje otwarte. Możesz zlecić kolejny transport dla pozostałych bębnów lub ręcznie zakończyć zgłoszenie.
                   </div>
                 </div>
               )}
@@ -734,7 +736,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                   </>
                 )}
 
-                {selectedRequest.status === 'Approved' && (
+                {(selectedRequest.status === 'Approved' || (selectedRequest.status === 'InTransit' && selectedRequest.selected_drums?.some(d => typeof d === 'object' && d.transported === false))) && (
                   <button
                     onClick={() => {
                       setRequestForTransport(selectedRequest);
@@ -743,7 +745,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                     className="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
                   >
                     <Truck className="w-5 h-5" />
-                    <span>Rozpocznij transport</span>
+                    <span>{selectedRequest.status === 'InTransit' ? 'Zleć kolejny transport' : 'Rozpocznij transport'}</span>
                   </button>
                 )}
 

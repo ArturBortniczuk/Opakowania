@@ -509,8 +509,7 @@ export const drumsAPI = {
             if (Array.isArray(drums)) {
               drums.forEach(d => {
                 const cecha = typeof d === 'object' ? d.cecha : d;
-                const isNotTransported = typeof d === 'object' && d !== null && d.transported === false;
-                if (cecha && !isNotTransported) reportedCechas.add(cecha);
+                if (cecha) reportedCechas.add(cecha);
               });
             }
           });

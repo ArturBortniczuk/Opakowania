@@ -16,7 +16,9 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
 
   useEffect(() => {
     if (isOpen && request) {
-      const allDrumCechas = request.selected_drums?.map(d => typeof d === 'object' ? d.cecha || d.kod_bebna : d) || [];
+      const allDrumCechas = request.selected_drums
+        ?.filter(d => typeof d !== 'object' || d.transported !== true)
+        .map(d => typeof d === 'object' ? d.cecha || d.kod_bebna : d) || [];
       setCheckedDrums(allDrumCechas);
       fetchUserMpk();
       setTransportDate(request.collection_date ? request.collection_date.split('T')[0] : new Date().toISOString().split('T')[0]);
@@ -176,10 +178,10 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Bębny do odebrania ({checkedDrums.length} z {request.selected_drums?.length || 0})
+              Bębny do odebrania ({checkedDrums.length} z {request.selected_drums?.filter(d => typeof d !== 'object' || d.transported !== true).length || 0})
             </label>
             <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100 bg-white">
-              {request.selected_drums?.map((drum, idx) => {
+              {request.selected_drums?.filter(d => typeof d !== 'object' || d.transported !== true).map((drum, idx) => {
                 const cecha = typeof drum === 'object' ? drum.cecha || drum.kod_bebna : drum;
                 const nazwa = typeof drum === 'object' ? drum.nazwa || drum.rozmiar_bebna : '';
                 const isChecked = checkedDrums.includes(cecha);

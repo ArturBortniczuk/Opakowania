@@ -358,8 +358,8 @@ const ClientReturnRequests = ({ user }) => {
                           <div className="mb-3 bg-amber-50/50 border border-amber-200/50 text-amber-800 p-2.5 rounded-lg text-xs flex items-start gap-2">
                             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                             <div>
-                              <span className="font-semibold">Część bębnów nie została odebrana.</span><br />
-                              Zaznaczone na szaro bębny wróciły na Twoją listę "Oczekujących na zwrot" i możesz je ponownie zgłosić.
+                              <span className="font-semibold">Część bębnów nie została odebrana w tym transporcie.</span><br />
+                              Zaznaczone na szaro bębny wciąż oczekują na odbiór. Zgłoszenie pozostaje dla nich otwarte.
                             </div>
                           </div>
                         )}
