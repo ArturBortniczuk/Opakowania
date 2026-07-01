@@ -179,7 +179,7 @@ const LogisticsMap = () => {
 
       // 2. Pobieramy aktywne zwroty
       const retRes = await returnsAPI.getReturns();
-      const validPickups = [];
+      const pickupsByLoc = {};
 
       (retRes || [])
         .filter(r => r.status === 'Pending' || r.status === 'Approved')
@@ -201,15 +201,23 @@ const LogisticsMap = () => {
           }
 
           if (lat && lng) {
-            validPickups.push({
+            const locKey = `${lat},${lng}`;
+            if (!pickupsByLoc[locKey]) {
+              pickupsByLoc[locKey] = {
+                id: `loc_pickup_${locKey}`,
+                lat: parseFloat(lat),
+                lng: parseFloat(lng),
+                title: companyName ? `Zgłoszenia: ${companyName}` : `Zgłoszenia Odbioru`,
+                type: 'pickup',
+                companyName: companyName,
+                address: address,
+                pickups: []
+              };
+            }
+            
+            pickupsByLoc[locKey].pickups.push({
               id: `ret_${r.id}`,
               requestId: r.id,
-              lat: parseFloat(lat),
-              lng: parseFloat(lng),
-              title: `Zgłoszenie Odbioru #${r.id}`,
-              type: 'pickup',
-              companyName: companyName,
-              address: address,
               drumsCount: r.selected_drums ? r.selected_drums.length : 0,
               selected_drums: r.selected_drums,
               status: r.status,
@@ -236,7 +244,9 @@ const LogisticsMap = () => {
       const missingList = Object.values(missingByLoc).sort((a, b) => b.count - a.count);
       setMissingAddresses(missingList);
 
-      setLocations([...groupedDrums, ...validPickups]);
+      const groupedPickups = Object.values(pickupsByLoc);
+
+      setLocations([...groupedDrums, ...groupedPickups]);
     } catch (error) {
       console.error('Błąd pobierania danych do mapy:', error);
     }
@@ -595,45 +605,53 @@ const LogisticsMap = () => {
                       )}
                       
                       {selectedLocation.type === 'pickup' && (
-                        <>
-                          <div className="bg-purple-50 p-2 rounded mb-3 border border-purple-100">
-                            <p className="text-sm text-gray-800 mb-1">Status: <strong>{selectedLocation.status}</strong></p>
-                            <p className="text-sm text-gray-800 mb-1">Planowana data: <strong>{selectedLocation.date ? new Date(selectedLocation.date).toLocaleDateString() : 'Brak'}</strong></p>
-                            <div className="flex justify-between items-center mt-2 pt-2 border-t border-purple-200">
-                              <span className="text-sm text-purple-800 font-medium">Zgłoszone bębny: <span className="font-bold">{selectedLocation.drumsCount}</span></span>
-                              <a 
-                                href={`/admin/returns?searchTerm=${selectedLocation.requestId}&openModalId=${selectedLocation.requestId}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-2 py-1 bg-purple-600 text-white hover:bg-purple-700 rounded text-xs font-medium transition-colors flex items-center"
-                              >
-                                <Eye className="w-3.5 h-3.5 mr-1" /> Szczegóły zgłoszenia
-                              </a>
+                        <div className="max-h-[400px] overflow-y-auto pr-1">
+                          {selectedLocation.pickups.map(pickup => (
+                            <div key={pickup.id} className="mb-4 last:mb-0 border-b last:border-0 pb-4 last:pb-0 border-gray-200">
+                              <div className="flex justify-between items-center mb-2">
+                                <h4 className="font-bold text-purple-800 text-sm">Zgłoszenie #{pickup.requestId}</h4>
+                                <a 
+                                  href={`/admin/returns?searchTerm=${pickup.requestId}&openModalId=${pickup.requestId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2 py-1 bg-purple-600 text-white hover:bg-purple-700 rounded text-xs font-medium transition-colors flex items-center"
+                                >
+                                  <Eye className="w-3.5 h-3.5 mr-1" /> Szczegóły
+                                </a>
+                              </div>
+                              
+                              <div className="bg-purple-50 p-2 rounded mb-3 border border-purple-100">
+                                <p className="text-sm text-gray-800 mb-1">Status: <strong>{pickup.status}</strong></p>
+                                <p className="text-sm text-gray-800 mb-1">Planowana data: <strong>{pickup.date ? new Date(pickup.date).toLocaleDateString() : 'Brak'}</strong></p>
+                                <div className="mt-2 pt-2 border-t border-purple-200">
+                                  <span className="text-sm text-purple-800 font-medium">Zgłoszone bębny: <span className="font-bold">{pickup.drumsCount}</span></span>
+                                </div>
+                              </div>
+                              
+                              {pickup.selected_drums && pickup.selected_drums.length > 0 && (
+                                <div className="space-y-1.5 mb-3">
+                                  {pickup.selected_drums.map((drum, idx) => {
+                                    const cecha = typeof drum === 'object' ? (drum.cecha || drum.kod_bebna) : drum;
+                                    const isDamaged = typeof drum === 'object' && drum.isDamaged;
+                                    return (
+                                      <div key={idx} className={`flex flex-col p-2 rounded border ${isDamaged ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'}`}>
+                                        <div className="flex justify-between items-start">
+                                          <span className={`font-mono text-sm font-bold ${isDamaged ? 'text-red-700' : 'text-gray-800'}`}>
+                                            {cecha || 'Brak cechy'}
+                                          </span>
+                                          {isDamaged && <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 ml-1" title="Zgłoszono uszkodzenie" />}
+                                        </div>
+                                        {typeof drum === 'object' && drum.description && (
+                                          <p className="text-[10px] text-gray-600 italic mt-1 truncate">{drum.description}</p>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
-                          </div>
-                          
-                          {selectedLocation.selected_drums && selectedLocation.selected_drums.length > 0 && (
-                            <div className="max-h-56 overflow-y-auto pr-1 space-y-1.5 mb-3">
-                              {selectedLocation.selected_drums.map((drum, idx) => {
-                                const cecha = typeof drum === 'object' ? (drum.cecha || drum.kod_bebna) : drum;
-                                const isDamaged = typeof drum === 'object' && drum.isDamaged;
-                                return (
-                                  <div key={idx} className={`flex flex-col p-2 rounded border ${isDamaged ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'}`}>
-                                    <div className="flex justify-between items-start">
-                                      <span className={`font-mono text-sm font-bold ${isDamaged ? 'text-red-700' : 'text-gray-800'}`}>
-                                        {cecha || 'Brak cechy'}
-                                      </span>
-                                      {isDamaged && <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 ml-1" title="Zgłoszono uszkodzenie" />}
-                                    </div>
-                                    {typeof drum === 'object' && drum.description && (
-                                      <p className="text-[10px] text-gray-600 italic mt-1 truncate">{drum.description}</p>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </>
+                          ))}
+                        </div>
                       )}
 
                       <div className="mt-2">
