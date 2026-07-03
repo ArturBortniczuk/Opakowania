@@ -182,7 +182,7 @@ const LogisticsMap = () => {
       const pickupsByLoc = {};
 
       (retRes || [])
-        .filter(r => r.status === 'Pending' || r.status === 'Approved')
+        .filter(r => r.status === 'Pending' || r.status === 'Approved' || r.status === 'InTransit')
         .forEach(r => {
           let lat = r.latitude;
           let lng = r.longitude;
@@ -219,9 +219,25 @@ const LogisticsMap = () => {
               id: `ret_${r.id}`,
               requestId: r.id,
               drumsCount: r.selected_drums ? r.selected_drums.length : 0,
-              selected_drums: r.selected_drums,
+              selected_drums: (r.selected_drums || []).map(drum => {
+                const cecha = typeof drum === 'object' ? (drum.cecha || drum.kod_bebna) : drum;
+                const isDamaged = typeof drum === 'object' && drum.isDamaged;
+                const description = typeof drum === 'object' ? drum.description : '';
+                const fullDrum = drumsData.find(d => (d.cecha || d.kod_bebna) === cecha) || {};
+                
+                return {
+                  cecha,
+                  isDamaged,
+                  description,
+                  kon_dostawca: typeof drum === 'object' && drum.kon_dostawca ? drum.kon_dostawca : fullDrum.kon_dostawca,
+                  rozmiar_bebna: typeof drum === 'object' && drum.rozmiar_bebna ? drum.rozmiar_bebna : (fullDrum.rozmiar_bebna || fullDrum.nazwa)
+                };
+              }),
               status: r.status,
-              date: r.collection_date
+              date: r.collection_date,
+              profilePhone: r.profile_phone || '',
+              profileName: r.profile_name || '',
+              mpk: r.mpk || ''
             });
           } else {
             // Dodaj do listy brakujących adresów, by można było przypisać ręcznie
@@ -257,13 +273,17 @@ const LogisticsMap = () => {
   }, []);
 
   // Kustomowe Ikony SVG (Pin Google z własnym kolorem)
-  const getMarkerIcon = (type, maxAgeDays = 0) => {
+  const getMarkerIcon = (type, maxAgeDays = 0, status = null) => {
     if (!window.google) return null; // Zabezpieczenie przed błędem przed wczytaniem skryptu
 
     let fillColor = '#3B82F6'; // Domyślny niebieski
     
     if (type === 'pickup') {
-      fillColor = '#8B5CF6'; // Fioletowy dla zgłoszeń odbioru
+      if (status === 'InTransit') {
+        fillColor = '#F97316'; // Pomarańczowy dla zgłoszeń w transporcie
+      } else {
+        fillColor = '#8B5CF6'; // Fioletowy dla pozostałych zgłoszeń
+      }
     } else if (type === 'drums') {
       if (maxAgeDays > 120) {
         fillColor = '#EF4444'; // Czerwony
@@ -536,7 +556,8 @@ const LogisticsMap = () => {
                 options={{ clickableIcons: false, gestureHandling: 'greedy' }}
               >
                 {filteredLocations.map((loc) => {
-                  const icon = getMarkerIcon(loc.type, loc.maxAgeDays);
+                  const isInTransit = loc.type === 'pickup' && loc.pickups.some(p => p.status === 'InTransit');
+                  const icon = getMarkerIcon(loc.type, loc.maxAgeDays, isInTransit ? 'InTransit' : 'Pending');
                   if (!icon) return null; // Jeszcze nie załadowano Google Maps API
 
                   return (
@@ -559,10 +580,25 @@ const LogisticsMap = () => {
                     onCloseClick={() => setSelectedLocation(null)}
                   >
                     <div className="p-3 max-w-sm w-80">
-                      <h3 className="font-bold text-gray-900 mb-1 border-b pb-1 truncate" title={selectedLocation.title}>{selectedLocation.title}</h3>
-                      <p className="text-sm font-medium text-gray-700 mb-2 truncate flex items-center">
-                        <Building className="w-3 h-3 mr-1 inline" /> {selectedLocation.companyName}
-                      </p>
+                      <h3 className="font-bold text-gray-900 mb-1 border-b pb-1 truncate" title={selectedLocation.title}>
+                        {selectedLocation.type === 'pickup' ? 'Zgłoszenia Odbioru' : selectedLocation.title}
+                      </h3>
+                      
+                      <div className="mb-3 border-b border-gray-100 pb-2">
+                        <p className="text-sm font-bold text-blue-700 truncate flex items-center">
+                          <Building className="w-4 h-4 mr-1.5 inline" /> {selectedLocation.companyName}
+                        </p>
+                        {selectedLocation.mpk && (
+                          <p className="text-xs text-gray-600 mt-1 truncate flex items-center">
+                            <span className="font-bold mr-1">MPK:</span> {selectedLocation.mpk}
+                          </p>
+                        )}
+                        {selectedLocation.address && (
+                          <p className="text-xs text-gray-600 mt-1 truncate flex items-center">
+                            <MapPin className="w-3 h-3 mr-1.5 inline" /> {selectedLocation.address}
+                          </p>
+                        )}
+                      </div>
                       
                       {selectedLocation.type === 'drums' && (
                         <>
@@ -621,8 +657,11 @@ const LogisticsMap = () => {
                               </div>
                               
                               <div className="bg-purple-50 p-2 rounded mb-3 border border-purple-100">
-                                <p className="text-sm text-gray-800 mb-1">Status: <strong>{pickup.status}</strong></p>
+                                <p className="text-sm text-gray-800 mb-1">Status: <strong className={pickup.status === 'InTransit' ? 'text-orange-600' : ''}>{pickup.status}</strong></p>
                                 <p className="text-sm text-gray-800 mb-1">Planowana data: <strong>{pickup.date ? new Date(pickup.date).toLocaleDateString() : 'Brak'}</strong></p>
+                                {pickup.profilePhone && (
+                                  <p className="text-xs text-gray-600 mt-1.5">Kontakt: <strong>{pickup.profileName} {pickup.profilePhone}</strong></p>
+                                )}
                                 <div className="mt-2 pt-2 border-t border-purple-200">
                                   <span className="text-sm text-purple-800 font-medium">Zgłoszone bębny: <span className="font-bold">{pickup.drumsCount}</span></span>
                                 </div>
@@ -631,17 +670,25 @@ const LogisticsMap = () => {
                               {pickup.selected_drums && pickup.selected_drums.length > 0 && (
                                 <div className="space-y-1.5 mb-3">
                                   {pickup.selected_drums.map((drum, idx) => {
-                                    const cecha = typeof drum === 'object' ? (drum.cecha || drum.kod_bebna) : drum;
-                                    const isDamaged = typeof drum === 'object' && drum.isDamaged;
+                                    const cecha = drum.cecha;
+                                    const isDamaged = drum.isDamaged;
                                     return (
                                       <div key={idx} className={`flex flex-col p-2 rounded border ${isDamaged ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'}`}>
                                         <div className="flex justify-between items-start">
-                                          <span className={`font-mono text-sm font-bold ${isDamaged ? 'text-red-700' : 'text-gray-800'}`}>
-                                            {cecha || 'Brak cechy'}
-                                          </span>
+                                          <div className="flex flex-col">
+                                            <span className={`font-mono text-sm font-bold ${isDamaged ? 'text-red-700' : 'text-gray-800'}`}>
+                                              {cecha || 'Brak cechy'}
+                                              {drum.kon_dostawca && (
+                                                <span className="text-xs font-normal text-gray-500 ml-1">({drum.kon_dostawca})</span>
+                                              )}
+                                            </span>
+                                            {drum.rozmiar_bebna && (
+                                              <span className="text-xs text-gray-600">{drum.rozmiar_bebna}</span>
+                                            )}
+                                          </div>
                                           {isDamaged && <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 ml-1" title="Zgłoszono uszkodzenie" />}
                                         </div>
-                                        {typeof drum === 'object' && drum.description && (
+                                        {drum.description && (
                                           <p className="text-[10px] text-gray-600 italic mt-1 truncate">{drum.description}</p>
                                         )}
                                       </div>
@@ -676,6 +723,7 @@ const LogisticsMap = () => {
               <div className="flex items-center"><div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div> 50-100 dni</div>
               <div className="flex items-center"><div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div> 0-50 dni</div>
               <div className="flex items-center"><div className="w-3 h-3 rounded-full bg-purple-500 mr-2"></div> Odbiory (Zgłoszenia)</div>
+              <div className="flex items-center"><div className="w-3 h-3 rounded-full bg-orange-500 mr-2"></div> Odbiory w Transporcie</div>
             </div>
           </div>
 
