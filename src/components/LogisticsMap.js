@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
 import { supabase } from '../lib/supabase';
-import { returnsAPI, drumsAPI } from '../utils/supabaseApi';
+import { returnsAPI, drumsAPI, transportAPI } from '../utils/supabaseApi';
 import GeocodeMigration from './GeocodeMigration';
 import { MapPin, Map as MapIcon, X, Check, Search, AlertTriangle, Filter, Building, User, Eye } from 'lucide-react';
+import TransportOrderModal from './TransportOrderModal';
 
 const containerStyle = {
   width: '100%',
@@ -25,7 +26,7 @@ const getAgeInDays = (dateStr) => {
   return Math.floor(diffTime / (1000 * 60 * 60 * 24));
 };
 
-const LogisticsMap = () => {
+const LogisticsMap = ({ user }) => {
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || ''
@@ -55,6 +56,11 @@ const LogisticsMap = () => {
   const [assigningLocation, setAssigningLocation] = useState(null);
   const [temporaryMarker, setTemporaryMarker] = useState(null);
   const [isSavingManual, setIsSavingManual] = useState(false);
+
+  // Transport z mapy
+  const [showTransportModal, setShowTransportModal] = useState(false);
+  const [requestForTransport, setRequestForTransport] = useState(null);
+  const [selectedDrumsForTransport, setSelectedDrumsForTransport] = useState([]);
 
   const onLoad = useCallback(function callback(map) {
     setMap(map);
@@ -426,6 +432,128 @@ const LogisticsMap = () => {
     }
   }, [assigningLocation, fetchData]);
 
+  const handleDrumToggle = (cecha, e) => {
+    e.stopPropagation();
+    setSelectedDrumsForTransport(prev => 
+      prev.includes(cecha) ? prev.filter(c => c !== cecha) : [...prev, cecha]
+    );
+  };
+
+  const handleCreateTransportRequest = async () => {
+    if (!selectedLocation || selectedDrumsForTransport.length === 0) return;
+    
+    const nip = selectedLocation.drums[0].nip || '0000000000';
+    const companyName = selectedLocation.companyName || 'Nieznany Klient';
+    const addressStr = selectedLocation.address || '';
+    
+    let street = addressStr;
+    let postalCode = '00-000';
+    let city = 'Nieznane';
+    const parts = addressStr.split(',');
+    if (parts.length >= 2) {
+      street = parts[0].trim();
+      const cityZip = parts[1].trim().split(' ');
+      if (cityZip.length >= 2) {
+         postalCode = cityZip[0];
+         city = cityZip.slice(1).join(' ');
+      } else {
+         city = parts[1].trim();
+      }
+    }
+
+    try {
+      const returnData = {
+        user_nip: nip,
+        company_name: companyName,
+        email: user?.email || 'admin@opakowania.pl',
+        street: street,
+        postal_code: postalCode,
+        city: city,
+        loading_hours: '8:00 - 15:00',
+        available_equipment: 'Brak danych',
+        notes: 'Zgłoszenie wygenerowane automatycznie przez administratora z poziomu mapy logistycznej.',
+        selected_drums: selectedDrumsForTransport.map(cecha => ({ cecha, isDamaged: false, description: '' })),
+        profile_name: user?.name || 'Administrator',
+        profile_email: user?.email || '',
+        profile_phone: ''
+      };
+
+      const newRequest = await returnsAPI.createReturn(returnData);
+      const approvedRequest = await returnsAPI.updateReturnStatus(newRequest.id, { status: 'Approved' });
+      
+      setRequestForTransport(approvedRequest);
+      setShowTransportModal(true);
+      
+    } catch (error) {
+      console.error('Błąd tworzenia zgłoszenia z mapy:', error);
+      alert('Nie udało się utworzyć zgłoszenia zwrotu.');
+    }
+  };
+
+  const handleTransportConfirm = async (transportData) => {
+    try {
+      const updatedDrums = requestForTransport.selected_drums.map(d => {
+        const cecha = typeof d === 'object' ? d.cecha || d.kod_bebna : d;
+        const isTransportedNow = transportData.transportedDrumCechas.includes(cecha);
+        return { ...d, transported: isTransportedNow };
+      });
+      const transportedCount = transportData.transportedDrumCechas.length;
+
+      if (transportData.transportMethod === 'spedycja') {
+        const spedycjaPayload = {
+          createdBy: user?.name || 'Admin Opakowania',
+          createdByEmail: user?.email || 'admin@grupaeltron.pl',
+          responsiblePerson: user?.name || 'Admin Opakowania',
+          responsibleEmail: user?.email || 'admin@grupaeltron.pl',
+          mpk: transportData.mpk,
+          location: 'Odbiory własne',
+          producerAddress: {
+            city: requestForTransport.city,
+            postalCode: requestForTransport.postal_code,
+            street: requestForTransport.street
+          },
+          delivery: transportData.deliveryAddress,
+          loadingContact: `${requestForTransport.profile_name || ''} ${requestForTransport.profile_phone || ''}`.trim(),
+          unloadingContact: '',
+          deliveryDate: transportData.transportDate,
+          notes: `Zgłoszenie z Opakowań #${requestForTransport.id}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}\n${requestForTransport.notes || ''}`,
+          clientName: requestForTransport.company_name,
+          sourceClientName: requestForTransport.company_name,
+          goodsDescription: [
+            {
+              name: `Bębny z kablowni (${transportedCount} szt.)`,
+              weight: transportData.totalWeight,
+              type: 'Bębny'
+            }
+          ]
+        };
+
+        await transportAPI.createTransportOrder(spedycjaPayload);
+      }
+
+      await returnsAPI.updateReturnStatus(requestForTransport.id, {
+        status: 'InTransit',
+        transport_date: transportData.transportDate,
+        selected_drums: updatedDrums
+      });
+      
+      setShowTransportModal(false);
+      setRequestForTransport(null);
+      setSelectedDrumsForTransport([]);
+      setSelectedLocation(null);
+      fetchData();
+      
+      if (transportData.transportMethod === 'spedycja') {
+        alert('Zlecenie spedycyjne zostało pomyślnie wysłane do systemu Transport!');
+      } else {
+        alert('Status zgłoszenia został zaktualizowany na Transport własny.');
+      }
+    } catch (err) {
+      console.error('Błąd wysyłania zlecenia z mapy:', err);
+      alert('Nie udało się wysłać zlecenia: ' + err.message);
+    }
+  };
+
   if (loadError) return <div className="p-4 bg-red-50 text-red-700 rounded-lg">Błąd ładowania mapy. Upewnij się, że klucz API jest poprawny.</div>;
   if (!isLoaded) return <div className="p-4">Ładowanie mapy...</div>;
 
@@ -565,7 +693,12 @@ const LogisticsMap = () => {
                       key={loc.id}
                       position={{ lat: loc.lat, lng: loc.lng }}
                       icon={icon}
-                      onClick={() => !assigningLocation && setSelectedLocation(loc)}
+                      onClick={() => {
+                        if (!assigningLocation) {
+                          setSelectedLocation(loc);
+                          setSelectedDrumsForTransport([]);
+                        }
+                      }}
                     />
                   );
                 })}
@@ -577,7 +710,7 @@ const LogisticsMap = () => {
                 {selectedLocation && !assigningLocation && (
                   <InfoWindowF
                     position={{ lat: selectedLocation.lat, lng: selectedLocation.lng }}
-                    onCloseClick={() => setSelectedLocation(null)}
+                    onCloseClick={() => { setSelectedLocation(null); setSelectedDrumsForTransport([]); }}
                   >
                     <div className="p-3 max-w-sm w-80">
                       <h3 className="font-bold text-gray-900 mb-1 border-b pb-1 truncate" title={selectedLocation.title}>
@@ -610,15 +743,25 @@ const LogisticsMap = () => {
                           <div className="max-h-56 overflow-y-auto pr-1 space-y-1.5 mb-3">
                             {selectedLocation.filteredDrums.map(drum => {
                               const isOverdue = drum.age_days > 120;
+                              const cecha = drum.cecha || drum.kod_bebna || 'Brak cechy';
+                              const isSelected = selectedDrumsForTransport.includes(cecha);
                               return (
-                                <div key={drum.id} className={`flex flex-col p-2 rounded border ${isOverdue ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'}`}>
+                                <div 
+                                  key={drum.id} 
+                                  onClick={(e) => handleDrumToggle(cecha, e)}
+                                  className={`flex flex-col p-2 rounded border cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50 border-indigo-400 shadow-sm' : isOverdue ? 'bg-red-50 border-red-200 hover:border-indigo-300' : 'bg-gray-50 border-gray-100 hover:border-indigo-300'}`}
+                                >
                                   <div className="flex justify-between items-start">
                                     <div className="flex items-center">
-                                      <span className="font-mono text-sm font-bold text-gray-800">{drum.cecha || drum.kod_bebna || 'Brak cechy'}</span>
+                                      <div className={`w-4 h-4 rounded border flex items-center justify-center mr-2 flex-shrink-0 transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300 bg-white'}`}>
+                                        {isSelected && <Check className="w-3 h-3 text-white" />}
+                                      </div>
+                                      <span className="font-mono text-sm font-bold text-gray-800">{cecha}</span>
                                       <a 
-                                        href={`/admin/drums?searchTerm=${encodeURIComponent(drum.cecha || drum.kod_bebna)}&openModal=true`}
+                                        href={`/admin/drums?searchTerm=${encodeURIComponent(cecha)}&openModal=true`}
                                         target="_blank"
                                         rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
                                         className="ml-2 p-1 bg-white hover:bg-gray-100 border border-gray-200 rounded text-gray-500 hover:text-blue-600 transition-colors inline-block"
                                         title="Zobacz szczegóły bębna w nowej karcie"
                                       >
@@ -637,6 +780,18 @@ const LogisticsMap = () => {
                               );
                             })}
                           </div>
+                          
+                          {selectedDrumsForTransport.length > 0 && (
+                            <div className="mt-2 pt-3 border-t border-gray-100 flex justify-between items-center bg-indigo-50 p-2 rounded-lg">
+                              <span className="text-xs text-indigo-800 font-medium">Wybrano bębnów: <strong className="text-indigo-900">{selectedDrumsForTransport.length}</strong></span>
+                              <button 
+                                onClick={handleCreateTransportRequest}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm"
+                              >
+                                Zleć transport
+                              </button>
+                            </div>
+                          )}
                         </>
                       )}
                       
@@ -657,7 +812,13 @@ const LogisticsMap = () => {
                               </div>
                               
                               <div className="bg-purple-50 p-2 rounded mb-3 border border-purple-100">
-                                <p className="text-sm text-gray-800 mb-1">Status: <strong className={pickup.status === 'InTransit' ? 'text-orange-600' : ''}>{pickup.status}</strong></p>
+                                <p className="text-sm text-gray-800 mb-1">Status: <strong className={pickup.status === 'InTransit' ? 'text-orange-600' : ''}>
+                                  {pickup.status === 'Pending' ? 'Oczekujące' : 
+                                   pickup.status === 'Approved' ? 'Zatwierdzone do transportu' :
+                                   pickup.status === 'InTransit' ? 'W transporcie' :
+                                   pickup.status === 'Completed' ? 'Zakończone' :
+                                   pickup.status === 'Rejected' ? 'Odrzucone' : pickup.status}
+                                </strong></p>
                                 <p className="text-sm text-gray-800 mb-1">Planowana data: <strong>{pickup.date ? new Date(pickup.date).toLocaleDateString() : 'Brak'}</strong></p>
                                 {pickup.profilePhone && (
                                   <p className="text-xs text-gray-600 mt-1.5">Kontakt: <strong>{pickup.profileName} {pickup.profilePhone}</strong></p>
@@ -810,6 +971,17 @@ const LogisticsMap = () => {
       </div>
 
       <GeocodeMigration />
+      
+      <TransportOrderModal
+        isOpen={showTransportModal}
+        onClose={() => {
+          setShowTransportModal(false);
+          setRequestForTransport(null);
+        }}
+        onConfirm={handleTransportConfirm}
+        request={requestForTransport}
+        user={user}
+      />
     </div>
   );
 };
