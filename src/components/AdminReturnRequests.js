@@ -242,18 +242,41 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     );
   };
 
-  const getPriorityBadge = (priority) => {
+  const handlePriorityChange = async (requestId, newPriority) => {
+    if (!canChangeStatus) return;
+    try {
+      await returnsAPI.updateReturnStatus(requestId, { priority: newPriority });
+      handleRefresh();
+    } catch (err) {
+      console.error('Błąd zmiany priorytetu:', err);
+      alert('Nie udało się zmienić priorytetu.');
+    }
+  };
+
+  const getPriorityBadge = (request) => {
     const badges = {
       High: { color: 'text-red-500', bg: 'bg-red-50', text: 'Priorytet: Wysoki', icon: AlertTriangle },
       Normal: { color: 'text-gray-400', bg: 'bg-gray-50', text: 'Priorytet: Normalny', icon: Circle },
       Low: { color: 'text-blue-400', bg: 'bg-blue-50', text: 'Priorytet: Niski', icon: ArrowDown }
     };
 
+    const priority = request.priority || 'Normal';
     const badge = badges[priority] || badges.Normal;
     const Icon = badge.icon || Circle;
 
+    const handleClick = (e) => {
+      e.stopPropagation();
+      if (!canChangeStatus) return;
+      const nextPriority = priority === 'High' ? 'Normal' : 'High';
+      handlePriorityChange(request.id, nextPriority);
+    };
+
     return (
-      <div className={`p-2 rounded-xl border border-transparent hover:border-current transition-colors cursor-help ${badge.bg} ${badge.color}`} title={badge.text}>
+      <div 
+        onClick={handleClick}
+        className={`p-2 rounded-xl border border-transparent transition-colors ${canChangeStatus ? 'cursor-pointer hover:border-current hover:bg-gray-100' : 'cursor-help'} ${badge.bg} ${badge.color}`} 
+        title={canChangeStatus ? `${badge.text} (Kliknij, aby zmienić)` : badge.text}
+      >
         <Icon className="w-5 h-5" />
       </div>
     );
@@ -333,7 +356,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
           <div className="flex items-center gap-2 shrink-0">
             {getStatusBadge(request.status)}
-            {getPriorityBadge(request.priority)}
+            {getPriorityBadge(request)}
           </div>
         </div>
 
@@ -469,7 +492,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                 <h2 className="text-2xl font-bold text-gray-900">Zgłoszenie zwrotu #{selectedRequest.id}</h2>
                 <div className="flex items-center space-x-3 mt-2">
                   {getStatusBadge(selectedRequest.status)}
-                  {getPriorityBadge(selectedRequest.priority)}
+                  {getPriorityBadge(selectedRequest)}
                 </div>
               </div>
               <button
@@ -558,7 +581,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Priorytet</label>
-                    <div className="mt-1">{getPriorityBadge(selectedRequest.priority)}</div>
+                    <div className="mt-1">{getPriorityBadge(selectedRequest)}</div>
                   </div>
                   {selectedRequest.transport_date && (
                     <div>

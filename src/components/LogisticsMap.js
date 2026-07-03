@@ -264,6 +264,7 @@ const LogisticsMap = ({ user }) => {
                 };
               }),
               status: r.status,
+              priority: r.priority,
               date: r.collection_date,
               profileEmail: r.email || r.profile_email || '',
               profilePhone: r.profile_phone || extractedPhone || '',
@@ -305,13 +306,15 @@ const LogisticsMap = ({ user }) => {
   }, []);
 
   // Kustomowe Ikony SVG (Pin Google z własnym kolorem)
-  const getMarkerIcon = (type, maxAgeDays = 0, status = null) => {
+  const getMarkerIcon = (type, maxAgeDays = 0, status = null, priority = null) => {
     if (!window.google) return null; // Zabezpieczenie przed błędem przed wczytaniem skryptu
 
     let fillColor = '#3B82F6'; // Domyślny niebieski
     
     if (type === 'pickup') {
-      if (status === 'InTransit') {
+      if (priority === 'High') {
+        fillColor = '#EF4444'; // Czerwony dla priorytetowych zgłoszeń
+      } else if (status === 'InTransit') {
         fillColor = '#F97316'; // Pomarańczowy dla zgłoszeń w transporcie
       } else {
         fillColor = '#8B5CF6'; // Fioletowy dla pozostałych zgłoszeń
@@ -652,7 +655,8 @@ const LogisticsMap = ({ user }) => {
               >
                 {filteredLocations.map((loc) => {
                   const isInTransit = loc.type === 'pickup' && loc.pickups.some(p => p.status === 'InTransit');
-                  const icon = getMarkerIcon(loc.type, loc.maxAgeDays, isInTransit ? 'InTransit' : 'Pending');
+                  const isHighPriority = loc.type === 'pickup' && loc.pickups.some(p => p.priority === 'High');
+                  const icon = getMarkerIcon(loc.type, loc.maxAgeDays, isInTransit ? 'InTransit' : 'Pending', isHighPriority ? 'High' : 'Normal');
                   if (!icon) return null; // Jeszcze nie załadowano Google Maps API
 
                   return (
@@ -756,7 +760,10 @@ const LogisticsMap = ({ user }) => {
                           {selectedLocation.pickups.map(pickup => (
                             <div key={pickup.id} className="mb-4 last:mb-0 border-b last:border-0 pb-4 last:pb-0 border-gray-200">
                               <div className="flex justify-between items-center mb-2">
-                                <h4 className="font-bold text-purple-800 text-sm">Zgłoszenie #{pickup.requestId}</h4>
+                                <h4 className="font-bold text-purple-800 text-sm flex items-center">
+                                  Zgłoszenie #{pickup.requestId}
+                                  {pickup.priority === 'High' && <AlertTriangle className="w-4 h-4 text-red-500 ml-1.5" title="Priorytet: Wysoki" />}
+                                </h4>
                                 <a 
                                   href={`/admin/returns?searchTerm=${pickup.requestId}&openModalId=${pickup.requestId}`}
                                   target="_blank"
