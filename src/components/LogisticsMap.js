@@ -220,6 +220,10 @@ const LogisticsMap = ({ user }) => {
               };
             }
             
+            const notesStr = r.notes || '';
+            const matchPhone = notesStr.match(/Telefon kontaktowy:\s*([^\n]+)/);
+            const extractedPhone = matchPhone ? matchPhone[1].trim() : '';
+
             pickupsByLoc[locKey].pickups.push({
               id: `ret_${r.id}`,
               requestId: r.id,
@@ -240,7 +244,7 @@ const LogisticsMap = ({ user }) => {
               }),
               status: r.status,
               date: r.collection_date,
-              profilePhone: r.profile_phone || '',
+              profilePhone: r.profile_phone || extractedPhone || '',
               profileName: r.profile_name || '',
               mpk: r.mpk || '',
               originalRequest: r
@@ -673,7 +677,9 @@ const LogisticsMap = ({ user }) => {
                         )}
                         {selectedLocation.type === 'pickup' && selectedLocation.pickups?.[0]?.profilePhone && (
                           <p className="text-xs text-gray-600 mt-1 truncate flex items-center">
-                            <User className="w-3 h-3 mr-1.5 inline" /> {selectedLocation.pickups[0].profileName} <span className="font-bold ml-1">{selectedLocation.pickups[0].profilePhone}</span>
+                            <User className="w-3 h-3 mr-1.5 inline" /> 
+                            {selectedLocation.pickups[0].profileName && <span>{selectedLocation.pickups[0].profileName} </span>}
+                            <span className="font-bold ml-1">{selectedLocation.pickups[0].profilePhone}</span>
                           </p>
                         )}
                       </div>
