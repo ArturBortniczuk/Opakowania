@@ -4,7 +4,7 @@ import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-m
 import { supabase } from '../lib/supabase';
 import { returnsAPI, drumsAPI, transportAPI } from '../utils/supabaseApi';
 import GeocodeMigration from './GeocodeMigration';
-import { MapPin, Map as MapIcon, X, Check, Search, AlertTriangle, Filter, Building, User, Eye } from 'lucide-react';
+import { MapPin, Map as MapIcon, X, Check, Search, AlertTriangle, Filter, Building, User, Eye, Truck } from 'lucide-react';
 import TransportOrderModal from './TransportOrderModal';
 
 const containerStyle = {
@@ -60,7 +60,6 @@ const LogisticsMap = ({ user }) => {
   // Transport z mapy
   const [showTransportModal, setShowTransportModal] = useState(false);
   const [requestForTransport, setRequestForTransport] = useState(null);
-  const [selectedDrumsForTransport, setSelectedDrumsForTransport] = useState([]);
 
   const onLoad = useCallback(function callback(map) {
     setMap(map);
@@ -243,7 +242,8 @@ const LogisticsMap = ({ user }) => {
               date: r.collection_date,
               profilePhone: r.profile_phone || '',
               profileName: r.profile_name || '',
-              mpk: r.mpk || ''
+              mpk: r.mpk || '',
+              originalRequest: r
             });
           } else {
             // Dodaj do listy brakujących adresów, by można było przypisać ręcznie
@@ -432,64 +432,6 @@ const LogisticsMap = ({ user }) => {
     }
   }, [assigningLocation, fetchData]);
 
-  const handleDrumToggle = (cecha, e) => {
-    e.stopPropagation();
-    setSelectedDrumsForTransport(prev => 
-      prev.includes(cecha) ? prev.filter(c => c !== cecha) : [...prev, cecha]
-    );
-  };
-
-  const handleCreateTransportRequest = async () => {
-    if (!selectedLocation || selectedDrumsForTransport.length === 0) return;
-    
-    const nip = selectedLocation.drums[0].nip || '0000000000';
-    const companyName = selectedLocation.companyName || 'Nieznany Klient';
-    const addressStr = selectedLocation.address || '';
-    
-    let street = addressStr;
-    let postalCode = '00-000';
-    let city = 'Nieznane';
-    const parts = addressStr.split(',');
-    if (parts.length >= 2) {
-      street = parts[0].trim();
-      const cityZip = parts[1].trim().split(' ');
-      if (cityZip.length >= 2) {
-         postalCode = cityZip[0];
-         city = cityZip.slice(1).join(' ');
-      } else {
-         city = parts[1].trim();
-      }
-    }
-
-    try {
-      const returnData = {
-        user_nip: nip,
-        company_name: companyName,
-        email: user?.email || 'admin@opakowania.pl',
-        street: street,
-        postal_code: postalCode,
-        city: city,
-        loading_hours: '8:00 - 15:00',
-        available_equipment: 'Brak danych',
-        notes: 'Zgłoszenie wygenerowane automatycznie przez administratora z poziomu mapy logistycznej.',
-        selected_drums: selectedDrumsForTransport.map(cecha => ({ cecha, isDamaged: false, description: '' })),
-        profile_name: user?.name || 'Administrator',
-        profile_email: user?.email || '',
-        profile_phone: ''
-      };
-
-      const newRequest = await returnsAPI.createReturn(returnData);
-      const approvedRequest = await returnsAPI.updateReturnStatus(newRequest.id, { status: 'Approved' });
-      
-      setRequestForTransport(approvedRequest);
-      setShowTransportModal(true);
-      
-    } catch (error) {
-      console.error('Błąd tworzenia zgłoszenia z mapy:', error);
-      alert('Nie udało się utworzyć zgłoszenia zwrotu.');
-    }
-  };
-
   const handleTransportConfirm = async (transportData) => {
     try {
       const updatedDrums = requestForTransport.selected_drums.map(d => {
@@ -539,7 +481,6 @@ const LogisticsMap = ({ user }) => {
       
       setShowTransportModal(false);
       setRequestForTransport(null);
-      setSelectedDrumsForTransport([]);
       setSelectedLocation(null);
       fetchData();
       
@@ -696,7 +637,6 @@ const LogisticsMap = ({ user }) => {
                       onClick={() => {
                         if (!assigningLocation) {
                           setSelectedLocation(loc);
-                          setSelectedDrumsForTransport([]);
                         }
                       }}
                     />
@@ -710,7 +650,7 @@ const LogisticsMap = ({ user }) => {
                 {selectedLocation && !assigningLocation && (
                   <InfoWindowF
                     position={{ lat: selectedLocation.lat, lng: selectedLocation.lng }}
-                    onCloseClick={() => { setSelectedLocation(null); setSelectedDrumsForTransport([]); }}
+                    onCloseClick={() => setSelectedLocation(null)}
                   >
                     <div className="p-3 max-w-sm w-80">
                       <h3 className="font-bold text-gray-900 mb-1 border-b pb-1 truncate" title={selectedLocation.title}>
@@ -731,6 +671,11 @@ const LogisticsMap = ({ user }) => {
                             <MapPin className="w-3 h-3 mr-1.5 inline" /> {selectedLocation.address}
                           </p>
                         )}
+                        {selectedLocation.type === 'pickup' && selectedLocation.pickups?.[0]?.profilePhone && (
+                          <p className="text-xs text-gray-600 mt-1 truncate flex items-center">
+                            <User className="w-3 h-3 mr-1.5 inline" /> {selectedLocation.pickups[0].profileName} <span className="font-bold ml-1">{selectedLocation.pickups[0].profilePhone}</span>
+                          </p>
+                        )}
                       </div>
                       
                       {selectedLocation.type === 'drums' && (
@@ -743,25 +688,15 @@ const LogisticsMap = ({ user }) => {
                           <div className="max-h-56 overflow-y-auto pr-1 space-y-1.5 mb-3">
                             {selectedLocation.filteredDrums.map(drum => {
                               const isOverdue = drum.age_days > 120;
-                              const cecha = drum.cecha || drum.kod_bebna || 'Brak cechy';
-                              const isSelected = selectedDrumsForTransport.includes(cecha);
                               return (
-                                <div 
-                                  key={drum.id} 
-                                  onClick={(e) => handleDrumToggle(cecha, e)}
-                                  className={`flex flex-col p-2 rounded border cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50 border-indigo-400 shadow-sm' : isOverdue ? 'bg-red-50 border-red-200 hover:border-indigo-300' : 'bg-gray-50 border-gray-100 hover:border-indigo-300'}`}
-                                >
+                                <div key={drum.id} className={`flex flex-col p-2 rounded border ${isOverdue ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-100'}`}>
                                   <div className="flex justify-between items-start">
                                     <div className="flex items-center">
-                                      <div className={`w-4 h-4 rounded border flex items-center justify-center mr-2 flex-shrink-0 transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300 bg-white'}`}>
-                                        {isSelected && <Check className="w-3 h-3 text-white" />}
-                                      </div>
-                                      <span className="font-mono text-sm font-bold text-gray-800">{cecha}</span>
+                                      <span className="font-mono text-sm font-bold text-gray-800">{drum.cecha || drum.kod_bebna || 'Brak cechy'}</span>
                                       <a 
-                                        href={`/admin/drums?searchTerm=${encodeURIComponent(cecha)}&openModal=true`}
+                                        href={`/admin/drums?searchTerm=${encodeURIComponent(drum.cecha || drum.kod_bebna)}&openModal=true`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        onClick={(e) => e.stopPropagation()}
                                         className="ml-2 p-1 bg-white hover:bg-gray-100 border border-gray-200 rounded text-gray-500 hover:text-blue-600 transition-colors inline-block"
                                         title="Zobacz szczegóły bębna w nowej karcie"
                                       >
@@ -780,18 +715,6 @@ const LogisticsMap = ({ user }) => {
                               );
                             })}
                           </div>
-                          
-                          {selectedDrumsForTransport.length > 0 && (
-                            <div className="mt-2 pt-3 border-t border-gray-100 flex justify-between items-center bg-indigo-50 p-2 rounded-lg">
-                              <span className="text-xs text-indigo-800 font-medium">Wybrano bębnów: <strong className="text-indigo-900">{selectedDrumsForTransport.length}</strong></span>
-                              <button 
-                                onClick={handleCreateTransportRequest}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm"
-                              >
-                                Zleć transport
-                              </button>
-                            </div>
-                          )}
                         </>
                       )}
                       
@@ -820,11 +743,19 @@ const LogisticsMap = ({ user }) => {
                                    pickup.status === 'Rejected' ? 'Odrzucone' : pickup.status}
                                 </strong></p>
                                 <p className="text-sm text-gray-800 mb-1">Planowana data: <strong>{pickup.date ? new Date(pickup.date).toLocaleDateString() : 'Brak'}</strong></p>
-                                {pickup.profilePhone && (
-                                  <p className="text-xs text-gray-600 mt-1.5">Kontakt: <strong>{pickup.profileName} {pickup.profilePhone}</strong></p>
-                                )}
-                                <div className="mt-2 pt-2 border-t border-purple-200">
+                                <div className="mt-2 pt-2 border-t border-purple-200 flex justify-between items-center">
                                   <span className="text-sm text-purple-800 font-medium">Zgłoszone bębny: <span className="font-bold">{pickup.drumsCount}</span></span>
+                                  {(pickup.status === 'Approved' || pickup.status === 'InTransit') && (
+                                    <button
+                                      onClick={() => {
+                                        setRequestForTransport(pickup.originalRequest);
+                                        setShowTransportModal(true);
+                                      }}
+                                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 rounded text-[11px] font-bold transition-colors shadow-sm flex items-center"
+                                    >
+                                      <Truck className="w-3.5 h-3.5 mr-1" /> Zleć transport
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                               
