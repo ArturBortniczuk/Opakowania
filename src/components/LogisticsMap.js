@@ -4,7 +4,7 @@ import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-m
 import { supabase } from '../lib/supabase';
 import { returnsAPI, drumsAPI, transportAPI } from '../utils/supabaseApi';
 import GeocodeMigration from './GeocodeMigration';
-import { MapPin, Map as MapIcon, X, Check, Search, AlertTriangle, Filter, Building, User, Eye, Truck } from 'lucide-react';
+import { MapPin, Map as MapIcon, X, Check, Search, AlertTriangle, Filter, Building, User, Eye, Truck, Mail } from 'lucide-react';
 import TransportOrderModal from './TransportOrderModal';
 
 const containerStyle = {
@@ -184,6 +184,26 @@ const LogisticsMap = ({ user }) => {
 
       // 2. Pobieramy aktywne zwroty
       const retRes = await returnsAPI.getReturns();
+      
+      // 2b. Pobieramy mapowanie MPK
+      let mpkByNip = {};
+      try {
+        const { data: companies } = await supabase.from('companies').select('nip, salesperson_name');
+        const { data: salespeople } = await supabase.from('salespeople').select('name, mpk');
+        if (companies && salespeople) {
+          companies.forEach(c => {
+            if (c.salesperson_name) {
+              const sp = salespeople.find(s => s.name === c.salesperson_name);
+              if (sp && sp.mpk) {
+                mpkByNip[c.nip] = sp.mpk;
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Błąd pobierania danych MPK', err);
+      }
+
       const pickupsByLoc = {};
 
       (retRes || [])
@@ -216,6 +236,7 @@ const LogisticsMap = ({ user }) => {
                 type: 'pickup',
                 companyName: companyName,
                 address: address,
+                mpk: mpkByNip[r.user_nip] || r.mpk || '',
                 pickups: []
               };
             }
@@ -244,6 +265,7 @@ const LogisticsMap = ({ user }) => {
               }),
               status: r.status,
               date: r.collection_date,
+              profileEmail: r.email || r.profile_email || '',
               profilePhone: r.profile_phone || extractedPhone || '',
               profileName: r.profile_name || '',
               mpk: r.mpk || '',
@@ -675,8 +697,13 @@ const LogisticsMap = ({ user }) => {
                             <MapPin className="w-3 h-3 mr-1.5 inline" /> {selectedLocation.address}
                           </p>
                         )}
-                        {selectedLocation.type === 'pickup' && selectedLocation.pickups?.[0]?.profilePhone && (
+                        {selectedLocation.type === 'pickup' && selectedLocation.pickups?.[0]?.profileEmail && (
                           <p className="text-xs text-gray-600 mt-1 truncate flex items-center">
+                            <Mail className="w-3 h-3 mr-1.5 inline" /> {selectedLocation.pickups[0].profileEmail}
+                          </p>
+                        )}
+                        {selectedLocation.type === 'pickup' && selectedLocation.pickups?.[0]?.profilePhone && (
+                          <p className="text-xs text-gray-600 mt-1.5 truncate flex items-center">
                             <User className="w-3 h-3 mr-1.5 inline" /> 
                             {selectedLocation.pickups[0].profileName && <span>{selectedLocation.pickups[0].profileName} </span>}
                             <span className="font-bold ml-1">{selectedLocation.pickups[0].profilePhone}</span>
