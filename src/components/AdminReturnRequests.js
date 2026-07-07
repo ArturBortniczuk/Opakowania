@@ -766,7 +766,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                 </div>
               )}
               
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {Array.isArray(selectedRequest.selected_drums) && selectedRequest.selected_drums.map((drum, idx) => {
                   const label = getDrumLabel(drum);
                   const damaged = isDrumDamaged(drum);
@@ -846,10 +846,10 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                           prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
                         );
                       }}
-                      className={`p-4 rounded-xl border flex flex-col relative transition-all ${
+                      className={`p-5 rounded-xl border flex flex-col relative transition-all duration-200 ${
                         splitMode 
-                          ? (isSelectedForSplit ? 'border-indigo-500 bg-indigo-50 cursor-pointer shadow-sm' : 'border-gray-200 hover:border-indigo-300 cursor-pointer opacity-60')
-                          : (isNotTransported ? 'bg-gray-100 border-gray-300 opacity-60 grayscale hover:grayscale-0 transition-all' : damaged ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200')
+                          ? (isSelectedForSplit ? 'border-indigo-500 bg-indigo-50 cursor-pointer shadow-md' : 'border-gray-200 hover:border-indigo-300 cursor-pointer opacity-60')
+                          : (isNotTransported ? 'bg-gray-100 border-gray-300 opacity-60 grayscale hover:grayscale-0' : damaged ? 'bg-red-50 border-red-200 shadow-sm' : 'bg-white border-gray-200 shadow-sm hover:shadow-md hover:border-indigo-100')
                       }`}
                     >
                       {splitMode && (
