@@ -42,6 +42,8 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   const [showTransportModal, setShowTransportModal] = useState(false);
   const [requestForTransport, setRequestForTransport] = useState(null);
   const [hasOpenedFromUrl, setHasOpenedFromUrl] = useState(false);
+  const [splitMode, setSplitMode] = useState(false);
+  const [splitSelectedDrums, setSplitSelectedDrums] = useState([]);
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
@@ -258,6 +260,56 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   const handleCloseModal = () => {
     setShowRequestDetails(false);
     setSelectedRequest(null);
+    setSplitMode(false);
+    setSplitSelectedDrums([]);
+  };
+
+  const handleSplitConfirm = async () => {
+    if (splitSelectedDrums.length === 0) return;
+    if (splitSelectedDrums.length === selectedRequest.selected_drums.length) {
+      alert("Nie możesz wydzielić wszystkich bębnów do nowego zgłoszenia.");
+      return;
+    }
+
+    const confirm = window.confirm(`Czy na pewno chcesz utworzyć nowe zgłoszenie zawierające ${splitSelectedDrums.length} wybranych bębnów? Zostaną one usunięte z obecnego zgłoszenia.`);
+    if (!confirm) return;
+
+    try {
+      const drumsToMove = selectedRequest.selected_drums.filter(d => splitSelectedDrums.includes(getDrumLabel(d)));
+      const drumsToKeep = selectedRequest.selected_drums.filter(d => !splitSelectedDrums.includes(getDrumLabel(d)));
+
+      await returnsAPI.updateReturnStatus(selectedRequest.id, { selected_drums: drumsToKeep });
+
+      const newReturnData = {
+        user_nip: selectedRequest.user_nip,
+        company_name: selectedRequest.company_name,
+        collection_date: selectedRequest.collection_date,
+        street: selectedRequest.street,
+        postal_code: selectedRequest.postal_code,
+        city: selectedRequest.city,
+        email: selectedRequest.email,
+        loading_hours: selectedRequest.loading_hours || '',
+        available_equipment: selectedRequest.available_equipment || '',
+        notes: (selectedRequest.notes || '') + '\n\n[Zgłoszenie wydzielone ze zgłoszenia #' + selectedRequest.id + ']',
+        selected_drums: drumsToMove,
+        profile_id: selectedRequest.profile_id || null,
+        profile_name: selectedRequest.profile_name || null,
+        profile_email: selectedRequest.profile_email || null,
+        profile_phone: selectedRequest.profile_phone || null
+      };
+
+      await returnsAPI.createReturn(newReturnData);
+
+      setSplitMode(false);
+      setSplitSelectedDrums([]);
+      handleCloseModal();
+      handleRefresh();
+
+      alert('Zgłoszenie zostało pomyślnie podzielone!');
+    } catch (err) {
+      console.error('Błąd przy dzieleniu zgłoszenia:', err);
+      alert('Wystąpił błąd podczas dzielenia zgłoszenia.');
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -652,12 +704,46 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                 <h3 className="text-lg font-semibold text-gray-900">
                   Wybrane bębny ({selectedRequest.selected_drums?.filter(d => typeof d === 'object' && d.transported !== false)?.length || 0} z {selectedRequest.selected_drums?.length || 0} szt.)
                 </h3>
-                {enriching && (
-                  <div className="flex items-center space-x-2 text-xs text-blue-600 font-medium animate-pulse">
-                    <RefreshCw className="w-3 h-3 animate-spin" />
-                    <span>Pobieranie aktualnych danych...</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-3">
+                  {enriching ? (
+                    <div className="flex items-center space-x-2 text-xs text-blue-600 font-medium animate-pulse">
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      <span>Pobieranie aktualnych danych...</span>
+                    </div>
+                  ) : (
+                    <>
+                      {canChangeStatus && selectedRequest.selected_drums?.length > 1 && !splitMode && (
+                        <button
+                          onClick={() => setSplitMode(true)}
+                          className="text-sm font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          <ArrowUpDown className="w-4 h-4" />
+                          Podziel zgłoszenie
+                        </button>
+                      )}
+                      {splitMode && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setSplitMode(false);
+                              setSplitSelectedDrums([]);
+                            }}
+                            className="text-sm font-bold text-gray-600 hover:text-gray-800 px-3 py-1.5 rounded-lg bg-gray-100 transition-colors"
+                          >
+                            Anuluj
+                          </button>
+                          <button
+                            onClick={handleSplitConfirm}
+                            disabled={splitSelectedDrums.length === 0 || splitSelectedDrums.length === selectedRequest.selected_drums.length}
+                            className="text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Wydziel ({splitSelectedDrums.length})
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
               
               {selectedRequest.selected_drums?.some(d => typeof d === 'object' && d.transported === false) && (
@@ -704,8 +790,30 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
                   const isNotTransported = drum.transported === false;
                   
+                  const isSelectedForSplit = splitSelectedDrums.includes(label);
+
                   return (
-                    <div key={idx} className={`p-4 rounded-xl border flex flex-col ${isNotTransported ? 'bg-gray-100 border-gray-300 opacity-60 grayscale hover:grayscale-0 transition-all' : damaged ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}`}>
+                    <div 
+                      key={idx} 
+                      onClick={() => {
+                        if (!splitMode) return;
+                        setSplitSelectedDrums(prev => 
+                          prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
+                        );
+                      }}
+                      className={`p-4 rounded-xl border flex flex-col relative transition-all ${
+                        splitMode 
+                          ? (isSelectedForSplit ? 'border-indigo-500 bg-indigo-50 cursor-pointer shadow-sm' : 'border-gray-200 hover:border-indigo-300 cursor-pointer opacity-60')
+                          : (isNotTransported ? 'bg-gray-100 border-gray-300 opacity-60 grayscale hover:grayscale-0 transition-all' : damaged ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200')
+                      }`}
+                    >
+                      {splitMode && (
+                        <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center bg-white ${
+                          isSelectedForSplit ? 'border-indigo-500 text-indigo-600' : 'border-gray-300 text-transparent'
+                        }`}>
+                          <CheckCircle className="w-4 h-4" />
+                        </div>
+                      )}
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex flex-col">
                           <span className={`font-bold text-lg ${isNotTransported ? 'text-gray-500 line-through' : damaged ? 'text-red-700' : 'text-blue-700'}`}>
@@ -715,9 +823,9 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                         </div>
                         <div className="flex items-center gap-1">
                           {damaged && <AlertTriangle className="w-5 h-5 text-red-500" title="Uszkodzony" />}
-                          {canChangeStatus && (
+                          {canChangeStatus && !splitMode && (
                             <button
-                              onClick={() => handleRemoveDrum(drum)}
+                              onClick={(e) => { e.stopPropagation(); handleRemoveDrum(drum); }}
                               className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                               title="Usuń ze zgłoszenia (klient będzie mógł go ponownie zgłosić)"
                             >
