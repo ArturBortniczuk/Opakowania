@@ -779,6 +779,18 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                   
                   const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
                   
+                  // Nowa logika "Nasze":
+                  const isOurDrum = 
+                    !returnDeadline || 
+                    nameUpper.startsWith('BĘBEN ELTRON') || 
+                    daysInPossession > 360 ||
+                    (returnDeadline && new Date() > returnDeadline);
+                  
+                  let daysLeftToReturn = 'Brak danych';
+                  if (returnDeadline) {
+                    daysLeftToReturn = Math.ceil((returnDeadline - new Date()) / (1000 * 60 * 60 * 24));
+                  }
+                  
                   // --- Nowa logika wyliczeń ---
                   // 1. Zysk klienta (%)
                   let clientReturnPercentage = 100;
@@ -919,7 +931,6 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                           </div>
                         </div>
 
-                        </div>
                         <div className="pt-1 border-t border-gray-100">
                           <span className="text-gray-400 font-bold uppercase block">Własność:</span>
                           {isOurDrum ? (
