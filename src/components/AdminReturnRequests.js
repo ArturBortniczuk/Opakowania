@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { returnsAPI, companiesAPI, drumsAPI, transportAPI } from '../utils/supabaseApi';
+import { returnsAPI, companiesAPI, drumsAPI, transportAPI, rulesAPI } from '../utils/supabaseApi';
 import TransportOrderModal from './TransportOrderModal';
 import {
   Truck,
@@ -44,6 +44,15 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   const [hasOpenedFromUrl, setHasOpenedFromUrl] = useState(false);
   const [splitMode, setSplitMode] = useState(false);
   const [splitSelectedDrums, setSplitSelectedDrums] = useState([]);
+  const [supplierRules, setSupplierRules] = useState([]);
+
+  const parsePriceRaw = (val) => {
+    if (!val) return 0;
+    if (typeof val === 'number') return val;
+    const cleaned = String(val).replace(/\s/g, '').replace(',', '.');
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? 0 : parsed;
+  };
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
@@ -61,6 +70,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
   useEffect(() => {
     fetchRequests();
+    rulesAPI.getRules().then(setSupplierRules).catch(console.error);
   }, [fetchRequests]);
 
   const handleRefresh = () => {
@@ -769,24 +779,45 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                   
                   const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
                   
-                  // Nowa logika "Nasze":
-                  // 1. Brak daty zwrotu do dostawcy
-                  // 2. Nazwa zaczyna się od "BĘBEN ELTRON"
-                  // 3. Klient posiada bęben powyżej 360 dni
-                  // 4. Termin zwrotu do dostawcy już minął (data_zwrotu_do_dostawcy < dzisiaj)
-                  const isOurDrum = 
-                    !returnDeadline || 
-                    nameUpper.startsWith('BĘBEN ELTRON') || 
-                    daysInPossession > 360 ||
-                    (returnDeadline && new Date() > returnDeadline);
+                  // --- Nowa logika wyliczeń ---
+                  // 1. Zysk klienta (%)
+                  let clientReturnPercentage = 100;
+                  if (daysInPossession <= 120) clientReturnPercentage = 100;
+                  else if (daysInPossession <= 150) clientReturnPercentage = 90;
+                  else if (daysInPossession <= 180) clientReturnPercentage = 75;
+                  else if (daysInPossession <= 240) clientReturnPercentage = 50;
+                  else if (daysInPossession <= 340) clientReturnPercentage = 25;
+                  else clientReturnPercentage = 0;
+
+                  // 2. Zwrot do kablowni (%)
+                  const supplierName = (drum.kon_dostawca || drum.dostawca || '').toUpperCase();
+                  const drumNameUpper = (drum.nazwa || '').toUpperCase();
                   
-                  const returnPeriod = drum.returnPeriodDays || 120;
-                  const returnPercentage = daysInPossession <= returnPeriod ? 100 : 0;
-                  
-                  let daysLeftToReturn = 'Brak danych';
-                  if (returnDeadline) {
-                    daysLeftToReturn = Math.ceil((returnDeadline - new Date()) / (1000 * 60 * 60 * 24));
+                  let supplierReturnPercentage = 100;
+                  if (returnDeadline && new Date() > returnDeadline) {
+                    supplierReturnPercentage = 0;
                   }
+                  
+                  const matchingRule = supplierRules.find(r => 
+                    (supplierName && supplierName.includes(r.supplier_name.toUpperCase())) || 
+                    (drumNameUpper && drumNameUpper.includes(r.supplier_name.toUpperCase()))
+                  );
+                  
+                  if (matchingRule) {
+                    if (returnDeadline && new Date() > returnDeadline) {
+                       const daysOverdue = Math.ceil((new Date() - returnDeadline) / (1000 * 60 * 60 * 24));
+                       if (daysOverdue <= matchingRule.max_days_overdue) {
+                         supplierReturnPercentage = matchingRule.return_percentage;
+                       } else {
+                         supplierReturnPercentage = 0;
+                       }
+                    }
+                  }
+
+                  // 3. Wartości finansowe
+                  const cenaNetto = parsePriceRaw(drum.cena_netto_bebna);
+                  const wartoscKablownia = cenaNetto * (supplierReturnPercentage / 100);
+                  const wartoscKlient = (cenaNetto * 1.2) * (clientReturnPercentage / 100);
 
                   const isNotTransported = drum.transported === false;
                   
@@ -844,15 +875,50 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                           <span className="text-gray-400 font-bold uppercase block">Faktura:</span>
                           <span className="text-gray-700 font-medium">{drum.numer_faktury || 'Brak danych'}</span>
                         </div>
+                        
                         <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100">
                           <div>
                             <span className="text-gray-400 font-bold uppercase block">W posiadaniu:</span>
                             <span className="text-gray-900 font-bold">{daysInPossession} dni</span>
                           </div>
                           <div>
-                            <span className="text-gray-400 font-bold uppercase block">Zwrot:</span>
-                            <span className={`font-bold ${returnPercentage === 100 ? 'text-emerald-600' : 'text-red-600'}`}>{returnPercentage}%</span>
+                            <span className="text-gray-400 font-bold uppercase block">Termin Kablownia:</span>
+                            <span className="text-gray-900 font-bold">
+                              {returnDeadline ? returnDeadline.toLocaleDateString('pl-PL') : 'Brak'}
+                            </span>
                           </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100">
+                          <div>
+                            <span className="text-gray-400 font-bold uppercase block">Zwrot do Kablowni:</span>
+                            <span className={`font-bold ${supplierReturnPercentage === 100 ? 'text-emerald-600' : supplierReturnPercentage > 0 ? 'text-amber-600' : 'text-red-600'}`}>
+                              {supplierReturnPercentage}%
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 font-bold uppercase block">Zysk Klienta:</span>
+                            <span className={`font-bold ${clientReturnPercentage === 100 ? 'text-emerald-600' : clientReturnPercentage > 0 ? 'text-amber-600' : 'text-red-600'}`}>
+                              {clientReturnPercentage}%
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="pt-1 border-t border-gray-100 space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-gray-400 font-bold uppercase">Cena Netto:</span>
+                            <span className="text-gray-700 font-medium">{cenaNetto.toFixed(2)} PLN</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400 font-bold uppercase">Od Kablowni:</span>
+                            <span className="text-emerald-700 font-bold">+{wartoscKablownia.toFixed(2)} PLN</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400 font-bold uppercase">Dla Klienta:</span>
+                            <span className="text-red-700 font-bold">-{wartoscKlient.toFixed(2)} PLN</span>
+                          </div>
+                        </div>
+
                         </div>
                         <div className="pt-1 border-t border-gray-100">
                           <span className="text-gray-400 font-bold uppercase block">Własność:</span>
