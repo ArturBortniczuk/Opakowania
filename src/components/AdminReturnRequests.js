@@ -16,7 +16,8 @@ import {
   Edit,
   RefreshCw,
   Circle,
-  ArrowDown
+  ArrowDown,
+  Trash2
 } from 'lucide-react';
 
 const AdminReturnRequests = ({ user, initialFilter = {} }) => {
@@ -164,6 +165,42 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     } catch (err) {
       console.error('Błąd dodawania numeru korekty:', err);
       alert('Nie udało się zapisać numeru korekty.');
+    }
+  };
+
+  const handleRemoveDrum = async (drumToRemove) => {
+    if (!canChangeStatus) return;
+    const label = getDrumLabel(drumToRemove);
+    const confirmRemove = window.confirm(`Czy na pewno chcesz usunąć bęben ${label} z tego zgłoszenia?\n\nSpowoduje to, że bęben znowu będzie widoczny dla klienta jako dostępny do zwrotu (np. jeśli klient zapomniał go załadować).`);
+    if (!confirmRemove) return;
+
+    try {
+      const newDrums = selectedRequest.selected_drums.filter(d => getDrumLabel(d) !== label);
+      
+      if (newDrums.length === 0) {
+        const confirmCancel = window.confirm('Zgłoszenie nie ma już żadnych bębnów. Czy chcesz całkowicie odrzucić/anulować to zgłoszenie?');
+        if (confirmCancel) {
+          await returnsAPI.updateReturnStatus(selectedRequest.id, { status: 'Rejected', selected_drums: [] });
+          handleCloseModal();
+          handleRefresh();
+          return;
+        } else {
+          return;
+        }
+      }
+
+      await returnsAPI.updateReturnStatus(selectedRequest.id, { selected_drums: newDrums });
+      
+      setSelectedRequest(prev => ({
+        ...prev,
+        selected_drums: newDrums
+      }));
+      
+      handleRefresh();
+      alert(`Bęben ${label} został usunięty ze zgłoszenia.`);
+    } catch (err) {
+      console.error('Błąd usuwania bębna ze zgłoszenia:', err);
+      alert('Nie udało się usunąć bębna ze zgłoszenia.');
     }
   };
 
@@ -676,7 +713,18 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                           </span>
                           {isNotTransported && <span className="text-[10px] font-bold text-red-600 uppercase">Nie zabrano / Odrzucono</span>}
                         </div>
-                        {damaged && <AlertTriangle className="w-5 h-5 text-red-500" title="Uszkodzony" />}
+                        <div className="flex items-center gap-1">
+                          {damaged && <AlertTriangle className="w-5 h-5 text-red-500" title="Uszkodzony" />}
+                          {canChangeStatus && (
+                            <button
+                              onClick={() => handleRemoveDrum(drum)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Usuń ze zgłoszenia (klient będzie mógł go ponownie zgłosić)"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       
                       <div className="space-y-2 text-[11px]">
