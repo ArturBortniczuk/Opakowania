@@ -828,8 +828,10 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
                   // 3. Wartości finansowe
                   const cenaNetto = parsePriceRaw(drum.cena_netto_bebna);
+                  const cenaZMarza = cenaNetto * 1.2;
                   const wartoscKablownia = cenaNetto * (supplierReturnPercentage / 100);
-                  const wartoscKlient = (cenaNetto * 1.2) * (clientReturnPercentage / 100);
+                  const lostPercentage = 100 - clientReturnPercentage;
+                  const spadekWartosci = cenaZMarza * (lostPercentage / 100);
 
                   const isNotTransported = drum.transported === false;
                   
@@ -909,7 +911,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                             </span>
                           </div>
                           <div>
-                            <span className="text-gray-400 font-bold uppercase block">Zysk Klienta:</span>
+                            <span className="text-gray-400 font-bold uppercase block">Zwrot Klienta:</span>
                             <span className={`font-bold ${clientReturnPercentage === 100 ? 'text-emerald-600' : clientReturnPercentage > 0 ? 'text-amber-600' : 'text-red-600'}`}>
                               {clientReturnPercentage}%
                             </span>
@@ -918,16 +920,16 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
                         <div className="pt-1 border-t border-gray-100 space-y-1">
                           <div className="flex justify-between">
-                            <span className="text-gray-400 font-bold uppercase">Cena Netto:</span>
-                            <span className="text-gray-700 font-medium">{cenaNetto.toFixed(2)} PLN</span>
+                            <span className="text-gray-400 font-bold uppercase">Cena (z marżą):</span>
+                            <span className="text-gray-700 font-medium">{cenaZMarza.toFixed(2)} PLN</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-400 font-bold uppercase">Od Kablowni:</span>
                             <span className="text-emerald-700 font-bold">+{wartoscKablownia.toFixed(2)} PLN</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-400 font-bold uppercase">Dla Klienta:</span>
-                            <span className="text-red-700 font-bold">-{wartoscKlient.toFixed(2)} PLN</span>
+                            <span className="text-gray-400 font-bold uppercase">Spadek Wartości (FUS):</span>
+                            <span className="text-red-700 font-bold">-{spadekWartosci.toFixed(2)} PLN</span>
                           </div>
                         </div>
 
