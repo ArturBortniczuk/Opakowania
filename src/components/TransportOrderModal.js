@@ -14,6 +14,10 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   const [transportMethod, setTransportMethod] = useState('spedycja');
   const [checkedDrums, setCheckedDrums] = useState([]);
   const [drumProviders, setDrumProviders] = useState({});
+  const [distanceKm, setDistanceKm] = useState(0);
+  const [calculatingDistance, setCalculatingDistance] = useState(false);
+  const [salespersonName, setSalespersonName] = useState('');
+  const [deliveryName, setDeliveryName] = useState('');
 
   useEffect(() => {
     if (isOpen && request) {
@@ -67,6 +71,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
           .single();
           
         if (companyData?.salesperson_name) {
+          setSalespersonName(companyData.salesperson_name);
           const salespersonMpk = await getSalespersonMpk(companyData.salesperson_name);
           if (salespersonMpk) {
             setMpk(salespersonMpk);
@@ -79,6 +84,47 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
     }
     // Proste pobieranie z profilu, ew. fallback na 'Brak MPK'
     setMpk(user?.mpk || 'Brak przypisanego MPK');
+  };
+
+  const calculateDistance = async () => {
+    if (!request) return;
+    setCalculatingDistance(true);
+    try {
+      const origin = `${request.city}, ${request.postal_code}, ${request.street}`;
+      let dest = '';
+      if (destination === 'Magazyn Białystok') {
+        dest = 'Białystok, 15-169, Wysockiego 69B';
+      } else if (destination === 'Magazyn Zielonka') {
+        dest = 'Zielonka, 05-220, Krótka 2';
+      } else {
+        if (!customDestination.city || !customDestination.postalCode) {
+            setDistanceKm(0);
+            setCalculatingDistance(false);
+            return;
+        }
+        dest = `${customDestination.city}, ${customDestination.postalCode}, ${customDestination.street}`;
+      }
+      
+      const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+      if (!apiKey) throw new Error("Brak klucza API");
+      
+      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(dest)}&mode=driving&key=${apiKey}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      
+      if (data.status === 'OK' && data.rows[0].elements[0].status === 'OK') {
+         const dist = Math.round(data.rows[0].elements[0].distance.value / 1000);
+         setDistanceKm(dist);
+      } else {
+         alert('Nie udało się obliczyć odległości dla podanych adresów.');
+         setDistanceKm(0);
+      }
+    } catch(e) {
+      console.error(e);
+      alert('Błąd podczas obliczania odległości.');
+      setDistanceKm(0);
+    }
+    setCalculatingDistance(false);
   };
 
   const calculateInitialWeight = async (drums) => {
@@ -157,11 +203,14 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
     onConfirm({
       destination: destination === 'Inne' ? 'Inne' : destination,
       deliveryAddress,
+      deliveryName: destination === 'Magazyn Białystok' ? 'Magazyn Białystok' : (destination === 'Magazyn Zielonka' ? 'Magazyn Zielonka' : deliveryName),
       totalWeight,
       transportDate,
       mpk,
       transportMethod,
-      transportedDrumCechas: checkedDrums
+      transportedDrumCechas: checkedDrums,
+      distanceKm,
+      salespersonName
     });
   };
 
@@ -301,6 +350,17 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
                 <div className="col-span-3">
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Własny adres dostawy</p>
                 </div>
+                <div className="col-span-3">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Nazwa miejsca dostawy (Odbiorca)</label>
+                  <input
+                    type="text"
+                    value={deliveryName}
+                    onChange={(e) => setDeliveryName(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="np. Magazyn Klienta"
+                    required
+                  />
+                </div>
                 <div className="col-span-1">
                   <label className="block text-xs font-semibold text-gray-700 mb-1">Kod pocztowy</label>
                   <input
@@ -335,7 +395,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
                   <Package className="w-4 h-4" />
@@ -354,7 +414,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
                     </div>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Waga obliczona automatycznie, możesz edytować.</p>
+                <p className="text-xs text-gray-500 mt-1">Waga obliczona automatycznie.</p>
               </div>
 
               <div>
@@ -370,6 +430,30 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
                   placeholder="np. 522-01-999"
                 />
                 <p className="text-xs text-gray-500 mt-1">Koszty dla spedycji.</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Odległość (km)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={distanceKm}
+                    onChange={(e) => setDistanceKm(parseFloat(e.target.value) || 0)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <button 
+                    type="button" 
+                    onClick={calculateDistance} 
+                    disabled={calculatingDistance}
+                    className="px-3 py-2 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 text-sm font-semibold whitespace-nowrap transition-colors"
+                  >
+                    {calculatingDistance ? 'Liczenie...' : 'Oblicz'}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Dla kosztów transportu.</p>
               </div>
             </div>
           </div>
