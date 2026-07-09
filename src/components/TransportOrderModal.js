@@ -18,6 +18,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   const [calculatingDistance, setCalculatingDistance] = useState(false);
   const [salespersonName, setSalespersonName] = useState('');
   const [deliveryName, setDeliveryName] = useState('');
+  const [unloadingContact, setUnloadingContact] = useState('');
 
   useEffect(() => {
     if (isOpen && request) {
@@ -127,6 +128,16 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
     setCalculatingDistance(false);
   };
 
+  useEffect(() => {
+    if (destination === 'Magazyn Białystok') {
+      setUnloadingContact('691678225');
+    } else if (destination === 'Magazyn Zielonka') {
+      setUnloadingContact('691452934');
+    } else if (destination === 'Inne' && (unloadingContact === '691678225' || unloadingContact === '691452934')) {
+      setUnloadingContact('');
+    }
+  }, [destination]);
+
   const calculateInitialWeight = async (drums) => {
     if (!drums || drums.length === 0) {
       setTotalWeight(0);
@@ -220,7 +231,8 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
       transportMethod,
       transportedDrumCechas: checkedDrums,
       distanceKm,
-      salespersonName
+      salespersonName,
+      unloadingContact
     });
   };
 
@@ -228,7 +240,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
@@ -352,6 +364,22 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
                   <option value="Magazyn Zielonka">Magazyn Zielonka (Krótka 2)</option>
                   <option value="Inne">Inne miejsce...</option>
                 </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Telefon do Odbiorcy
+                </label>
+                <input
+                  type="text"
+                  value={unloadingContact}
+                  onChange={(e) => setUnloadingContact(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Numer telefonu..."
+                  required
+                />
               </div>
             </div>
 

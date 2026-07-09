@@ -500,8 +500,8 @@ const LogisticsMap = ({ user }) => {
             street: requestForTransport.street
           },
           delivery: transportData.deliveryAddress,
-          loadingContact: `${requestForTransport.profile_name || requestForTransport.company_name || ''} ${requestForTransport.profile_phone || requestForTransport.email || ''}`.trim(),
-          unloadingContact: '',
+          loadingContact: ((requestForTransport.notes || '').match(/Telefon kontaktowy:\s*([^\n]+)/)?.[1]?.trim()) || requestForTransport.profile_phone || 'Brak telefonu',
+          unloadingContact: transportData.unloadingContact || '',
           deliveryDate: transportData.transportDate,
           notes: `Zgłoszenie z Opakowań #${requestForTransport.id}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}\n${requestForTransport.notes || ''}`,
           clientName: transportData.deliveryName || requestForTransport.company_name,
