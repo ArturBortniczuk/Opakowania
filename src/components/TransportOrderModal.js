@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Truck, X, MapPin, Package, Building2, User } from 'lucide-react';
+import { Truck, X, MapPin, Package, Building2, User, Check } from 'lucide-react';
 import { calculatorAPI } from '../utils/calculatorApi';
 import { getSalespersonMpk } from '../utils/supabaseApi';
 import { supabase } from '../lib/supabase';
