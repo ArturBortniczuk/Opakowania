@@ -4,6 +4,24 @@ import { calculatorAPI } from '../utils/calculatorApi';
 import { getSalespersonMpk } from '../utils/supabaseApi';
 import { supabase } from '../lib/supabase';
 
+const KABLOWNIE_DATA = {
+  'STYROBUD': { address: 'Trzeboś, ul. Górna 194, 36-050 Sokołów Młp.', contact: '+48 663 896 832' },
+  'Skierniewice Bruk-bet': { address: 'Skierniewice', contact: 'palety.skierniewice@bruk-bet.pl' },
+  'NKT': { address: 'Warszowice', contact: '+48 538 637 957' },
+  'PRYSMIAN': { address: 'ul. Sąsiedzka 1g, 05-806 Sokołów', contact: '+48 725 505 315' },
+  'DRUTPLAST': { address: '', contact: '662 448 575' },
+  'Forum-Rondo': { address: '', contact: '' },
+  'Eltrim Kable': { address: '', contact: 'jankak@eltrim.com.pl' },
+  'Zakłady Kablowe BITNER': { address: '', contact: 'janusz.dubowski@bitner.com.pl' },
+  'Elektrokabel': { address: '', contact: '' },
+  'Tele-Fonika Kable Bydgoszcz': { address: '', contact: '' },
+  'NPA Skawina': { address: '', contact: '' },
+  'Fabryka Kabli ELPAR': { address: 'ul. Polna 40, 21-200 Parczew', contact: 'karolina.flisiak@elpar.pl' },
+  'ZPB KACZMAREK': { address: 'Folwark 1, 63-900 Rawicz', contact: '+48 65 546 12 55' },
+  'Betard sp. z o.o.': { address: '', contact: '' },
+  'Technokabel': { address: '', contact: '' }
+};
+
 const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   const [destination, setDestination] = useState('Magazyn Białystok');
   const [customDestination, setCustomDestination] = useState({ city: '', postalCode: '', street: '' });
@@ -18,6 +36,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   const [calculatingDistance, setCalculatingDistance] = useState(false);
   const [salespersonName, setSalespersonName] = useState('');
   const [deliveryName, setDeliveryName] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
   const [unloadingContact, setUnloadingContact] = useState('');
 
   useEffect(() => {
@@ -62,7 +81,6 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   }, [checkedDrums, isOpen, request]);
 
   const fetchUserMpk = async () => {
-    // Sprawdzamy klienta i jego przypisanego handlowca
     if (request?.user_nip) {
       try {
         const { data: companyData } = await supabase
@@ -83,7 +101,6 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
         console.error('Błąd pobierania mpk firmy:', e);
       }
     }
-    // Proste pobieranie z profilu, ew. fallback na 'Brak MPK'
     setMpk(user?.mpk || 'Brak przypisanego MPK');
   };
 
@@ -97,6 +114,8 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
         dest = 'Białystok, 15-169, Wysockiego 69B';
       } else if (destination === 'Magazyn Zielonka') {
         dest = 'Zielonka, 05-220, Krótka 2';
+      } else if (KABLOWNIE_DATA[destination]) {
+        dest = KABLOWNIE_DATA[destination].address;
       } else {
         if (!customDestination.city || !customDestination.postalCode) {
             setDistanceKm(0);
@@ -131,10 +150,18 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   useEffect(() => {
     if (destination === 'Magazyn Białystok') {
       setUnloadingContact('691678225');
+      setDeliveryAddress('');
     } else if (destination === 'Magazyn Zielonka') {
       setUnloadingContact('691452934');
-    } else if (destination === 'Inne' && (unloadingContact === '691678225' || unloadingContact === '691452934')) {
-      setUnloadingContact('');
+      setDeliveryAddress('');
+    } else if (KABLOWNIE_DATA[destination]) {
+      setUnloadingContact(KABLOWNIE_DATA[destination].contact || '');
+      setDeliveryAddress(KABLOWNIE_DATA[destination].address || '');
+    } else if (destination === 'Inne') {
+      if (unloadingContact === '691678225' || unloadingContact === '691452934' || Object.values(KABLOWNIE_DATA).some(k => k.contact === unloadingContact)) {
+        setUnloadingContact('');
+        setDeliveryAddress('');
+      }
     }
   }, [destination]);
 
@@ -161,7 +188,6 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
         const drumCecha = typeof drum === 'object' ? drum.cecha || drum.kod_bebna : drum;
         const dbDrum = dbDrums.find(d => d.cecha === drumCecha || d.kod_bebna === drumCecha) || {};
         
-        // Sprawdzamy czy bęben ma określoną wagę w JSON (jeśli ma) lub z bazy z tabeli drums
         const explicitWeight = 
            (typeof drum === 'object' ? drum.waga_bebna || drum.WAGA_BEBNA || drum.waga || drum.weight || drum.waga_netto : null) ||
            dbDrum.waga_bebna || dbDrum.WAGA_BEBNA || dbDrum.waga || dbDrum.weight || dbDrum.waga_netto;
@@ -171,24 +197,21 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
         }
 
         if (foundWeight === null) {
-          // drum może być obiektem lub stringiem
           const drumName = (typeof drum === 'object' ? (drum.rozmiar_bebna || drum.nazwa || drum.cecha || drum.kod_bebna || '') : String(drum)).toUpperCase();
-          
-          // Szukamy pasującego wymiaru
           let diameterCm = null;
           const fiMatch = drumName.match(/FI\s*(\d+)/);
           if (fiMatch) {
             const val = parseInt(fiMatch[1], 10);
-            diameterCm = val < 40 ? val * 10 : val; // Zgadywanie czy dm czy cm
+            diameterCm = val < 40 ? val * 10 : val;
           } else {
             const numMatch = drumName.match(/(\d+)/);
             if (numMatch) {
               const val = parseInt(numMatch[1], 10);
-              diameterCm = val < 40 ? val * 10 : val; // Zgadywanie czy dm czy cm
+              diameterCm = val < 40 ? val * 10 : val;
             }
           }
 
-          foundWeight = 50; // Waga domyślna
+          foundWeight = 50;
           
           if (diameterCm) {
             const matchedDim = allDimensions.find(d => parseFloat(d.outer_diameter) === diameterCm);
@@ -209,21 +232,21 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    let deliveryAddress = {};
+  const handleConfirm = () => {
+    let finalDeliveryAddress = {};
     if (destination === 'Magazyn Białystok') {
-      deliveryAddress = { city: 'Białystok', postalCode: '15-169', street: 'Wysockiego 69B' };
+      finalDeliveryAddress = { city: 'Białystok', postalCode: '15-169', street: 'Wysockiego 69B' };
     } else if (destination === 'Magazyn Zielonka') {
-      deliveryAddress = { city: 'Zielonka', postalCode: '05-220', street: 'Krótka 2' };
+      finalDeliveryAddress = { city: 'Zielonka', postalCode: '05-220', street: 'Krótka 2' };
+    } else if (KABLOWNIE_DATA[destination]) {
+      finalDeliveryAddress = { name: destination, address: KABLOWNIE_DATA[destination].address };
     } else {
-      deliveryAddress = customDestination;
+      finalDeliveryAddress = customDestination;
     }
 
     onConfirm({
       destination: destination === 'Inne' ? 'Inne' : destination,
-      deliveryAddress,
+      deliveryAddress: finalDeliveryAddress,
       deliveryName: destination === 'Magazyn Białystok' ? 'Magazyn Białystok' : (destination === 'Magazyn Zielonka' ? 'Magazyn Zielonka' : deliveryName),
       totalWeight,
       transportDate,
@@ -239,9 +262,9 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   if (!isOpen || !request) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/50 backdrop-blur-sm">
+      <div className="max-h-[90vh] overflow-y-auto w-full max-w-2xl bg-white rounded-2xl shadow-2xl relative flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex-shrink-0 flex items-center justify-between p-6 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
               <Truck className="w-6 h-6" />
@@ -253,8 +276,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100">
             <div className="flex items-start gap-3">
               <Building2 className="w-5 h-5 text-blue-500 mt-0.5" />
@@ -303,216 +325,86 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Sposób transportu
-              </label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Sposób transportu</label>
               <div className="flex gap-4">
                 <label className={`flex-1 flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${transportMethod === 'spedycja' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
-                  <input
-                    type="radio"
-                    name="transportMethod"
-                    value="spedycja"
-                    checked={transportMethod === 'spedycja'}
-                    onChange={(e) => setTransportMethod(e.target.value)}
-                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                  />
-                  <div>
-                    <span className="block text-sm font-semibold text-gray-900">Spedycja</span>
-                    <span className="block text-xs text-gray-500">Zgłoszenie do systemu Transport</span>
-                  </div>
+                  <input type="radio" name="transportMethod" value="spedycja" checked={transportMethod === 'spedycja'} onChange={(e) => setTransportMethod(e.target.value)} className="w-4 h-4 text-blue-600" />
+                  <div><span className="block text-sm font-semibold text-gray-900">Spedycja</span></div>
                 </label>
                 <label className={`flex-1 flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${transportMethod === 'wlasny' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 hover:bg-gray-50'}`}>
-                  <input
-                    type="radio"
-                    name="transportMethod"
-                    value="wlasny"
-                    checked={transportMethod === 'wlasny'}
-                    onChange={(e) => setTransportMethod(e.target.value)}
-                    className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <div>
-                    <span className="block text-sm font-semibold text-gray-900">Transport własny</span>
-                    <span className="block text-xs text-gray-500">Tylko zmiana statusu zgłoszenia</span>
-                  </div>
+                  <input type="radio" name="transportMethod" value="wlasny" checked={transportMethod === 'wlasny'} onChange={(e) => setTransportMethod(e.target.value)} className="w-4 h-4 text-emerald-600" />
+                  <div><span className="block text-sm font-semibold text-gray-900">Własny</span></div>
                 </label>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Data transportu
-                </label>
-                <input
-                  type="date"
-                  value={transportDate}
-                  onChange={(e) => setTransportDate(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Data transportu</label>
+                <input type="date" value={transportDate} onChange={(e) => setTransportDate(e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-xl" required />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Miejsce docelowe (Dostawa)
-                </label>
-                <select
-                  value={destination}
-                  onChange={(e) => setDestination(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="Magazyn Białystok">Magazyn Białystok (Wysockiego 69B)</option>
-                  <option value="Magazyn Zielonka">Magazyn Zielonka (Krótka 2)</option>
-                  <option value="Inne">Inne miejsce...</option>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Miejsce docelowe (Dostawa)</label>
+                <select value={destination} onChange={(e) => setDestination(e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-xl bg-white">
+                  <optgroup label="Nasze Magazyny">
+                    <option value="Magazyn Białystok">Magazyn Białystok (Centrala)</option>
+                    <option value="Magazyn Zielonka">Magazyn Zielonka</option>
+                  </optgroup>
+                  <optgroup label="Dostawcy (Kablownie)">
+                    {Object.keys(KABLOWNIE_DATA).map(k => (<option key={k} value={k}>{k}</option>))}
+                  </optgroup>
+                  <optgroup label="Inne adresy">
+                    <option value="Inne">Inne miejsce dostawy...</option>
+                  </optgroup>
                 </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Telefon do Odbiorcy
-                </label>
-                <input
-                  type="text"
-                  value={unloadingContact}
-                  onChange={(e) => setUnloadingContact(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Numer telefonu..."
-                  required
-                />
               </div>
             </div>
 
             {destination === 'Inne' && (
               <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                <div className="col-span-3">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Własny adres dostawy</p>
-                </div>
-                <div className="col-span-3">
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Nazwa miejsca dostawy (Odbiorca)</label>
-                  <input
-                    type="text"
-                    value={deliveryName}
-                    onChange={(e) => setDeliveryName(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="np. Magazyn Klienta"
-                    required
-                  />
-                </div>
-                <div className="col-span-1">
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Kod pocztowy</label>
-                  <input
-                    type="text"
-                    value={customDestination.postalCode}
-                    onChange={(e) => setCustomDestination({...customDestination, postalCode: e.target.value})}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="00-000"
-                    required
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Miasto</label>
-                  <input
-                    type="text"
-                    value={customDestination.city}
-                    onChange={(e) => setCustomDestination({...customDestination, city: e.target.value})}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-                <div className="col-span-3">
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Ulica i numer</label>
-                  <input
-                    type="text"
-                    value={customDestination.street}
-                    onChange={(e) => setCustomDestination({...customDestination, street: e.target.value})}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
+                <input type="text" placeholder="Nazwa" value={deliveryName} onChange={(e) => setDeliveryName(e.target.value)} className="col-span-3 px-3 py-2 border rounded-lg" required />
+                <input type="text" placeholder="Kod pocztowy" value={customDestination.postalCode} onChange={(e) => setCustomDestination({...customDestination, postalCode: e.target.value})} className="col-span-1 px-3 py-2 border rounded-lg" required />
+                <input type="text" placeholder="Miasto" value={customDestination.city} onChange={(e) => setCustomDestination({...customDestination, city: e.target.value})} className="col-span-2 px-3 py-2 border rounded-lg" required />
+                <input type="text" placeholder="Ulica i numer" value={customDestination.street} onChange={(e) => setCustomDestination({...customDestination, street: e.target.value})} className="col-span-3 px-3 py-2 border rounded-lg" required />
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
-                  <Package className="w-4 h-4" />
-                  Łączna waga bębnów (kg)
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Waga (kg)</label>
                 <div className="relative">
-                  <input
-                    type="number"
-                    value={totalWeight}
-                    onChange={(e) => setTotalWeight(parseFloat(e.target.value) || 0)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  {calculatingWeight && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                    </div>
-                  )}
+                  <input type="number" value={totalWeight} onChange={(e) => setTotalWeight(parseFloat(e.target.value) || 0)} className="w-full px-4 py-2.5 border border-gray-300 rounded-xl" />
+                  {calculatingWeight && <div className="absolute right-3 top-1/2 -translate-y-1/2"><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div></div>}
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Waga obliczona automatycznie.</p>
               </div>
-
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
-                  <User className="w-4 h-4" />
-                  Numer MPK
-                </label>
-                <input
-                  type="text"
-                  value={mpk}
-                  onChange={(e) => setMpk(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50"
-                  placeholder="np. 522-01-999"
-                />
-                <p className="text-xs text-gray-500 mt-1">Koszty dla spedycji.</p>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Telefon odbiorcy</label>
+                <input type="text" value={unloadingContact} onChange={(e) => setUnloadingContact(e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-xl" />
               </div>
+            </div>
 
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
-                  Odległość (km)
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Odległość (km)</label>
                 <div className="flex gap-2">
-                  <input
-                    type="number"
-                    value={distanceKm}
-                    onChange={(e) => setDistanceKm(parseFloat(e.target.value) || 0)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <button 
-                    type="button" 
-                    onClick={calculateDistance} 
-                    disabled={calculatingDistance}
-                    className="px-3 py-2 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 text-sm font-semibold whitespace-nowrap transition-colors"
-                  >
-                    {calculatingDistance ? 'Liczenie...' : 'Oblicz'}
+                  <input type="number" value={distanceKm} onChange={(e) => setDistanceKm(parseFloat(e.target.value) || 0)} className="w-full px-4 py-2.5 border border-gray-300 rounded-xl" />
+                  <button type="button" onClick={calculateDistance} disabled={calculatingDistance} className="px-4 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-xl font-semibold transition-colors">
+                    {calculatingDistance ? '...' : 'Oblicz'}
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Dla kosztów transportu.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Numer MPK</label>
+                <input type="text" value={mpk} onChange={(e) => setMpk(e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 bg-gray-50 rounded-xl text-gray-700" placeholder="np. 522-01-999" />
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="flex gap-3 pt-4 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2.5 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold transition-colors"
-            >
-              Anuluj
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2.5 text-white bg-blue-600 hover:bg-blue-700 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
-            >
-              <Truck className="w-4 h-4" />
-              Wyślij zlecenie
-            </button>
-          </div>
-        </form>
+        <div className="flex-shrink-0 flex justify-end gap-3 p-6 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+          <button onClick={onClose} className="px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 font-medium">Anuluj</button>
+          <button onClick={handleConfirm} className="px-5 py-2.5 text-white bg-blue-600 rounded-xl hover:bg-blue-700 font-medium flex items-center gap-2"><Check size={18} />Wyślij zgłoszenie</button>
+        </div>
       </div>
     </div>
   );
