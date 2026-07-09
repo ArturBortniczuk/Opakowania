@@ -138,15 +138,25 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
       let calcWeight = 0;
       const allDimensions = await calculatorAPI.getDrumDimensions();
       
+      const cechy = drums.map(d => typeof d === 'object' ? d.cecha || d.kod_bebna : d).filter(Boolean);
+      let dbDrums = [];
+      if (cechy.length > 0) {
+         const { data } = await supabase.from('drums').select('cecha, kod_bebna, waga_bebna, WAGA_BEBNA, waga, weight, waga_netto').in('cecha', cechy);
+         if (data) dbDrums = data;
+      }
+      
       drums.forEach(drum => {
         let foundWeight = null;
+        const drumCecha = typeof drum === 'object' ? drum.cecha || drum.kod_bebna : drum;
+        const dbDrum = dbDrums.find(d => d.cecha === drumCecha || d.kod_bebna === drumCecha) || {};
         
-        // Sprawdzamy czy bęben ma już określoną wagę
-        if (typeof drum === 'object' && drum !== null) {
-           const explicitWeight = drum.waga_bebna || drum.WAGA_BEBNA || drum.waga || drum.weight || drum.waga_netto;
-           if (explicitWeight && !isNaN(parseFloat(explicitWeight))) {
-               foundWeight = parseFloat(explicitWeight);
-           }
+        // Sprawdzamy czy bęben ma określoną wagę w JSON (jeśli ma) lub z bazy z tabeli drums
+        const explicitWeight = 
+           (typeof drum === 'object' ? drum.waga_bebna || drum.WAGA_BEBNA || drum.waga || drum.weight || drum.waga_netto : null) ||
+           dbDrum.waga_bebna || dbDrum.WAGA_BEBNA || dbDrum.waga || dbDrum.weight || dbDrum.waga_netto;
+
+        if (explicitWeight && !isNaN(parseFloat(explicitWeight))) {
+           foundWeight = parseFloat(explicitWeight);
         }
 
         if (foundWeight === null) {
