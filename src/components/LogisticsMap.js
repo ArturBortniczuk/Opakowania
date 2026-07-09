@@ -471,10 +471,26 @@ const LogisticsMap = ({ user }) => {
       const transportedCount = transportData.transportedDrumCechas.length;
 
       if (transportData.transportMethod === 'spedycja') {
+        const selectedDrumsDetails = requestForTransport.selected_drums.filter(d => {
+            const cecha = typeof d === 'object' ? d.cecha || d.kod_bebna : d;
+            return transportData.transportedDrumCechas.includes(cecha);
+        });
+
+        const drumsDescParts = selectedDrumsDetails.map(d => {
+            if (typeof d === 'object') {
+                const cecha = d.cecha || d.kod_bebna || '';
+                const size = d.rozmiar_bebna || d.nazwa || '';
+                const weight = d.waga_bebna || d.WAGA_BEBNA || d.weight || d.waga || '';
+                return `${cecha} ${size ? `(${size})` : ''}${weight ? ` - ${weight}kg` : ''}`;
+            }
+            return d;
+        });
+        const goodsDesc = drumsDescParts.join(', ');
+
         const spedycjaPayload = {
           createdBy: user?.name || 'Admin Opakowania',
           createdByEmail: user?.email || 'admin@grupaeltron.pl',
-          responsiblePerson: user?.name || 'Admin Opakowania',
+          responsiblePerson: transportData.salespersonName || user?.name || 'Admin Opakowania',
           responsibleEmail: user?.email || 'admin@grupaeltron.pl',
           mpk: transportData.mpk,
           location: 'Odbiory własne',
@@ -484,19 +500,17 @@ const LogisticsMap = ({ user }) => {
             street: requestForTransport.street
           },
           delivery: transportData.deliveryAddress,
-          loadingContact: `${requestForTransport.profile_name || ''} ${requestForTransport.profile_phone || ''}`.trim(),
+          loadingContact: `${requestForTransport.profile_name || requestForTransport.company_name || ''} ${requestForTransport.profile_phone || requestForTransport.email || ''}`.trim(),
           unloadingContact: '',
           deliveryDate: transportData.transportDate,
           notes: `Zgłoszenie z Opakowań #${requestForTransport.id}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}\n${requestForTransport.notes || ''}`,
-          clientName: requestForTransport.company_name,
+          clientName: transportData.deliveryName || requestForTransport.company_name,
           sourceClientName: requestForTransport.company_name,
-          goodsDescription: [
-            {
-              name: `Bębny z kablowni (${transportedCount} szt.)`,
-              weight: transportData.totalWeight,
-              type: 'Bębny'
-            }
-          ]
+          distanceKm: transportData.distanceKm || 0,
+          goodsDescription: {
+            description: `Bębny z kablowni (${transportedCount} szt.): ${goodsDesc}`,
+            weight: transportData.totalWeight
+          }
         };
 
         await transportAPI.createTransportOrder(spedycjaPayload);
