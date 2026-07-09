@@ -242,7 +242,7 @@ const LogisticsMap = ({ user }) => {
             }
             
             const notesStr = r.notes || '';
-            const matchPhone = notesStr.match(/Telefon kontaktowy:\s*([^\n]+)/);
+            const matchPhone = notesStr.match(/Telefon kontaktowy:\s*([\d\s\+\-]{8,20})/);
             const extractedPhone = matchPhone ? matchPhone[1].trim() : '';
 
             pickupsByLoc[locKey].pickups.push({
@@ -500,7 +500,7 @@ const LogisticsMap = ({ user }) => {
             street: requestForTransport.street
           },
           delivery: transportData.deliveryAddress,
-          loadingContact: ((requestForTransport.notes || '').match(/Telefon kontaktowy:\s*([^\n]+)/)?.[1]?.trim()) || requestForTransport.profile_phone || 'Brak telefonu',
+          loadingContact: ((requestForTransport.notes || '').match(/Telefon kontaktowy:\s*([\d\s\+\-]{8,20})/)?.[1]?.trim()) || requestForTransport.profile_phone || 'Brak telefonu',
           unloadingContact: transportData.unloadingContact || '',
           deliveryDate: transportData.transportDate,
           notes: `Zgłoszenie z Opakowań #${requestForTransport.id}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}\n${requestForTransport.notes || ''}`,

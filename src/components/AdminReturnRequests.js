@@ -133,7 +133,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
             street: requestForTransport.street
           },
           delivery: transportData.deliveryAddress,
-          loadingContact: ((requestForTransport.notes || '').match(/Telefon kontaktowy:\s*([^\n]+)/)?.[1]?.trim()) || requestForTransport.profile_phone || 'Brak telefonu',
+          loadingContact: ((requestForTransport.notes || '').match(/Telefon kontaktowy:\s*([\d\s\+\-]{8,20})/)?.[1]?.trim()) || requestForTransport.profile_phone || 'Brak telefonu',
           unloadingContact: transportData.unloadingContact || '',
           deliveryDate: transportData.transportDate,
           notes: `Zgłoszenie z Opakowań #${requestForTransport.id}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}\n${requestForTransport.notes || ''}`,
