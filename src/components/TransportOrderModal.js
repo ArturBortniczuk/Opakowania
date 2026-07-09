@@ -5,21 +5,21 @@ import { getSalespersonMpk } from '../utils/supabaseApi';
 import { supabase } from '../lib/supabase';
 
 const KABLOWNIE_DATA = {
-  'STYROBUD': { address: 'Trzeboś, ul. Górna 194, 36-050 Sokołów Młp.', contact: '+48 663 896 832' },
-  'Skierniewice Bruk-bet': { address: 'Skierniewice', contact: 'palety.skierniewice@bruk-bet.pl' },
-  'NKT': { address: 'Warszowice', contact: '+48 538 637 957' },
-  'PRYSMIAN': { address: 'ul. Sąsiedzka 1g, 05-806 Sokołów', contact: '+48 725 505 315' },
-  'DRUTPLAST': { address: '', contact: '662 448 575' },
-  'Forum-Rondo': { address: '', contact: '' },
-  'Eltrim Kable': { address: '', contact: 'jankak@eltrim.com.pl' },
-  'Zakłady Kablowe BITNER': { address: '', contact: 'janusz.dubowski@bitner.com.pl' },
-  'Elektrokabel': { address: '', contact: '' },
-  'Tele-Fonika Kable Bydgoszcz': { address: '', contact: '' },
-  'NPA Skawina': { address: '', contact: '' },
+  'STYROBUD': { address: 'ul. Górna 194, 36-050 Trzeboś', contact: '+48 663 896 832' },
+  'Skierniewice Bruk-bet': { address: 'ul. Czerwona 18A, 96-100 Skierniewice', contact: '884 106 616' },
+  'NKT': { address: 'ul. Gajowa 3, 43-254 Warszowice', contact: '+48 538 637 957' },
+  'PRYSMIAN': { address: 'ul. Sąsiedzka 1G, 05-806 Sokołów', contact: '+48 725 505 315' },
+  'DRUTPLAST': { address: 'ul. Parkowa 23, 78-650 Mirosławiec', contact: '662 448 575' },
+  'Forum-Rondo': { address: 'Morszków 56C, 08-304', contact: '+48 25 787 18 10' },
+  'Eltrim Kable': { address: 'Ruszkowo 18, 13-200 Działdowo', contact: '+48 23 697 03 00' },
+  'Zakłady Kablowe BITNER': { address: 'Krakowska 2, 32-353 Trzyciąż', contact: '+48 12 389 40 24' },
+  'Elektrokabel': { address: 'Chopina 151, 62-700 Turek', contact: '604 898 625' },
+  'Tele-Fonika Kable Bydgoszcz': { address: 'Fordońska 152, 85-752 Bydgoszcz', contact: '+48 52 364 32 10' },
+  'NPA Skawina': { address: 'Józefa Piłsudskiego 23, 32-050 Skawina', contact: '+48 12 276 08 02' },
   'Fabryka Kabli ELPAR': { address: 'ul. Polna 40, 21-200 Parczew', contact: 'karolina.flisiak@elpar.pl' },
   'ZPB KACZMAREK': { address: 'Folwark 1, 63-900 Rawicz', contact: '+48 65 546 12 55' },
-  'Betard sp. z o.o.': { address: '', contact: '' },
-  'Technokabel': { address: '', contact: '' }
+  'Betard sp. z o.o.': { address: 'Polna 30, 55-095 Długołęka', contact: '+48 71 315 20 09' },
+  'Technokabel': { address: 'Wiatraczna 28, 06-550 Szreńsk', contact: '+48 23 655 17 00' }
 };
 
 const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
@@ -47,7 +47,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
       setCheckedDrums(allDrumCechas);
       fetchUserMpk();
       setTransportDate(request.collection_date ? request.collection_date.split('T')[0] : new Date().toISOString().split('T')[0]);
-      
+
       const fetchProviders = async () => {
         try {
           const cechy = request.selected_drums?.map(d => typeof d === 'object' ? d.cecha || d.kod_bebna : d) || [];
@@ -88,7 +88,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
           .select('salesperson_name')
           .eq('nip', request.user_nip)
           .single();
-          
+
         if (companyData?.salesperson_name) {
           setSalespersonName(companyData.salesperson_name);
           const salespersonMpk = await getSalespersonMpk(companyData.salesperson_name);
@@ -118,28 +118,28 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
         dest = KABLOWNIE_DATA[destination].address;
       } else {
         if (!customDestination.city || !customDestination.postalCode) {
-            setDistanceKm(0);
-            setCalculatingDistance(false);
-            return;
+          setDistanceKm(0);
+          setCalculatingDistance(false);
+          return;
         }
         dest = `${customDestination.city}, ${customDestination.postalCode}, ${customDestination.street}`;
       }
-      
+
       const transportApiUrl = process.env.REACT_APP_TRANSPORT_API_URL || 'https://transport.grupaeltron.pl/api/spedycje/webhook';
       const baseUrl = transportApiUrl.replace('/api/spedycje/webhook', '');
       const url = `${baseUrl}/api/distance?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(dest)}`;
-      
+
       const res = await fetch(url);
       const data = await res.json();
-      
+
       if (data.status === 'OK' && data.rows && data.rows[0].elements[0].status === 'OK') {
-         const dist = Math.round(data.rows[0].elements[0].distance.value / 1000);
-         setDistanceKm(dist);
+        const dist = Math.round(data.rows[0].elements[0].distance.value / 1000);
+        setDistanceKm(dist);
       } else {
-         alert('Nie udało się obliczyć odległości dla podanych adresów.');
-         setDistanceKm(0);
+        alert('Nie udało się obliczyć odległości dla podanych adresów.');
+        setDistanceKm(0);
       }
-    } catch(e) {
+    } catch (e) {
       console.error(e);
       alert('Błąd podczas obliczania odległości.');
       setDistanceKm(0);
@@ -170,30 +170,30 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
       setTotalWeight(0);
       return;
     }
-    
+
     setCalculatingWeight(true);
     try {
       let calcWeight = 0;
       const allDimensions = await calculatorAPI.getDrumDimensions();
-      
+
       const cechy = drums.map(d => typeof d === 'object' ? d.cecha || d.kod_bebna : d).filter(Boolean);
       let dbDrums = [];
       if (cechy.length > 0) {
-         const { data } = await supabase.from('drums').select('cecha, kod_bebna, waga_bebna, WAGA_BEBNA, waga, weight, waga_netto').in('cecha', cechy);
-         if (data) dbDrums = data;
+        const { data } = await supabase.from('drums').select('cecha, kod_bebna, waga_bebna, WAGA_BEBNA, waga, weight, waga_netto').in('cecha', cechy);
+        if (data) dbDrums = data;
       }
-      
+
       drums.forEach(drum => {
         let foundWeight = null;
         const drumCecha = typeof drum === 'object' ? drum.cecha || drum.kod_bebna : drum;
         const dbDrum = dbDrums.find(d => d.cecha === drumCecha || d.kod_bebna === drumCecha) || {};
-        
-        const explicitWeight = 
-           (typeof drum === 'object' ? drum.waga_bebna || drum.WAGA_BEBNA || drum.waga || drum.weight || drum.waga_netto : null) ||
-           dbDrum.waga_bebna || dbDrum.WAGA_BEBNA || dbDrum.waga || dbDrum.weight || dbDrum.waga_netto;
+
+        const explicitWeight =
+          (typeof drum === 'object' ? drum.waga_bebna || drum.WAGA_BEBNA || drum.waga || drum.weight || drum.waga_netto : null) ||
+          dbDrum.waga_bebna || dbDrum.WAGA_BEBNA || dbDrum.waga || dbDrum.weight || dbDrum.waga_netto;
 
         if (explicitWeight && !isNaN(parseFloat(explicitWeight))) {
-           foundWeight = parseFloat(explicitWeight);
+          foundWeight = parseFloat(explicitWeight);
         }
 
         if (foundWeight === null) {
@@ -212,7 +212,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
           }
 
           foundWeight = 50;
-          
+
           if (diameterCm) {
             const matchedDim = allDimensions.find(d => parseFloat(d.outer_diameter) === diameterCm);
             if (matchedDim && matchedDim.weight) {
@@ -222,7 +222,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
         }
         calcWeight += foundWeight;
       });
-      
+
       setTotalWeight(calcWeight);
     } catch (err) {
       console.error('Błąd obliczania wagi:', err);
@@ -298,7 +298,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
                 const nazwa = typeof drum === 'object' ? drum.nazwa || drum.rozmiar_bebna : '';
                 const dostawca = drumProviders[cecha] || (typeof drum === 'object' ? drum.kon_dostawca : null) || 'Brak danych';
                 const isChecked = checkedDrums.includes(cecha);
-                
+
                 return (
                   <label key={idx} className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50 transition-colors ${!isChecked ? 'opacity-50' : ''}`}>
                     <input
@@ -363,9 +363,9 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
             {destination === 'Inne' && (
               <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
                 <input type="text" placeholder="Nazwa" value={deliveryName} onChange={(e) => setDeliveryName(e.target.value)} className="col-span-3 px-3 py-2 border rounded-lg" required />
-                <input type="text" placeholder="Kod pocztowy" value={customDestination.postalCode} onChange={(e) => setCustomDestination({...customDestination, postalCode: e.target.value})} className="col-span-1 px-3 py-2 border rounded-lg" required />
-                <input type="text" placeholder="Miasto" value={customDestination.city} onChange={(e) => setCustomDestination({...customDestination, city: e.target.value})} className="col-span-2 px-3 py-2 border rounded-lg" required />
-                <input type="text" placeholder="Ulica i numer" value={customDestination.street} onChange={(e) => setCustomDestination({...customDestination, street: e.target.value})} className="col-span-3 px-3 py-2 border rounded-lg" required />
+                <input type="text" placeholder="Kod pocztowy" value={customDestination.postalCode} onChange={(e) => setCustomDestination({ ...customDestination, postalCode: e.target.value })} className="col-span-1 px-3 py-2 border rounded-lg" required />
+                <input type="text" placeholder="Miasto" value={customDestination.city} onChange={(e) => setCustomDestination({ ...customDestination, city: e.target.value })} className="col-span-2 px-3 py-2 border rounded-lg" required />
+                <input type="text" placeholder="Ulica i numer" value={customDestination.street} onChange={(e) => setCustomDestination({ ...customDestination, street: e.target.value })} className="col-span-3 px-3 py-2 border rounded-lg" required />
               </div>
             )}
 
