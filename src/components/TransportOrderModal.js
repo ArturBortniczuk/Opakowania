@@ -105,14 +105,14 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
         dest = `${customDestination.city}, ${customDestination.postalCode}, ${customDestination.street}`;
       }
       
-      const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
-      if (!apiKey) throw new Error("Brak klucza API");
+      const transportApiUrl = process.env.REACT_APP_TRANSPORT_API_URL || 'https://transport.grupaeltron.pl/api/spedycje/webhook';
+      const baseUrl = transportApiUrl.replace('/api/spedycje/webhook', '');
+      const url = `${baseUrl}/api/distance?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(dest)}`;
       
-      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(dest)}&mode=driving&key=${apiKey}`;
       const res = await fetch(url);
       const data = await res.json();
       
-      if (data.status === 'OK' && data.rows[0].elements[0].status === 'OK') {
+      if (data.status === 'OK' && data.rows && data.rows[0].elements[0].status === 'OK') {
          const dist = Math.round(data.rows[0].elements[0].distance.value / 1000);
          setDistanceKm(dist);
       } else {
@@ -395,7 +395,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">
                   <Package className="w-4 h-4" />
