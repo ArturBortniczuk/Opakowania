@@ -904,7 +904,7 @@ export const drumsAPI = {
     try {
       let query = supabase
         .from('drums')
-        .select(`nip, pelna_nazwa_kontrahenta, cecha, numer_faktury, data_wydania, typ_dok, nr_dokumentupz`)
+        .select(`nip, pelna_nazwa_kontrahenta, cecha, numer_faktury, data_wydania, typ_dok, nr_dokumentupz, rozmiar_bebna`)
         .eq('typ_opakowania', 'Paleta');
 
       const currentUser = _currentUserCache;
@@ -931,7 +931,8 @@ export const drumsAPI = {
           clientsMap[row.nip] = {
             nip: row.nip,
             companyName: row.pelna_nazwa_kontrahenta || 'Nieznana firma',
-            balance: 0,
+            totalBalance: 0,
+            balancesBySize: {},
             history: []
           };
         }
@@ -948,12 +949,19 @@ export const drumsAPI = {
         }
 
         const finalQuantity = isReturn ? -Math.abs(quantity) : Math.abs(quantity);
-        clientsMap[row.nip].balance += finalQuantity;
+        clientsMap[row.nip].totalBalance += finalQuantity;
+        
+        const size = row.rozmiar_bebna || 'Brak rozmiaru';
+        if (!clientsMap[row.nip].balancesBySize[size]) {
+          clientsMap[row.nip].balancesBySize[size] = 0;
+        }
+        clientsMap[row.nip].balancesBySize[size] += finalQuantity;
 
         clientsMap[row.nip].history.push({
           date: row.data_wydania,
           document: row.numer_faktury || row.nr_dokumentupz,
           quantity: finalQuantity,
+          size: size,
           isReturn
         });
       });
@@ -963,7 +971,7 @@ export const drumsAPI = {
         client.history.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
       });
 
-      return Object.values(clientsMap).sort((a, b) => (b.balance || 0) - (a.balance || 0));
+      return Object.values(clientsMap).sort((a, b) => (b.totalBalance || 0) - (a.totalBalance || 0));
     } catch (error) {
       console.error('❌ Błąd pobierania sald palet:', error);
       throw error;

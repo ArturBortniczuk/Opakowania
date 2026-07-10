@@ -101,8 +101,8 @@ const AdminPalletsList = () => {
                     <div className="flex items-center space-x-6">
                       <div className="text-right">
                         <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Saldo</p>
-                        <div className={`text-xl font-black ${client.balance > 0 ? 'text-blue-600' : 'text-gray-900'}`}>
-                          {client.balance} <span className="text-sm font-medium opacity-70">szt.</span>
+                        <div className={`text-xl font-black ${client.totalBalance > 0 ? 'text-blue-600' : 'text-gray-900'}`}>
+                          {client.totalBalance} <span className="text-sm font-medium opacity-70">szt.</span>
                         </div>
                       </div>
                       
@@ -114,6 +114,23 @@ const AdminPalletsList = () => {
 
                   {expandedNip === client.nip && (
                     <div className="bg-gray-50 border-t border-gray-200 p-4">
+                      {client.balancesBySize && Object.keys(client.balancesBySize).length > 0 && (
+                        <div className="mb-6">
+                          <h4 className="font-semibold text-gray-700 mb-3 flex items-center">
+                            <Package className="w-4 h-4 mr-2" />
+                            Podsumowanie według rozmiarów
+                          </h4>
+                          <div className="flex flex-wrap gap-3">
+                            {Object.entries(client.balancesBySize).map(([size, quantity]) => (
+                              <div key={size} className="bg-white border border-gray-200 rounded-lg p-3 min-w-[150px] shadow-sm flex flex-col">
+                                <span className="text-xs text-gray-500 uppercase font-medium mb-1 truncate" title={size}>{size}</span>
+                                <span className={`text-lg font-bold ${quantity > 0 ? 'text-blue-600' : 'text-gray-900'}`}>{quantity} szt.</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <h4 className="font-semibold text-gray-700 mb-3 flex items-center">
                         <FileText className="w-4 h-4 mr-2" />
                         Historia dokumentów
@@ -127,6 +144,7 @@ const AdminPalletsList = () => {
                               <tr>
                                 <th className="px-4 py-2 text-left font-medium text-gray-600">Data</th>
                                 <th className="px-4 py-2 text-left font-medium text-gray-600">Dokument</th>
+                                <th className="px-4 py-2 text-left font-medium text-gray-600">Rozmiar palety</th>
                                 <th className="px-4 py-2 text-left font-medium text-gray-600">Operacja</th>
                                 <th className="px-4 py-2 text-right font-medium text-gray-600">Ilość</th>
                               </tr>
@@ -139,6 +157,9 @@ const AdminPalletsList = () => {
                                   </td>
                                   <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-800">
                                     {h.document || '-'}
+                                  </td>
+                                  <td className="px-4 py-2 whitespace-nowrap text-gray-600 text-sm truncate max-w-[200px]" title={h.size}>
+                                    {h.size || '-'}
                                   </td>
                                   <td className="px-4 py-2 whitespace-nowrap">
                                     {h.isReturn ? (

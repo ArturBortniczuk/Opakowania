@@ -64,11 +64,22 @@ const PalletsList = () => {
         </div>
 
         <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-8 text-white text-center shadow-lg mb-8">
-          <p className="text-blue-100 text-lg mb-2 font-medium">Aktualne saldo u Ciebie:</p>
+          <p className="text-blue-100 text-lg mb-2 font-medium">Suma wszystkich palet u Ciebie:</p>
           <div className="text-6xl font-black mb-2">
-            {balanceData?.balance || 0} <span className="text-2xl font-semibold opacity-75">szt.</span>
+            {balanceData?.totalBalance || 0} <span className="text-2xl font-semibold opacity-75">szt.</span>
           </div>
-          <p className="text-blue-200 text-sm">Stan na dzień dzisiejszy</p>
+          <p className="text-blue-200 text-sm mb-6">Stan na dzień dzisiejszy</p>
+          
+          {balanceData?.balancesBySize && Object.keys(balanceData.balancesBySize).length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-6 border-t border-blue-400/30 pt-6">
+              {Object.entries(balanceData.balancesBySize).map(([size, quantity]) => (
+                <div key={size} className="bg-white/10 rounded-xl p-4 backdrop-blur-sm border border-white/10 text-left flex flex-col justify-between">
+                  <p className="text-blue-100 text-xs uppercase tracking-wider mb-2 truncate" title={size}>{size}</p>
+                  <div className="text-2xl font-bold">{quantity} <span className="text-sm font-normal opacity-80">szt.</span></div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {balanceData && balanceData.history.length > 0 && (
@@ -91,6 +102,7 @@ const PalletsList = () => {
                     <tr>
                       <th className="px-6 py-4 text-left font-medium text-gray-500 uppercase tracking-wider">Data</th>
                       <th className="px-6 py-4 text-left font-medium text-gray-500 uppercase tracking-wider">Dokument</th>
+                      <th className="px-6 py-4 text-left font-medium text-gray-500 uppercase tracking-wider">Rozmiar palety</th>
                       <th className="px-6 py-4 text-left font-medium text-gray-500 uppercase tracking-wider">Operacja</th>
                       <th className="px-6 py-4 text-right font-medium text-gray-500 uppercase tracking-wider">Ilość</th>
                     </tr>
@@ -103,6 +115,9 @@ const PalletsList = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
                           {h.document || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-gray-600 text-sm truncate max-w-[200px]" title={h.size}>
+                          {h.size || '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {h.isReturn ? (
