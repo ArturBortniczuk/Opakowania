@@ -390,7 +390,8 @@ export const drumsAPI = {
 
       let query = supabase
         .from('drums')
-        .select('*', { count: 'exact' });
+        .select('*', { count: 'exact' })
+        .eq('typ_opakowania', 'Bęben');
 
       if (statusFilter === 'empty') {
         query = query.eq('status', 'pusty na magazynie');
@@ -483,7 +484,8 @@ export const drumsAPI = {
       // Podstawowe zapytanie
       let query = supabase
         .from('drums')
-        .select(`*, companies (name, email, phone, address, custom_return_periods(return_period_days))`, { count: 'exact' });
+        .select(`*, companies (name, email, phone, address, custom_return_periods(return_period_days))`, { count: 'exact' })
+        .or('typ_opakowania.eq.Bęben,typ_opakowania.is.null');
 
       // Filtrowanie po zgłoszonych bębnach w aktywnych zleceniach zwrotu
       if (reportedOnly) {
@@ -891,6 +893,79 @@ export const drumsAPI = {
       };
     } catch (error) {
       console.error('❌ Błąd API bębnów:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Pobiera salda palet dla klientów, grupując je po NIP.
+   */
+  async getPalletBalances(nip = null) {
+    try {
+      let query = supabase
+        .from('drums')
+        .select(`nip, pelna_nazwa_kontrahenta, cecha, numer_faktury, data_wydania, typ_dok, nr_dokumentupz`)
+        .eq('typ_opakowania', 'Paleta');
+
+      const currentUser = _currentUserCache;
+      if (nip) {
+        query = query.eq('nip', nip);
+      } else {
+        const allowedNips = await getAllowedNips(currentUser);
+        if (allowedNips) {
+          if (allowedNips.length === 0) return [];
+          query = query.in('nip', allowedNips);
+        }
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      if (!data || data.length === 0) return [];
+
+      const clientsMap = {};
+      data.forEach(row => {
+        if (!row.nip) return;
+        
+        if (!clientsMap[row.nip]) {
+          clientsMap[row.nip] = {
+            nip: row.nip,
+            companyName: row.pelna_nazwa_kontrahenta || 'Nieznana firma',
+            balance: 0,
+            history: []
+          };
+        }
+
+        const cechaStr = String(row.cecha || '0');
+        const quantity = parseInt(cechaStr.replace(/[^\d.-]/g, ''), 10) || 0;
+
+        const typDok = String(row.typ_dok || '').toUpperCase();
+        const fv = String(row.numer_faktury || '').toUpperCase();
+        
+        let isReturn = false;
+        if (typDok.includes('K') || typDok.includes('ZWR') || fv.includes('KFV') || fv.includes('KFO') || fv.includes('KOR')) {
+          isReturn = true;
+        }
+
+        const finalQuantity = isReturn ? -Math.abs(quantity) : Math.abs(quantity);
+        clientsMap[row.nip].balance += finalQuantity;
+
+        clientsMap[row.nip].history.push({
+          date: row.data_wydania,
+          document: row.numer_faktury || row.nr_dokumentupz,
+          quantity: finalQuantity,
+          isReturn
+        });
+      });
+
+      // Sortuj historię wg daty malejąco dla każdego klienta
+      Object.values(clientsMap).forEach(client => {
+        client.history.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+      });
+
+      return Object.values(clientsMap).sort((a, b) => (b.balance || 0) - (a.balance || 0));
+    } catch (error) {
+      console.error('❌ Błąd pobierania sald palet:', error);
       throw error;
     }
   },

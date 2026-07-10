@@ -29,6 +29,7 @@ const Navbar = ({
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard', icon: Home },
     { path: '/drums', label: 'Moje bębny', icon: Package },
+    { path: '/pallets', label: 'Moje Palety', icon: Package },
     { path: '/my-returns', label: 'Moje zgłoszenia', icon: FileText },
     { path: '/return', label: 'Zgłoś zwrot', icon: Truck },
     { path: '/help', label: 'Instrukcja obsługi', icon: HelpCircle }

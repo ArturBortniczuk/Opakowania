@@ -6,6 +6,8 @@ import LoginForm from './components/LoginForm';
 import SetPassword from './components/SetPassword';
 import Dashboard from './components/Dashboard';
 import DrumsList from './components/DrumsList';
+import PalletsList from './components/PalletsList';
+import AdminPalletsList from './components/AdminPalletsList';
 import ReturnFormWrapper from './components/ReturnFormWrapper';
 import ClientReturnRequests from './components/ClientReturnRequests';
 import ProfileSelection from './components/ProfileSelection';
@@ -383,6 +385,11 @@ const App = () => {
                   <DrumsList user={currentUser} />
                 </ProtectedRoute>
               } />
+              <Route path="/pallets" element={
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff}>
+                  <PalletsList user={currentUser} />
+                </ProtectedRoute>
+              } />
               <Route path="/return" element={
                 <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff}>
                   <ReturnFormWrapper currentUser={currentUser} profile={currentProfile} />
@@ -408,6 +415,7 @@ const App = () => {
                       const routes = {
                         'admin-clients': '/admin/clients',
                         'admin-drums': '/admin/drums',
+                        'admin-pallets': '/admin/pallets',
                         'admin-returns': '/admin/returns',
                         'admin-return-periods': '/admin/return-periods',
                         'admin-supplier-rules': '/admin/supplier-rules',
@@ -437,6 +445,7 @@ const App = () => {
                       const routes = {
                         'admin-clients': '/admin/clients',
                         'admin-drums': '/admin/drums',
+                        'admin-pallets': '/admin/pallets',
                         'admin-returns': '/admin/returns',
                         'admin-return-periods': '/admin/return-periods',
                         'admin-supplier-rules': '/admin/supplier-rules',
@@ -471,6 +480,11 @@ const App = () => {
               <Route path="/admin/drums" element={
                 <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista', 'Magazyn', 'Wsparcie']}>
                   <AdminDrumsList user={currentUser} />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/pallets" element={
+                <ProtectedRoute currentUser={currentUser} isUserStaff={isUserStaff} adminOnly allowedRoles={['admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Specjalista', 'Magazyn', 'Wsparcie']}>
+                  <AdminPalletsList user={currentUser} />
                 </ProtectedRoute>
               } />
               <Route path="/admin/warehouse-drums" element={
