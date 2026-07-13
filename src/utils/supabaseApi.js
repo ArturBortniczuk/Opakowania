@@ -1068,6 +1068,7 @@ export const drumsAPI = {
           .from('drums')
           .select(`*, companies (name, email, phone, address, custom_return_periods(return_period_days))`)
           .range(from, to)
+          .or('typ_opakowania.eq.Bęben,typ_opakowania.is.null')
           .order('kod_bebna');
 
         if (nip) {
@@ -1833,9 +1834,9 @@ export const statsAPI = {
         { count: completedRequests }
       ] = await Promise.all([
         applyNipFilter(supabase.from('companies').select('*', { count: 'exact', head: true })),
-        applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true })),
+        applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null')),
         applyNipFilter(supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Pending'), 'user_nip'),
-        applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true }).lt('data_zwrotu_do_dostawcy', now)),
+        applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null').lt('data_zwrotu_do_dostawcy', now)),
         applyNipFilter(supabase.from('return_requests').select('*', { count: 'exact', head: true }).in('status', ['Pending', 'Approved']), 'user_nip'),
         applyNipFilter(supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Completed').gte('updated_at', thirtyDaysAgo), 'user_nip')
       ]);
@@ -1875,13 +1876,14 @@ export const statsAPI = {
         { count: dueSoonDrums }
       ] = await Promise.all([
         // Wszystkie bębny
-        supabase.from('drums').select('*', { count: 'exact', head: true }),
+        supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null'),
         // Aktywne (termin zwrotu w przyszłości, więcej niż 14 dni)
-        supabase.from('drums').select('*', { count: 'exact', head: true }).gt('data_zwrotu_do_dostawcy', fourteenDaysFromNow),
+        supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null').gt('data_zwrotu_do_dostawcy', fourteenDaysFromNow),
         // Przeterminowane (termin zwrotu w przeszłości)
-        supabase.from('drums').select('*', { count: 'exact', head: true }).lt('data_zwrotu_do_dostawcy', now),
+        supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null').lt('data_zwrotu_do_dostawcy', now),
         // Zbliża się termin (między dziś a 14 dni)
         supabase.from('drums').select('*', { count: 'exact', head: true })
+          .or('typ_opakowania.eq.Bęben,typ_opakowania.is.null')
           .gte('data_zwrotu_do_dostawcy', now)
           .lte('data_zwrotu_do_dostawcy', fourteenDaysFromNow)
       ]);
