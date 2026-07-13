@@ -10,8 +10,10 @@ const parsePriceRaw = (val) => {
   if (!val) return 0;
   if (typeof val === 'number') return val;
   const cleaned = String(val).replace(/\s/g, '').replace(',', '.');
-  const parsed = parseFloat(cleaned);
-  return isNaN(parsed) ? 0 : parsed;
+  let parsed = parseFloat(cleaned);
+  if (isNaN(parsed)) return 0;
+  if (parsed > 100000) parsed = parsed / 1000000;
+  return parsed;
 };
 
 const Dashboard = ({ user, profile }) => {
