@@ -293,6 +293,7 @@ export const drumsAPI = {
         const { data, error } = await supabase
           .from('drums')
           .select('rozmiar_bebna')
+          .or('typ_opakowania.eq.Bęben,typ_opakowania.is.null')
           .in('status', ['pusty na magazynie', 'na magazynie z towarem'])
           .range(page * pageSize, (page + 1) * pageSize - 1);
           
@@ -329,6 +330,7 @@ export const drumsAPI = {
         const { data, error } = await supabase
           .from('drums')
           .select('rozmiar_bebna')
+          .or('typ_opakowania.eq.Bęben,typ_opakowania.is.null')
           .range(page * pageSize, (page + 1) * pageSize - 1);
           
         if (error) throw error;
