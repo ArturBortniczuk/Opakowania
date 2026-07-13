@@ -904,29 +904,53 @@ export const drumsAPI = {
    */
   async getPalletBalances(nip = null) {
     try {
-      let query = supabase
-        .from('drums')
-        .select(`nip, pelna_nazwa_kontrahenta, cecha, numer_faktury, data_wydania, typ_dok, nr_dokumentupz, rozmiar_bebna`)
-        .eq('typ_opakowania', 'Paleta');
-
       const currentUser = _currentUserCache;
-      if (nip) {
-        query = query.eq('nip', nip);
-      } else {
-        const allowedNips = await getAllowedNips(currentUser);
-        if (allowedNips) {
-          if (allowedNips.length === 0) return [];
-          query = query.in('nip', allowedNips);
-        }
+      let allowedNips = null;
+
+      if (!nip) {
+        allowedNips = await getAllowedNips(currentUser);
+        if (allowedNips && allowedNips.length === 0) return [];
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      let allData = [];
+      let pageIndex = 0;
+      const chunkSize = 1000;
 
-      if (!data || data.length === 0) return [];
+      while (true) {
+        const from = pageIndex * chunkSize;
+        const to = from + chunkSize - 1;
+        
+        let chunkQuery = supabase
+          .from('drums')
+          .select(`nip, pelna_nazwa_kontrahenta, cecha, numer_faktury, data_wydania, typ_dok, nr_dokumentupz, rozmiar_bebna`)
+          .eq('typ_opakowania', 'Paleta')
+          .range(from, to);
+
+        if (nip) {
+          chunkQuery = chunkQuery.eq('nip', nip);
+        } else if (allowedNips) {
+          chunkQuery = chunkQuery.in('nip', allowedNips);
+        }
+
+        const { data, error } = await chunkQuery;
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          break;
+        }
+
+        allData = allData.concat(data);
+
+        if (data.length < chunkSize) {
+          break;
+        }
+        pageIndex++;
+      }
+
+      if (allData.length === 0) return [];
 
       const clientsMap = {};
-      data.forEach(row => {
+      allData.forEach(row => {
         if (!row.nip) return;
         
         if (!clientsMap[row.nip]) {
