@@ -4,17 +4,7 @@ import {
   Package, Truck, Calendar, TrendingUp, AlertCircle, CheckCircle, Clock, ArrowRight, BarChart3, Activity, XCircle, ChevronRight, UserCheck, Phone, Mail
 } from 'lucide-react';
 import { drumsAPI, returnsAPI, companiesAPI } from '../utils/supabaseApi';
-
-// Bezpieczny parser cen z plików Excela
-const parsePriceRaw = (val) => {
-  if (!val) return 0;
-  if (typeof val === 'number') return val;
-  const cleaned = String(val).replace(/\s/g, '').replace(',', '.');
-  let parsed = parseFloat(cleaned);
-  if (isNaN(parsed)) return 0;
-  if (parsed > 100000) parsed = parsed / 1000000;
-  return parsed;
-};
+import { parsePriceRaw, getClientPrice } from '../utils/priceHelpers';
 
 const Dashboard = ({ user, profile }) => {
   const navigate = useNavigate();
@@ -114,7 +104,7 @@ const Dashboard = ({ user, profile }) => {
           return new Date(dateStr);
         };
 
-        // Obliczenia Finansowe na podstawie ceny netto + 20% marży
+        // Obliczenia Finansowe na podstawie zdefiniowanej ceny dla klienta
         let totalVal = 0;
         let activeVal = 0;
         let overdueVal = 0;
@@ -122,9 +112,8 @@ const Dashboard = ({ user, profile }) => {
         let overduePaymentVal = 0;
 
         mappedDrums.forEach(drum => {
-          const priceRaw = parsePriceRaw(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
-          if (priceRaw > 0) {
-            const clientPrice = priceRaw * 1.2;
+          const clientPrice = getClientPrice(drum);
+          if (clientPrice > 0) {
             totalVal += clientPrice;
 
             if (drum.status === 'overdue') {
@@ -154,7 +143,7 @@ const Dashboard = ({ user, profile }) => {
               const now = new Date();
               now.setHours(0,0,0,0);
               if (paymentDeadline && paymentDeadline < now) {
-                overduePaymentVal += (priceRaw * 1.2 * 1.23); // Marża 20% + VAT 23%
+                overduePaymentVal += (clientPrice * 1.23); // Cena z marżą + VAT 23%
               }
             }
           }
@@ -700,9 +689,9 @@ const Dashboard = ({ user, profile }) => {
                             <span className={`text-xs font-bold block ${
                               isDueSoon ? 'text-amber-600' : 'text-blue-600'
                             }`}>{daysStr}</span>
-                            {drum.cena_netto_bebna && (
+                            {getClientPrice(drum) > 0 && (
                               <span className="text-[10px] font-bold text-gray-600 block mt-0.5">
-                                Wartość: {(parsePriceRaw(drum.cena_netto_bebna) * 1.2).toFixed(2)} PLN
+                                Wartość: {getClientPrice(drum).toFixed(2)} PLN
                               </span>
                             )}
                             <span className="text-[10px] text-gray-400 block font-medium mt-0.5">Termin: {returnDate ? new Date(returnDate).toLocaleDateString('pl-PL') : 'Brak'}</span>

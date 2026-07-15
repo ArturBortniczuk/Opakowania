@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
+import { getClientPrice } from '../utils/priceHelpers';
 import {
   Package, Calendar, Search, Filter, AlertCircle, CheckCircle, Clock,
   ArrowUpDown, Truck, RefreshCw, ChevronLeft, ChevronRight, ChevronDown,
@@ -19,19 +20,7 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
   const company = drum.company || drum.pelna_nazwa_kontrahenta;
   const nip = drum.nip || drum.NIP;
 
-  // Bezpieczny parser cen z plików Excela
-  const parsePriceRaw = (val) => {
-    if (!val) return 0;
-    if (typeof val === 'number') return val;
-    const cleaned = String(val).replace(/\s/g, '').replace(',', '.');
-    let parsed = parseFloat(cleaned);
-    if (isNaN(parsed)) return 0;
-    if (parsed > 100000) parsed = parsed / 1000000;
-    return parsed;
-  };
-
-  const priceRaw = parsePriceRaw(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
-  const clientPrice = priceRaw > 0 ? priceRaw * 1.2 : null;
+  const clientPrice = getClientPrice(drum) > 0 ? getClientPrice(drum) : null;
 
   const parsePaymentDate = (dateStr) => {
     if (!dateStr) return null;

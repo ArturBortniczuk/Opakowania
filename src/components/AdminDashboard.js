@@ -1,6 +1,7 @@
 // src/components/AdminDashboard.js - Zaktualizowany o prawdziwe dane
 import React, { useState, useEffect } from 'react';
 import { statsAPI, drumsAPI, returnsAPI } from '../utils/supabaseApi';
+import { parsePriceRaw, getClientPrice } from '../utils/priceHelpers';
 import InviteClientModal from './InviteClientModal';
 import { 
   Users, 
@@ -74,17 +75,6 @@ const AdminDashboard = ({ user, onNavigate }) => {
         let returnClientVal = 0;
         let overduePaymentVal = 0;
 
-        // Bezpieczny parser cen z plików Excela (usuwa spacje tysięcy i zamienia przecinki na kropki)
-        const parsePriceRaw = (val) => {
-          if (!val) return 0;
-          if (typeof val === 'number') return val;
-          const cleaned = String(val).replace(/\s/g, '').replace(',', '.');
-          let parsed = parseFloat(cleaned);
-          if (isNaN(parsed)) return 0;
-          if (parsed > 100000) parsed = parsed / 1000000;
-          return parsed;
-        };
-
         const parsePaymentDate = (dateStr) => {
           if (!dateStr) return null;
           const parts = dateStr.split('.');
@@ -130,7 +120,8 @@ const AdminDashboard = ({ user, onNavigate }) => {
               const now = new Date();
               now.setHours(0,0,0,0);
               if (paymentDeadline && paymentDeadline < now) {
-                overduePaymentVal += (priceRaw * 1.2 * 1.23); // Marża 20% + VAT 23%
+                const clientPriceRaw = getClientPrice(drum);
+                overduePaymentVal += (clientPriceRaw * 1.23); // Cena z marżą + VAT 23%
               }
             }
           }
@@ -139,11 +130,11 @@ const AdminDashboard = ({ user, onNavigate }) => {
         console.log(`Podsumowanie: Załadowano ${allDrums.length} bębnów. Wartość całkowita: ${totalVal}, Własne: ${ourVal}`);
 
         // Obliczamy bębny w trakcie zwrotów
-        // Tworzymy mapę cech bębnów z ich cenami z allDrums dla szybkiego wyszukiwania
-        const drumPriceMap = {};
+        // Tworzymy mapę bębnów z allDrums dla szybkiego wyszukiwania
+        const drumMap = {};
         allDrums.forEach(drum => {
           if (drum.cecha) {
-            drumPriceMap[drum.cecha] = parsePriceRaw(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA);
+            drumMap[drum.cecha] = drum;
           }
         });
 
@@ -156,15 +147,19 @@ const AdminDashboard = ({ user, onNavigate }) => {
                 if (cecha && !countedReturningDrums.has(cecha)) {
                   countedReturningDrums.add(cecha);
                   
-                  // Pobierz cenę netto - najpierw z allDrums (live), potem z obiektu snapshotu
-                  let price = drumPriceMap[cecha];
-                  if (price === undefined && typeof d === 'object') {
-                    price = parsePriceRaw(d.cena_netto || d.cena_netto_bebna);
+                  let drumData = drumMap[cecha];
+                  if (!drumData && typeof d === 'object') {
+                    drumData = d;
                   }
                   
-                  if (price && price > 0) {
-                    returnBaseVal += price;
-                    returnClientVal += price * 1.2;
+                  if (drumData) {
+                    const price = parsePriceRaw(drumData.cena_netto_bebna || drumData.CENA_NETTO_BEBNA || drumData.cena_netto);
+                    const clientPrice = getClientPrice(drumData);
+                    
+                    if (price > 0) {
+                      returnBaseVal += price;
+                      returnClientVal += clientPrice;
+                    }
                   }
                 }
               });
@@ -503,7 +498,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
                   {financialStats.inReturnBaseValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
                 </p>
                 <div className="pt-1.5 border-t border-amber-100/50 mt-1.5 space-y-0.5">
-                  <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Szacowany zwrot dla klientów (z marżą 20%)</p>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Szacowany zwrot dla klientów</p>
                   <p className="text-sm font-bold text-amber-700">
                     {financialStats.inReturnClientValue.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PLN
                   </p>

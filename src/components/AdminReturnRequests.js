@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { returnsAPI, companiesAPI, drumsAPI, transportAPI, rulesAPI } from '../utils/supabaseApi';
+import { parsePriceRaw, getClientPrice } from '../utils/priceHelpers';
 import TransportOrderModal from './TransportOrderModal';
 import {
   Truck,
@@ -47,15 +48,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   const [splitSelectedDrums, setSplitSelectedDrums] = useState([]);
   const [supplierRules, setSupplierRules] = useState([]);
 
-  const parsePriceRaw = (val) => {
-    if (!val) return 0;
-    if (typeof val === 'number') return val;
-    const cleaned = String(val).replace(/\s/g, '').replace(',', '.');
-    let parsed = parseFloat(cleaned);
-    if (isNaN(parsed)) return 0;
-    if (parsed > 100000) parsed = parsed / 1000000;
-    return parsed;
-  };
+
 
   const fetchRequests = useCallback(async () => {
     setLoading(true);
@@ -865,8 +858,8 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                   }
 
                   // 3. Wartości finansowe
-                  const cenaNetto = parsePriceRaw(drum.cena_netto_bebna);
-                  const cenaZMarza = cenaNetto * 1.2;
+                  const cenaNetto = parsePriceRaw(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA || drum.cena_netto);
+                  const cenaZMarza = getClientPrice(drum);
                   const wartoscKablownia = cenaNetto * (supplierReturnPercentage / 100);
                   const lostPercentage = 100 - clientReturnPercentage;
                   const spadekWartosci = cenaZMarza * (lostPercentage / 100);

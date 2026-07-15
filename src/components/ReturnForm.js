@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
+import { parsePriceRaw, getClientPrice } from '../utils/priceHelpers';
 
 registerLocale('pl', pl);
 
@@ -344,34 +345,25 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
     }
   };
 
-  // Bezpieczny parser cen z plików Excela
-  const parsePriceRaw = (val) => {
-    if (!val) return 0;
-    if (typeof val === 'number') return val;
-    const cleaned = String(val).replace(/\s/g, '').replace(',', '.');
-    let parsed = parseFloat(cleaned);
-    if (isNaN(parsed)) return 0;
-    if (parsed > 100000) parsed = parsed / 1000000;
-    return parsed;
-  };
-
-  // Oblicz całkowitą wartość wybranych bębnów (netto z marżą 20%)
+  // Oblicz całkowitą wartość wybranych bębnów
   const calculateSelectedDrumsValue = () => {
     let totalVal = 0;
     formData.selectedDrums.forEach(selDrum => {
-      let cenaNetto = selDrum.cena_netto;
-      if (selDrum.type !== 'pallet') {
-        const origDrum = userDrums.find(d => d.cecha === selDrum.cecha);
-        cenaNetto = origDrum?.cena_netto_bebna || cenaNetto;
+      let val = 0;
+      if (selDrum.type === 'pallet') {
+        if (selDrum.cena_netto) {
+          val = parsePriceRaw(selDrum.cena_netto) * 1.2; // Palety nadal wg starego algorytmu
+        }
+      } else {
+        const origDrum = userDrums.find(d => d.cecha === selDrum.cecha) || selDrum;
+        val = getClientPrice(origDrum);
       }
-      if (cenaNetto) {
-        const val = parsePriceRaw(cenaNetto) * 1.2;
-        if (val > 0) {
-          if (selDrum.type === 'pallet') {
-            totalVal += val * (selDrum.quantity || 1);
-          } else {
-            totalVal += val;
-          }
+      
+      if (val > 0) {
+        if (selDrum.type === 'pallet') {
+          totalVal += val * (selDrum.quantity || 1);
+        } else {
+          totalVal += val;
         }
       }
     });
@@ -392,11 +384,9 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
           }
         }
       } else {
-        const origDrum = userDrums.find(d => d.cecha === selDrum.cecha);
-        const cenaNetto = origDrum?.cena_netto_bebna || selDrum.cena_netto;
-        if (cenaNetto) {
-          const val = parsePriceRaw(cenaNetto) * 1.2;
-          if (val > 0) {
+        const origDrum = userDrums.find(d => d.cecha === selDrum.cecha) || selDrum;
+        const val = getClientPrice(origDrum);
+        if (val > 0) {
             // Policz procent zwrotu
             const daysInPossession = origDrum?.daysInPossession !== undefined 
               ? origDrum.daysInPossession 
@@ -883,7 +873,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
                     else returnPercentage = 0;
                   }
 
-                  const drumPrice = parsePriceRaw(drum.cena_netto_bebna) * 1.2;
+                  const drumPrice = getClientPrice(drum);
                   const refundValue = drumPrice * (returnPercentage / 100);
 
                   return (
