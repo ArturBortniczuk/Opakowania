@@ -402,7 +402,6 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
 
             totalRefund += val * (returnPercentage / 100);
           }
-        }
       }
     });
     return totalRefund;
