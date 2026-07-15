@@ -329,6 +329,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
                     <div className="flex flex-col">
                       <span className="text-sm font-semibold text-gray-900">{cecha} <span className="text-xs text-blue-600 ml-1">({dostawca})</span></span>
                       {nazwa && <span className="text-xs text-gray-500">{nazwa}</span>}
+                    </div>
                   </label>
                 );
               })}

@@ -996,8 +996,10 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
               </div>
               </>
             )}
+            </>
+          )}
 
-            {activeTab === 'pallets' && (
+          {activeTab === 'pallets' && (
               <div className="space-y-4">
                 {palletsLoading ? (
                   <div className="flex items-center justify-center py-8">

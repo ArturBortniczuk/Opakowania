@@ -96,6 +96,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
   const handleTransportConfirm = async (transportData) => {
     try {
+      const updatedDrums = requestForTransport.selected_drums.map(d => {
         const isPallet = typeof d === 'object' && d.type === 'pallet';
         if (isPallet) {
           const transportedQty = transportData.transportedPallets?.find(p => p.size === d.size)?.quantity;
