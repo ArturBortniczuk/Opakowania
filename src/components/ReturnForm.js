@@ -20,7 +20,8 @@ import {
   AlertTriangle,
   Trash2,
   Phone,
-  Search
+  Search,
+  Layers
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
@@ -75,10 +76,16 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('default');
   const [dateError, setDateError] = useState(false);
-  // Pobierz bębny użytkownika
+  
+  const [palletBalances, setPalletBalances] = useState({});
+  const [palletsLoading, setPalletsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('drums');
+  
+  // Pobierz bębny i palety użytkownika
   useEffect(() => {
     const fetchUserDrums = async () => {
       setDrumsLoading(true);
+      setPalletsLoading(true);
       try {
         console.log('🔄 ReturnForm: Pobieranie bębnów dla', user.nip);
 
@@ -89,10 +96,17 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
           sortOrder: 'asc'
         };
 
-        const [result, returns] = await Promise.all([
+        const [result, returns, palletsResult] = await Promise.all([
           drumsAPI.getDrums(user.nip, options),
-          returnsAPI.getReturns(user.nip)
+          returnsAPI.getReturns(user.nip),
+          drumsAPI.getPalletBalances(user.nip).catch(err => { console.error(err); return []; })
         ]);
+        
+        if (palletsResult && palletsResult.length > 0 && palletsResult[0].balancesBySize) {
+          setPalletBalances(palletsResult[0].balancesBySize);
+        } else {
+          setPalletBalances({});
+        }
         
         console.log('✅ ReturnForm: Otrzymano dane:', result);
 
@@ -151,6 +165,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
         setUserDrums([]);
       } finally {
         setDrumsLoading(false);
+        setPalletsLoading(false);
       }
     };
 
@@ -158,7 +173,9 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
       fetchUserDrums();
     } else {
       setDrumsLoading(false);
+      setPalletsLoading(false);
       setUserDrums([]);
+      setPalletBalances({});
     }
   }, [user?.nip]);
 
@@ -207,7 +224,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
   const steps = [
     { id: 1, title: 'Adres odbioru', icon: MapPin },
     { id: 2, title: 'Szczegóły', icon: MessageSquare },
-    { id: 3, title: 'Wybór bębnów', icon: Package },
+    { id: 3, title: 'Bębny i Palety', icon: Package },
     { id: 4, title: 'Potwierdzenie', icon: CheckCircle }
   ];
 
@@ -417,6 +434,41 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
           : item
       )
     }));
+  };
+
+  const handlePalletQuantityChange = (size, valueStr) => {
+    const value = parseInt(valueStr) || 0;
+    const maxQty = palletBalances[size] || 0;
+    const safeValue = Math.max(0, Math.min(value, maxQty)); // Ogranicz do salda
+    
+    setFormData(prev => {
+      // Usuń dotychczasowy wpis dla tej palety
+      const filtered = prev.selectedDrums.filter(item => !(item.type === 'pallet' && item.size === size));
+      
+      if (safeValue > 0) {
+        // Dodaj nowy wpis jeśli ilość > 0
+        filtered.push({
+          type: 'pallet',
+          size: size,
+          quantity: safeValue
+        });
+      }
+      
+      return {
+        ...prev,
+        selectedDrums: filtered
+      };
+    });
+  };
+
+  const getSelectedPalletsCount = () => {
+    return formData.selectedDrums
+      .filter(item => item.type === 'pallet')
+      .reduce((sum, item) => sum + item.quantity, 0);
+  };
+
+  const getSelectedDrumsCount = () => {
+    return formData.selectedDrums.filter(item => item.type !== 'pallet').length;
   };
 
   const StepIndicator = () => (
@@ -633,20 +685,43 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
           <div className="space-y-6">
             <div className="text-center mb-6">
               <Package className="w-16 h-16 mx-auto text-blue-600 mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900">Wybór bębnów</h2>
-              <p className="text-gray-600">Zaznacz bębny które chcesz zwrócić</p>
+              <h2 className="text-2xl font-bold text-gray-900">Wybór asortymentu do zwrotu</h2>
+              <p className="text-gray-600">Wybierz bębny i palety, które chcesz zwrócić</p>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+            {/* Zakładki */}
+            <div className="flex space-x-2 border-b border-gray-200 mb-6">
+              <button
+                onClick={() => setActiveTab('drums')}
+                className={`py-3 px-6 font-medium text-sm border-b-2 transition-colors flex items-center space-x-2 ${activeTab === 'drums' ? 'border-blue-600 text-blue-600 bg-blue-50/50 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+              >
+                <Package className="w-4 h-4" />
+                <span>Bębny ({getSelectedDrumsCount()})</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('pallets')}
+                className={`py-3 px-6 font-medium text-sm border-b-2 transition-colors flex items-center space-x-2 ${activeTab === 'pallets' ? 'border-blue-600 text-blue-600 bg-blue-50/50 rounded-t-lg' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+              >
+                <Layers className="w-4 h-4" />
+                <span>Palety ({getSelectedPalletsCount()} szt.)</span>
+              </button>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex justify-between items-center">
               <div className="flex items-center space-x-2">
                 <AlertCircle className="w-5 h-5 text-blue-600" />
                 <span className="text-sm text-blue-800">
-                  Wybrano: <strong>{formData.selectedDrums.length}</strong> z <strong>{userDrums.length}</strong> dostępnych bębnów
+                  Wybrane elementy do zwrotu w tym zgłoszeniu:
                 </span>
+              </div>
+              <div className="text-sm font-bold text-blue-900">
+                Bębny: {getSelectedDrumsCount()} | Palety: {getSelectedPalletsCount()} szt.
               </div>
             </div>
 
-            {drumsLoading ? (
+            {activeTab === 'drums' && (
+              <>
+                {drumsLoading ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 <p className="ml-4 text-gray-600">Ładowanie bębnów...</p>
@@ -921,6 +996,59 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
               </div>
               </>
             )}
+
+            {activeTab === 'pallets' && (
+              <div className="space-y-4">
+                {palletsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <p className="ml-4 text-gray-600">Ładowanie palet...</p>
+                  </div>
+                ) : Object.keys(palletBalances).length === 0 ? (
+                  <div className="text-center py-8 bg-gray-50 rounded-xl border border-gray-200">
+                    <Layers className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+                    <p className="text-gray-600 font-medium">Brak dostępnych palet na saldzie do zwrotu.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    {Object.entries(palletBalances).map(([size, maxQuantity]) => {
+                      const selectedPallet = formData.selectedDrums.find(item => item.type === 'pallet' && item.size === size);
+                      const currentQuantity = selectedPallet ? selectedPallet.quantity : 0;
+                      
+                      return (
+                        <div key={size} className={`p-5 rounded-xl border-2 transition-all duration-200 flex flex-col justify-between ${currentQuantity > 0 ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
+                          <div>
+                            <h4 className="text-lg font-bold text-gray-900 mb-1">Paleta {size}</h4>
+                            <p className="text-sm text-gray-500 mb-4">Dostępne saldo: <span className="font-semibold text-gray-700">{maxQuantity} szt.</span></p>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wider">Ilość do zwrotu</label>
+                            <div className="flex items-center relative">
+                              <input 
+                                type="number" 
+                                min="0" 
+                                max={maxQuantity}
+                                value={currentQuantity || ''}
+                                onChange={(e) => handlePalletQuantityChange(size, e.target.value)}
+                                placeholder="0"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg font-semibold text-gray-900 bg-white"
+                              />
+                              <span className="absolute right-4 text-gray-400 font-medium text-sm">szt.</span>
+                            </div>
+                            {currentQuantity > 0 && (
+                              <p className="text-xs text-blue-600 mt-2 font-medium flex items-center">
+                                <CheckCircle className="w-3 h-3 mr-1" /> Wybrano do zwrotu
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         );
 
@@ -957,12 +1085,16 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Ilość bębnów</p>
-                  <p className="font-medium text-gray-900">{formData.selectedDrums.length} szt.</p>
+                  <p className="font-medium text-gray-900">{getSelectedDrumsCount()} szt.</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Uszkodzone</p>
+                  <p className="text-sm text-gray-500">Ilość palet</p>
+                  <p className="font-medium text-gray-900">{getSelectedPalletsCount()} szt.</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Bębny uszkodzone</p>
                   <p className="font-medium text-red-600">
-                    {formData.selectedDrums.filter(d => d.isDamaged).length} szt.
+                    {formData.selectedDrums.filter(d => d.isDamaged && d.type !== 'pallet').length} szt.
                   </p>
                 </div>
                 {calculateSelectedDrumsValue() > 0 && (

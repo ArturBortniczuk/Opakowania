@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Calendar, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { Package, Calendar, FileText, ChevronDown, ChevronUp, RefreshCcw, ArrowRight } from 'lucide-react';
 import { drumsAPI, getCurrentUserFromCache } from '../utils/supabaseApi';
+import { useNavigate } from 'react-router-dom';
 
 const PalletsList = () => {
   const [balanceData, setBalanceData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchPallets();
@@ -53,33 +55,50 @@ const PalletsList = () => {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
-        <div className="flex items-center space-x-4 mb-6">
-          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center">
-            <Package className="w-8 h-8 text-blue-600" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center space-x-4">
+            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center border border-blue-100">
+              <Package className="w-8 h-8 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Saldo Palet</h2>
+              <p className="text-gray-500">{balanceData?.companyName || 'Twoja firma'}</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Saldo Palet</h2>
-            <p className="text-gray-500">{balanceData?.companyName || 'Twoja firma'}</p>
-          </div>
+          
+          <button 
+            onClick={() => navigate('/return')}
+            className="flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
+          >
+            <RefreshCcw className="w-5 h-5" />
+            <span>Zgłoś zwrot</span>
+            <ArrowRight className="w-4 h-4 ml-1 opacity-70" />
+          </button>
         </div>
 
-        <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-8 text-white text-center shadow-lg mb-8">
-          <p className="text-blue-100 text-lg mb-2 font-medium">Suma wszystkich palet u Ciebie:</p>
-          <div className="text-6xl font-black mb-2">
-            {balanceData?.totalBalance || 0} <span className="text-2xl font-semibold opacity-75">szt.</span>
-          </div>
-          <p className="text-blue-200 text-sm mb-6">Stan na dzień dzisiejszy</p>
+        <div className="bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 rounded-3xl p-8 text-white text-center shadow-xl mb-8 relative overflow-hidden">
+          {/* Dekoracyjne elementy tła */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20"></div>
+          <div className="absolute bottom-0 left-0 w-40 h-40 bg-blue-400/10 rounded-full blur-2xl -ml-10 -mb-10"></div>
           
-          {balanceData?.balancesBySize && Object.keys(balanceData.balancesBySize).length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-6 border-t border-blue-400/30 pt-6">
-              {Object.entries(balanceData.balancesBySize).map(([size, quantity]) => (
-                <div key={size} className="bg-white/10 rounded-xl p-4 backdrop-blur-sm border border-white/10 text-left flex flex-col justify-between">
-                  <p className="text-blue-100 text-xs uppercase tracking-wider mb-2 truncate" title={size}>{size}</p>
-                  <div className="text-2xl font-bold">{quantity} <span className="text-sm font-normal opacity-80">szt.</span></div>
-                </div>
-              ))}
+          <div className="relative z-10">
+            <p className="text-blue-100/90 text-lg mb-2 font-medium">Suma wszystkich palet u Ciebie:</p>
+            <div className="text-6xl md:text-7xl font-black mb-1 drop-shadow-sm tracking-tight">
+              {balanceData?.totalBalance || 0} <span className="text-2xl md:text-3xl font-semibold opacity-75 tracking-normal">szt.</span>
             </div>
-          )}
+            <p className="text-blue-200/80 text-sm mb-8 font-medium">Stan na dzień dzisiejszy</p>
+            
+            {balanceData?.balancesBySize && Object.keys(balanceData.balancesBySize).length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 border-t border-white/10 pt-8">
+                {Object.entries(balanceData.balancesBySize).map(([size, quantity]) => (
+                  <div key={size} className="bg-white/10 hover:bg-white/15 rounded-2xl p-5 backdrop-blur-md border border-white/10 text-left flex flex-col justify-between transition-all duration-300">
+                    <p className="text-blue-100/90 text-xs uppercase tracking-widest font-bold mb-3 truncate" title={size}>{size}</p>
+                    <div className="text-3xl font-bold text-white">{quantity} <span className="text-sm font-medium opacity-80">szt.</span></div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {balanceData && balanceData.history.length > 0 && (

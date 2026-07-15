@@ -12,6 +12,7 @@ import {
   MapPin,
   Calendar,
   Package,
+  Layers,
   ArrowUpDown,
   Edit,
   RefreshCw,
@@ -95,7 +96,13 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
   const handleTransportConfirm = async (transportData) => {
     try {
-      const updatedDrums = requestForTransport.selected_drums.map(d => {
+        const isPallet = typeof d === 'object' && d.type === 'pallet';
+        if (isPallet) {
+          const transportedQty = transportData.transportedPallets?.find(p => p.size === d.size)?.quantity;
+          const isTransported = d.transported === true || (transportedQty !== undefined && transportedQty > 0);
+          return { ...d, transported: isTransported, transportedQuantity: transportedQty !== undefined ? transportedQty : d.transportedQuantity };
+        }
+        
         const cecha = typeof d === 'object' ? d.cecha || d.kod_bebna : d;
         const wasTransported = typeof d === 'object' && d.transported === true;
         const isTransportedNow = transportData.transportedDrumCechas.includes(cecha);
@@ -103,16 +110,21 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
         return typeof d === 'object' ? { ...d, transported: isTransported } : { cecha: d, transported: isTransported };
       });
       const transportedCount = transportData.transportedDrumCechas.length;
+      const transportedPalletsCount = transportData.transportedPallets?.reduce((sum, p) => sum + (p.quantity || 0), 0) || 0;
 
       // 1. Wyślij do systemu Transport (tylko dla spedycji)
       if (transportData.transportMethod === 'spedycja') {
         const selectedDrumsDetails = requestForTransport.selected_drums.filter(d => {
+            if (typeof d === 'object' && d.type === 'pallet') {
+              return transportData.transportedPallets?.some(p => p.size === d.size && p.quantity > 0);
+            }
             const cecha = typeof d === 'object' ? d.cecha || d.kod_bebna : d;
             return transportData.transportedDrumCechas.includes(cecha);
         });
 
         const drumsDescParts = selectedDrumsDetails.map(d => {
             if (typeof d === 'object') {
+                if (d.type === 'pallet') return `Paleta ${d.size} - ${d.transportedQuantity || d.quantity} szt.`;
                 const cecha = d.cecha || d.kod_bebna || '';
                 const size = d.rozmiar_bebna || d.nazwa || '';
                 const weight = d.waga_bebna || d.WAGA_BEBNA || d.weight || d.waga || '';
@@ -143,7 +155,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
           sourceClientName: requestForTransport.company_name,
           distanceKm: transportData.distanceKm || 0,
           goodsDescription: {
-            description: `Bębny z kablowni (${transportedCount} szt.): ${goodsDesc}`,
+            description: `Bębny z kablowni (${transportedCount} szt.) i Palety (${transportedPalletsCount} szt.): ${goodsDesc}`,
             weight: transportData.totalWeight
           }
         };
@@ -438,6 +450,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
   const getDrumLabel = (drum) => {
     if (typeof drum === 'object' && drum !== null) {
+      if (drum.type === 'pallet') return `Paleta ${drum.size} (${drum.quantity} szt.)`;
       return drum.cecha || drum.kod_bebna || 'Nieznany';
     }
     return drum;
@@ -448,9 +461,11 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   };
 
   const RequestCard = ({ request }) => {
-    const damagedCount = Array.isArray(request.selected_drums)
-      ? request.selected_drums.filter(d => isDrumDamaged(d)).length
-      : 0;
+    const drumsList = Array.isArray(request.selected_drums) ? request.selected_drums.filter(d => typeof d !== 'object' || d.type !== 'pallet') : [];
+    const palletsList = Array.isArray(request.selected_drums) ? request.selected_drums.filter(d => typeof d === 'object' && d.type === 'pallet') : [];
+    
+    const damagedCount = drumsList.filter(d => isDrumDamaged(d)).length;
+    const palletsCount = palletsList.reduce((sum, p) => sum + (p.quantity || 0), 0);
 
     const collectionDate = new Date(request.collection_date);
     const daysUntilCollection = Math.ceil((collectionDate - new Date()) / (1000 * 60 * 60 * 24));
@@ -463,6 +478,9 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
           <div className="min-w-0">
             <h3 className="text-lg font-bold text-gray-900 leading-tight">Zgłoszenie #{request.id}</h3>
             <p className="text-sm font-medium text-blue-600 truncate mt-0.5">{request.company_name}</p>
+            <p className="text-xs font-semibold text-gray-600 mt-1">
+              Bębny: {drumsList.length} szt. {palletsCount > 0 && `| Palety: ${palletsCount} szt.`}
+            </p>
             <div className="flex flex-col mt-1">
               <p className="text-[10px] text-gray-400 font-bold tracking-wider uppercase leading-none">NIP: {request.user_nip}</p>
               <p className="text-[10px] text-gray-400 font-bold tracking-wider uppercase mt-1 leading-none">Zgłoszono: {new Date(request.created_at).toLocaleDateString('pl-PL')}</p>
@@ -728,7 +746,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">
-                  Wybrane bębny ({selectedRequest.selected_drums?.filter(d => typeof d === 'object' && d.transported !== false)?.length || 0} z {selectedRequest.selected_drums?.length || 0} szt.)
+                  Szczegóły asortymentu
                 </h3>
                 <div className="flex items-center gap-3">
                   {enriching ? (
@@ -782,8 +800,11 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                 </div>
               )}
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {Array.isArray(selectedRequest.selected_drums) && selectedRequest.selected_drums.map((drum, idx) => {
+              <div className="mb-4 text-gray-700 font-medium border-b pb-2">
+                Wybrane bębny ({Array.isArray(selectedRequest.selected_drums) ? selectedRequest.selected_drums.filter(d => (typeof d !== 'object' || d.type !== 'pallet') && d.transported !== false).length : 0} szt.)
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
+                {Array.isArray(selectedRequest.selected_drums) && selectedRequest.selected_drums.filter(d => typeof d !== 'object' || d.type !== 'pallet').map((drum, idx) => {
                   const label = getDrumLabel(drum);
                   const damaged = isDrumDamaged(drum);
                   const description = damaged ? drum.description : '';
@@ -972,6 +993,78 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                   );
                 })}
               </div>
+
+              {Array.isArray(selectedRequest.selected_drums) && selectedRequest.selected_drums.filter(d => typeof d === 'object' && d.type === 'pallet').length > 0 && (
+                <>
+                  <div className="mb-4 text-gray-700 font-medium border-b pb-2 mt-4">
+                    Wybrane palety
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
+                    {selectedRequest.selected_drums.filter(d => typeof d === 'object' && d.type === 'pallet').map((pallet, idx) => {
+                      const label = getDrumLabel(pallet);
+                      const isNotTransported = pallet.transported === false;
+                      const isSelectedForSplit = splitSelectedDrums.includes(label);
+                      const actualQuantity = pallet.transportedQuantity !== undefined ? pallet.transportedQuantity : pallet.quantity;
+                      
+                      return (
+                        <div 
+                          key={`pallet-${idx}`}
+                          onClick={() => {
+                            if (!splitMode) return;
+                            setSplitSelectedDrums(prev => 
+                              prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
+                            );
+                          }}
+                          className={`p-5 rounded-xl border flex flex-col relative transition-all duration-200 ${
+                            splitMode 
+                              ? (isSelectedForSplit ? 'border-indigo-500 bg-indigo-50 cursor-pointer shadow-md' : 'border-gray-200 hover:border-indigo-300 cursor-pointer opacity-60')
+                              : (isNotTransported ? 'bg-gray-100 border-gray-300 opacity-60 grayscale hover:grayscale-0' : 'bg-white border-gray-200 shadow-sm hover:shadow-md hover:border-indigo-100')
+                          }`}
+                        >
+                          {splitMode && (
+                            <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center bg-white ${
+                              isSelectedForSplit ? 'border-indigo-500 text-indigo-600' : 'border-gray-300 text-transparent'
+                            }`}>
+                              <CheckCircle className="w-4 h-4" />
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex flex-col">
+                              <span className={`font-bold text-lg ${isNotTransported ? 'text-gray-500 line-through' : 'text-blue-700'}`}>
+                                Paleta {pallet.size}
+                              </span>
+                              {isNotTransported && <span className="text-[10px] font-bold text-red-600 uppercase">Nie zabrano / Odrzucono</span>}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {canChangeStatus && !splitMode && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleRemoveDrum(pallet); }}
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Usuń ze zgłoszenia"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                              <span className="text-gray-600 font-medium">Ilość zgłoszona:</span>
+                              <span className="text-xl font-bold text-blue-700">{pallet.quantity} szt.</span>
+                            </div>
+                            {pallet.transportedQuantity !== undefined && (
+                              <div className="flex justify-between items-center p-3 bg-indigo-50/50 rounded-lg border border-indigo-100 mt-2">
+                                <span className="text-gray-600 font-medium">Faktycznie odebrano:</span>
+                                <span className="text-lg font-bold text-indigo-700">{pallet.transportedQuantity} szt.</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
 
             {selectedRequest.notes && (

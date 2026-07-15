@@ -31,6 +31,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   const [mpk, setMpk] = useState('');
   const [transportMethod, setTransportMethod] = useState('spedycja');
   const [checkedDrums, setCheckedDrums] = useState([]);
+  const [palletsToTransport, setPalletsToTransport] = useState([]);
   const [drumProviders, setDrumProviders] = useState({});
   const [distanceKm, setDistanceKm] = useState(0);
   const [calculatingDistance, setCalculatingDistance] = useState(false);
@@ -42,9 +43,19 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   useEffect(() => {
     if (isOpen && request) {
       const allDrumCechas = request.selected_drums
-        ?.filter(d => typeof d !== 'object' || d.transported !== true)
+        ?.filter(d => (typeof d !== 'object' || d.type !== 'pallet') && d.transported !== true)
         .map(d => typeof d === 'object' ? d.cecha || d.kod_bebna : d) || [];
       setCheckedDrums(allDrumCechas);
+
+      const palletsInit = request.selected_drums
+        ?.filter(d => typeof d === 'object' && d.type === 'pallet' && d.transported !== true && (d.quantity - (d.transportedQuantity || 0)) > 0)
+        .map(p => ({
+           size: p.size,
+           quantity: (p.quantity || 0) - (p.transportedQuantity || 0),
+           maxQuantity: (p.quantity || 0) - (p.transportedQuantity || 0)
+        })) || [];
+      setPalletsToTransport(palletsInit);
+      
       fetchUserMpk();
       setTransportDate(request.collection_date ? request.collection_date.split('T')[0] : new Date().toISOString().split('T')[0]);
 
@@ -73,6 +84,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
   useEffect(() => {
     if (isOpen && request) {
       const selected = request.selected_drums?.filter(d => {
+        if (typeof d === 'object' && d.type === 'pallet') return false;
         const cecha = typeof d === 'object' ? d.cecha || d.kod_bebna : d;
         return checkedDrums.includes(cecha);
       }) || [];
@@ -253,6 +265,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
       mpk,
       transportMethod,
       transportedDrumCechas: checkedDrums,
+      transportedPallets: palletsToTransport.filter(p => p.quantity > 0),
       distanceKm,
       salespersonName,
       unloadingContact
@@ -290,10 +303,10 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Bębny do odebrania ({checkedDrums.length} z {request.selected_drums?.filter(d => typeof d !== 'object' || d.transported !== true).length || 0})
+              Bębny do odebrania ({checkedDrums.length} z {request.selected_drums?.filter(d => (typeof d !== 'object' || d.type !== 'pallet') && d.transported !== true).length || 0})
             </label>
             <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100 bg-white">
-              {request.selected_drums?.filter(d => typeof d !== 'object' || d.transported !== true).map((drum, idx) => {
+              {request.selected_drums?.filter(d => (typeof d !== 'object' || d.type !== 'pallet') && d.transported !== true).map((drum, idx) => {
                 const cecha = typeof drum === 'object' ? drum.cecha || drum.kod_bebna : drum;
                 const nazwa = typeof drum === 'object' ? drum.nazwa || drum.rozmiar_bebna : '';
                 const dostawca = drumProviders[cecha] || (typeof drum === 'object' ? drum.kon_dostawca : null) || 'Brak danych';
@@ -316,11 +329,41 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
                     <div className="flex flex-col">
                       <span className="text-sm font-semibold text-gray-900">{cecha} <span className="text-xs text-blue-600 ml-1">({dostawca})</span></span>
                       {nazwa && <span className="text-xs text-gray-500">{nazwa}</span>}
-                    </div>
                   </label>
                 );
               })}
             </div>
+
+            {palletsToTransport.length > 0 && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 mt-4">
+                  Palety do odebrania
+                </label>
+                <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 bg-white p-3 space-y-3">
+                  {palletsToTransport.map((pallet, idx) => (
+                    <div key={`pallet-${idx}`} className="flex items-center justify-between py-2">
+                      <span className="text-sm font-semibold text-gray-900">Paleta {pallet.size}</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          max={pallet.maxQuantity}
+                          value={pallet.quantity}
+                          onChange={(e) => {
+                            const val = Math.max(0, Math.min(parseInt(e.target.value) || 0, pallet.maxQuantity));
+                            const newPallets = [...palletsToTransport];
+                            newPallets[idx].quantity = val;
+                            setPalletsToTransport(newPallets);
+                          }}
+                          className="w-20 px-2 py-1 border border-gray-300 rounded text-right font-medium"
+                        />
+                        <span className="text-sm text-gray-500 font-medium">/ {pallet.maxQuantity} szt.</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">
