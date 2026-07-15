@@ -78,6 +78,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
   const [dateError, setDateError] = useState(false);
   
   const [palletBalances, setPalletBalances] = useState({});
+  const [palletPrices, setPalletPrices] = useState({});
   const [palletsLoading, setPalletsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('drums');
   
@@ -104,8 +105,10 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
         
         if (palletsResult && palletsResult.length > 0 && palletsResult[0].balancesBySize) {
           setPalletBalances(palletsResult[0].balancesBySize);
+          setPalletPrices(palletsResult[0].pricesBySize || {});
         } else {
           setPalletBalances({});
+          setPalletPrices({});
         }
         
         console.log('✅ ReturnForm: Otrzymano dane:', result);
@@ -176,6 +179,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
       setPalletsLoading(false);
       setUserDrums([]);
       setPalletBalances({});
+      setPalletPrices({});
     }
   }, [user?.nip]);
 
@@ -355,13 +359,19 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
   const calculateSelectedDrumsValue = () => {
     let totalVal = 0;
     formData.selectedDrums.forEach(selDrum => {
-      // Znajdź powiązany bęben w userDrums
-      const origDrum = userDrums.find(d => d.cecha === selDrum.cecha);
-      const cenaNetto = origDrum?.cena_netto_bebna || selDrum.cena_netto;
+      let cenaNetto = selDrum.cena_netto;
+      if (selDrum.type !== 'pallet') {
+        const origDrum = userDrums.find(d => d.cecha === selDrum.cecha);
+        cenaNetto = origDrum?.cena_netto_bebna || cenaNetto;
+      }
       if (cenaNetto) {
         const val = parsePriceRaw(cenaNetto) * 1.2;
         if (val > 0) {
-          totalVal += val;
+          if (selDrum.type === 'pallet') {
+            totalVal += val * (selDrum.quantity || 1);
+          } else {
+            totalVal += val;
+          }
         }
       }
     });
@@ -372,25 +382,36 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
   const calculateSelectedDrumsRefund = () => {
     let totalRefund = 0;
     formData.selectedDrums.forEach(selDrum => {
-      const origDrum = userDrums.find(d => d.cecha === selDrum.cecha);
-      const cenaNetto = origDrum?.cena_netto_bebna || selDrum.cena_netto;
-      if (cenaNetto) {
-        const val = parsePriceRaw(cenaNetto) * 1.2;
-        if (val > 0) {
-          // Policz procent zwrotu
-          const daysInPossession = origDrum?.daysInPossession !== undefined 
-            ? origDrum.daysInPossession 
-            : (origDrum?.data_wydania_z_magazynu ? Math.ceil((new Date() - new Date(origDrum.data_wydania_z_magazynu)) / (1000 * 60 * 60 * 24)) : 0);
+      if (selDrum.type === 'pallet') {
+        const cenaNetto = selDrum.cena_netto;
+        if (cenaNetto) {
+          const val = parsePriceRaw(cenaNetto) * 1.2;
+          if (val > 0) {
+            // Zakładamy pełny zwrot za palety, ewentualnie dodaj warunki amortyzacji dla palet, jeśli istnieją
+            totalRefund += val * (selDrum.quantity || 1);
+          }
+        }
+      } else {
+        const origDrum = userDrums.find(d => d.cecha === selDrum.cecha);
+        const cenaNetto = origDrum?.cena_netto_bebna || selDrum.cena_netto;
+        if (cenaNetto) {
+          const val = parsePriceRaw(cenaNetto) * 1.2;
+          if (val > 0) {
+            // Policz procent zwrotu
+            const daysInPossession = origDrum?.daysInPossession !== undefined 
+              ? origDrum.daysInPossession 
+              : (origDrum?.data_wydania_z_magazynu ? Math.ceil((new Date() - new Date(origDrum.data_wydania_z_magazynu)) / (1000 * 60 * 60 * 24)) : 0);
 
-          let returnPercentage = 100;
-          if (daysInPossession <= 120) returnPercentage = 100;
-          else if (daysInPossession <= 150) returnPercentage = 90;
-          else if (daysInPossession <= 180) returnPercentage = 75;
-          else if (daysInPossession <= 240) returnPercentage = 50;
-          else if (daysInPossession <= 340) returnPercentage = 25;
-          else returnPercentage = 0;
+            let returnPercentage = 100;
+            if (daysInPossession <= 120) returnPercentage = 100;
+            else if (daysInPossession <= 150) returnPercentage = 90;
+            else if (daysInPossession <= 180) returnPercentage = 75;
+            else if (daysInPossession <= 240) returnPercentage = 50;
+            else if (daysInPossession <= 340) returnPercentage = 25;
+            else returnPercentage = 0;
 
-          totalRefund += val * (returnPercentage / 100);
+            totalRefund += val * (returnPercentage / 100);
+          }
         }
       }
     });
@@ -450,7 +471,8 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
         filtered.push({
           type: 'pallet',
           size: size,
-          quantity: safeValue
+          quantity: safeValue,
+          cena_netto: palletPrices[size] || 0
         });
       }
       
@@ -1102,7 +1124,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
                 {calculateSelectedDrumsValue() > 0 && (
                   <>
                     <div className="pt-2 border-t border-gray-200">
-                      <p className="text-sm text-gray-500">Suma wartości bębnów</p>
+                      <p className="text-sm text-gray-500">Suma wartości opakowań</p>
                       <p className="font-semibold text-gray-900">{calculateSelectedDrumsValue().toFixed(2)} PLN</p>
                     </div>
                     <div className="pt-2 border-t border-gray-200">

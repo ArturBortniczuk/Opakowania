@@ -922,7 +922,7 @@ export const drumsAPI = {
         
         let chunkQuery = supabase
           .from('drums')
-          .select(`nip, pelna_nazwa_kontrahenta, cecha, numer_faktury, data_wydania, typ_dok, nr_dokumentupz, rozmiar_bebna`)
+          .select(`nip, pelna_nazwa_kontrahenta, cecha, numer_faktury, data_wydania, typ_dok, nr_dokumentupz, rozmiar_bebna, cena_netto_bebna`)
           .eq('typ_opakowania', 'Paleta')
           .range(from, to);
 
@@ -959,6 +959,7 @@ export const drumsAPI = {
             companyName: row.pelna_nazwa_kontrahenta || 'Nieznana firma',
             totalBalance: 0,
             balancesBySize: {},
+            pricesBySize: {},
             history: []
           };
         }
@@ -982,6 +983,11 @@ export const drumsAPI = {
           clientsMap[row.nip].balancesBySize[size] = 0;
         }
         clientsMap[row.nip].balancesBySize[size] += finalQuantity;
+        
+        // Zapisz cenę dla danego rozmiaru palety (bierzemy pod uwagę tylko wydania, czyli bez '-' przed)
+        if (!isReturn && row.cena_netto_bebna) {
+          clientsMap[row.nip].pricesBySize[size] = row.cena_netto_bebna;
+        }
 
         clientsMap[row.nip].history.push({
           date: row.data_wydania,
