@@ -18,7 +18,8 @@ import {
   DollarSign,
   Target,
   PieChart,
-  Truck
+  Truck,
+  ChevronRight
 } from 'lucide-react';
 import { reportsAPI } from '../utils/supabaseApi';
 
