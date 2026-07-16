@@ -252,7 +252,7 @@ const AdminClientsList = ({ onNavigate }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-2 mb-4 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
+      <div className="grid grid-cols-2 gap-y-4 gap-x-2 mb-4 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
         <div className="flex flex-col items-center justify-center text-center">
           <div className="flex items-center space-x-1 text-sm mb-1">
             <Package className="w-4 h-4 text-blue-600" />
@@ -269,7 +269,7 @@ const AdminClientsList = ({ onNavigate }) => {
           <span className="font-bold text-gray-900">{client.palletsCount}</span>
         </div>
 
-        <div className="flex flex-col items-center justify-center text-center border-l border-r border-gray-200">
+        <div className="flex flex-col items-center justify-center text-center">
           <div className="flex items-center space-x-1 text-sm mb-1">
             <Clock className="w-4 h-4 text-yellow-600" />
             <span className="text-gray-500 font-medium text-xs">Oczekujące</span>
@@ -277,7 +277,7 @@ const AdminClientsList = ({ onNavigate }) => {
           <span className="font-bold text-gray-900">{client.pendingRequests}</span>
         </div>
 
-        <div className="flex flex-col items-center justify-center text-center">
+        <div className="flex flex-col items-center justify-center text-center border-l border-gray-200">
           <div className="flex items-center space-x-1 text-sm mb-1">
             <AlertCircle className={`w-4 h-4 ${client.overdueDrums > 0 ? 'text-red-600' : 'text-gray-400'}`} />
             <span className="text-gray-500 font-medium text-xs">Po terminie</span>
