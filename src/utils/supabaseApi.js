@@ -2129,6 +2129,68 @@ export const profilesAPI = {
 };
 
 // ==================================
+//  API do Raportów i Dashboardów
+// ==================================
+export const reportsAPI = {
+  /**
+   * Pobiera zaawansowane analityki bębnów korzystając z RPC
+   */
+  async getDrumsAnalytics() {
+    try {
+      const currentUser = _currentUserCache;
+      const allowedNips = await getAllowedNips(currentUser);
+      
+      const { data, error } = await supabase.rpc('get_drums_analytics', {
+        allowed_nips: allowedNips
+      });
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Błąd pobierania analityki bębnów:', error);
+      return {};
+    }
+  },
+
+  /**
+   * Pobiera zaawansowane analityki zwrotów korzystając z RPC
+   */
+  async getReturnsAnalytics() {
+    try {
+      const currentUser = _currentUserCache;
+      const allowedNips = await getAllowedNips(currentUser);
+
+      const { data, error } = await supabase.rpc('get_returns_analytics', {
+        allowed_nips: allowedNips
+      });
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Błąd pobierania analityki zwrotów:', error);
+      return {};
+    }
+  },
+
+  /**
+   * Pobiera zaawansowane analityki klientów korzystając z RPC
+   */
+  async getClientsAnalytics() {
+    try {
+      const currentUser = _currentUserCache;
+      const allowedNips = await getAllowedNips(currentUser);
+
+      const { data, error } = await supabase.rpc('get_clients_analytics', {
+        allowed_nips: allowedNips
+      });
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Błąd pobierania analityki klientów:', error);
+      return {};
+    }
+  }
+};
+
+// ==================================
 //  Funkcje pomocnicze
 // ==================================
 /**
