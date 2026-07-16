@@ -164,10 +164,10 @@ const AdminPalletsList = () => {
                                   <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-800">
                                     {h.document || '-'}
                                   </td>
-                                  <td className="px-4 py-2 whitespace-nowrap text-gray-800 text-sm truncate max-w-[200px]" title={h.name}>
+                                  <td className="px-4 py-2 whitespace-normal text-gray-800 text-sm min-w-[250px]">
                                     {h.name || '-'}
                                   </td>
-                                  <td className="px-4 py-2 whitespace-nowrap text-gray-600 text-sm truncate max-w-[200px]" title={h.size}>
+                                  <td className="px-4 py-2 whitespace-nowrap text-gray-600 text-sm">
                                     {h.size || '-'}
                                   </td>
                                   <td className="px-4 py-2 whitespace-nowrap">
