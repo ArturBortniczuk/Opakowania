@@ -247,7 +247,15 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
   };
 
   const hasActiveFilters = useMemo(() => {
-
+    return filterStatus !== 'all' || 
+           filterSupplierDateRange !== 'all' || 
+           filterClientDateRange !== 'all' || 
+           filterPaymentStatus !== 'all' || 
+           filterReportedOnly || 
+           selectedSizes.length > 0 || 
+           searchTerm !== '' || 
+           companySearchTerm !== '';
+  }, [filterStatus, filterSupplierDateRange, filterClientDateRange, filterPaymentStatus, filterReportedOnly, selectedSizes, searchTerm, companySearchTerm]);
   const handleClearExtension = async () => {
     if (!window.confirm('Czy na pewno chcesz usunąć to przedłużenie i przywrócić domyślny termin?')) {
       return;
