@@ -72,8 +72,8 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
   const [extensionNotes, setExtensionNotes] = useState('');
   const [savingExtension, setSavingExtension] = useState(false);
 
-  // NOWE: Stany notatki klienta
-  const [clientNote, setClientNote] = useState('');
+  // NOWE: Stany notatki administratora
+  const [adminNote, setAdminNote] = useState('');
   const [savingNote, setSavingNote] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -169,7 +169,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
       drum.clientReturnDeadline ? new Date(drum.clientReturnDeadline) : null
     );
     setExtensionNotes(drum.extensionNotes || '');
-    setClientNote(drum.clientNote || '');
+    setAdminNote(drum.adminNote || '');
     setShowDrumDetails(true);
   };
 
@@ -228,19 +228,18 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
     setSavingNote(true);
     try {
       const nipToSave = selectedDrum.nip || urlClientNip; // Fallback do NIP z URL jeśli potrzebny
-      await drumsAPI.saveDrumNote(selectedDrum.cecha || selectedDrum.kod_bebna, nipToSave, clientNote);
-      setSelectedDrum(prev => ({ ...prev, clientNote }));
+      await drumsAPI.saveAdminDrumNote(selectedDrum.cecha || selectedDrum.kod_bebna, nipToSave, adminNote);
+      setSelectedDrum(prev => ({ ...prev, adminNote }));
       setDrumsData(prev => ({
         ...prev,
         data: prev.data.map(d => 
           (d.cecha === selectedDrum.cecha && d.nip === nipToSave) 
-            ? { ...d, clientNote } 
+            ? { ...d, adminNote } 
             : d
         )
       }));
     } catch (err) {
       console.error('Błąd zapisu notatki:', err);
-      alert('Nie udało się zapisać notatki.');
     } finally {
       setSavingNote(false);
     }
@@ -713,7 +712,12 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
               <Package className="w-6 h-6 text-white" />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="font-bold text-gray-900 truncate text-lg">{drum.cecha || drum.kod_bebna || 'Brak cechy'}</h3>
+              <div className="flex items-center space-x-2">
+                <h3 className="font-bold text-gray-900 truncate text-lg">{drum.cecha || drum.kod_bebna || 'Brak cechy'}</h3>
+                {drum.adminNote && (
+                  <FileText className="w-5 h-5 text-blue-500 flex-shrink-0" title="Posiada notatkę" />
+                )}
+              </div>
               <p className="text-gray-600 text-sm truncate">
                 {drum.cecha ? `${drum.kod_bebna} • ${drum.rozmiar_bebna ? `FI ${drum.rozmiar_bebna}` : 'Brak rozmiaru'}` : (drum.rozmiar_bebna ? `FI ${drum.rozmiar_bebna}` : 'Brak rozmiaru')}
               </p>
@@ -1471,12 +1475,12 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
                 <div className="mt-6">
                   <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center space-x-2">
                     <FileText className="w-5 h-5 text-gray-500" />
-                    <span>Notatka klienta</span>
+                    <span>Notatka</span>
                   </h3>
                   <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-200">
                     <textarea
-                      value={clientNote}
-                      onChange={(e) => setClientNote(e.target.value)}
+                      value={adminNote}
+                      onChange={(e) => setAdminNote(e.target.value)}
                       placeholder="Wpisz notatkę do tego bębna..."
                       className="w-full p-3 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none mb-3"
                       rows={3}

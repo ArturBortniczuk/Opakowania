@@ -1154,6 +1154,7 @@ export const drumsAPI = {
       let customDeadlines = [];
       let exceptions = [];
       let clientNotes = [];
+      let adminNotes = [];
       if (allData && allData.length > 0) {
         const drumCechas = allData.map(d => d.cecha || d.kod_bebna).filter(Boolean);
         let deadlinesQuery = supabase.from('custom_drum_deadlines').select('*');
@@ -1186,20 +1187,31 @@ export const drumsAPI = {
         }
         
         let notesQuery = supabase.from('client_drum_notes').select('*');
+        let adminNotesQuery = supabase.from('admin_drum_notes').select('*');
         if (nip) {
           notesQuery = notesQuery.eq('nip', nip);
+          adminNotesQuery = adminNotesQuery.eq('nip', nip);
           if (drumCechas.length < 200) {
             notesQuery = notesQuery.in('kod_bebna', drumCechas);
+            adminNotesQuery = adminNotesQuery.in('kod_bebna', drumCechas);
           }
         } else if (allowedNips && allowedNips.length > 0) {
           notesQuery = notesQuery.in('nip', allowedNips);
+          adminNotesQuery = adminNotesQuery.in('nip', allowedNips);
           if (drumCechas.length < 200) {
             notesQuery = notesQuery.in('kod_bebna', drumCechas);
+            adminNotesQuery = adminNotesQuery.in('kod_bebna', drumCechas);
           }
         }
+        
         const { data: notesData } = await notesQuery;
         if (notesData) {
           clientNotes = notesData;
+        }
+
+        const { data: adminNotesData } = await adminNotesQuery;
+        if (adminNotesData) {
+          adminNotes = adminNotesData;
         }
       }
 
@@ -1256,6 +1268,9 @@ export const drumsAPI = {
         const clientNoteObj = clientNotes.find(n => (n.kod_bebna === drum.cecha || n.kod_bebna === drum.kod_bebna) && n.nip === drum.nip);
         const clientNote = clientNoteObj ? clientNoteObj.note : null;
 
+        const adminNoteObj = adminNotes.find(n => (n.kod_bebna === drum.cecha || n.kod_bebna === drum.kod_bebna) && n.nip === drum.nip);
+        const adminNote = adminNoteObj ? adminNoteObj.note : null;
+
         return {
           ...drum,
           db_data_zwrotu_do_dostawcy: drum.data_zwrotu_do_dostawcy, // Zachowaj surową wartość przed nadpisaniem
@@ -1268,6 +1283,7 @@ export const drumsAPI = {
           extensionCreatedAt: extension ? extension.created_at : null,
           
           clientNote,
+          adminNote,
           
           clientReturnDeadline: clientReturnDeadline,
           returnPeriodDays,
@@ -1462,7 +1478,38 @@ export const drumsAPI = {
       console.error('❌ Błąd zapisywania notatki:', error);
       throw error;
     }
-  }
+  },
+
+  /**
+   * Zapisuje notatkę administratora dla bębna.
+   * @param {string} cecha - Unikalna cecha bębna.
+   * @param {string} nip - NIP klienta.
+   * @param {string} note - Treść notatki.
+   * @returns {Promise<object>} Zaktualizowany rekord.
+   */
+  async saveAdminDrumNote(cecha, nip, note) {
+    try {
+      console.log(`📝 Zapisywanie notatki administratora dla bębna: ${cecha}, NIP: ${nip}`);
+      const { data, error } = await supabase
+        .from('admin_drum_notes')
+        .upsert({
+          kod_bebna: cecha,
+          nip: nip,
+          note: note,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'kod_bebna,nip'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('❌ Błąd zapisywania notatki administratora:', error);
+      throw error;
+    }
+  },
 };
 
 // ==================================

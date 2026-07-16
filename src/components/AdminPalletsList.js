@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Package, Search, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import { drumsAPI } from '../utils/supabaseApi';
 
 const AdminPalletsList = () => {
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const urlClientNip = queryParams.get('clientNip');
+
   const [balances, setBalances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [search, setSearch] = useState('');
-  const [expandedNip, setExpandedNip] = useState(null);
+  const [search, setSearch] = useState(urlClientNip || '');
+  const [expandedNip, setExpandedNip] = useState(urlClientNip || null);
 
   useEffect(() => {
     fetchPallets();
