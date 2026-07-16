@@ -970,8 +970,22 @@ export const drumsAPI = {
         const typDok = String(row.typ_dok || '').toUpperCase();
         const fv = String(row.numer_faktury || '').toUpperCase();
         
+        // Ignorujemy dokumenty przesunięć magazynowych oraz dokumenty wewnętrzne
+        if (typDok.startsWith('MM') || typDok.startsWith('PW') || typDok.startsWith('RW') || typDok.startsWith('PWI') || typDok.startsWith('RWI')) {
+          return;
+        }
+
         let isReturn = false;
-        if (typDok.includes('K') || typDok.includes('ZWR') || fv.includes('KFV') || fv.includes('KFO') || fv.includes('KOR')) {
+        // Korekty (K, ZWR), przyjęcia z zewnątrz (PZ, PZN) traktujemy jako zmniejszenie salda (zwrot na magazyn)
+        if (
+          typDok.includes('K') || 
+          typDok.includes('ZWR') || 
+          typDok.startsWith('PZ') || 
+          typDok.startsWith('ZZ') ||
+          fv.includes('KFV') || 
+          fv.includes('KFO') || 
+          fv.includes('KOR')
+        ) {
           isReturn = true;
         }
 
