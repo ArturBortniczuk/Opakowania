@@ -953,6 +953,11 @@ export const drumsAPI = {
       allData.forEach(row => {
         if (!row.nip) return;
         
+        const sizeCheck = row.rozmiar_bebna ? row.rozmiar_bebna.trim() : '';
+        if (!sizeCheck || sizeCheck.toLowerCase() === 'brak rozmiaru') {
+          return;
+        }
+        
         if (!clientsMap[row.nip]) {
           clientsMap[row.nip] = {
             nip: row.nip,
