@@ -186,6 +186,8 @@ const AdminReports = ({ onNavigate }) => {
     .slice(0, 8);
     
   const topClients = cStats.top_clients_by_drums || [];
+  const topDebtors = cStats.top_debtors || [];
+  const longestOverdue = dStats.longest_overdue || [];
   
   const monthlyTrends = rStats.monthly_trends || [];
 
@@ -331,6 +333,26 @@ const AdminReports = ({ onNavigate }) => {
                     max={cStats.total_companies || 1} 
                     color="bg-red-500" 
                   />
+                  
+                  {longestOverdue.length > 0 && (
+                    <div className="mt-6 border-t border-gray-100 pt-4">
+                      <h4 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">Rekordziści Przeterminowań</h4>
+                      <div className="space-y-3">
+                        {longestOverdue.map((drum, idx) => (
+                          <div key={idx} className="flex justify-between items-center text-sm p-2 bg-red-50 rounded-lg">
+                            <div>
+                              <div className="font-bold text-gray-900">{drum.cecha}</div>
+                              <div className="text-xs text-gray-500 truncate w-32" title={drum.nazwa}>{drum.nazwa}</div>
+                            </div>
+                            <div className="font-bold text-red-600 whitespace-nowrap">
+                              {drum.dni_przeterminowania} dni temu
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="mt-6 flex justify-end">
                     <button 
                       onClick={() => setSelectedReport('clients')}
@@ -396,53 +418,87 @@ const AdminReports = ({ onNavigate }) => {
               />
             </div>
 
-            <ChartCard title="TOP 10 Klientów (Najwięcej bębnów)">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead>
-                    <tr>
-                      <th className="px-6 py-3 bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tl-lg">Firma</th>
-                      <th className="px-6 py-3 bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">NIP</th>
-                      <th className="px-6 py-3 bg-gray-50 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Wszystkie Bębny</th>
-                      <th className="px-6 py-3 bg-gray-50 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tr-lg">Przeterminowane</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-100">
-                    {topClients.map((client, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="font-bold text-gray-900">{client.name}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {client.nip}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-blue-100 text-blue-800">
-                            {client.drums_count}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          {client.overdue_count > 0 ? (
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-red-100 text-red-800">
-                              {client.overdue_count}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-800">
-                              0
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {topClients.length === 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <ChartCard title="TOP 10 Klientów (Najwięcej bębnów)">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead>
                       <tr>
-                        <td colSpan="4" className="px-6 py-12 text-center text-gray-500">Brak danych do wyświetlenia</td>
+                        <th className="px-4 py-3 bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tl-lg">Firma</th>
+                        <th className="px-4 py-3 bg-gray-50 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Suma</th>
+                        <th className="px-4 py-3 bg-gray-50 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tr-lg">Zaległe</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </ChartCard>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-100">
+                      {topClients.map((client, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="font-bold text-gray-900 truncate w-40" title={client.name}>{client.name}</div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-center">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
+                              {client.drums_count}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-center">
+                            {client.overdue_count > 0 ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">
+                                {client.overdue_count}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">
+                                0
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {topClients.length === 0 && (
+                        <tr>
+                          <td colSpan="3" className="px-4 py-8 text-center text-gray-500">Brak danych</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </ChartCard>
+
+              <ChartCard title="TOP Dłużnicy (Nieopłacone Kaucje)">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead>
+                      <tr>
+                        <th className="px-4 py-3 bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tl-lg">Firma</th>
+                        <th className="px-4 py-3 bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">NIP</th>
+                        <th className="px-4 py-3 bg-gray-50 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tr-lg">Niezapłacone Bębny</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-100">
+                      {topDebtors.map((client, idx) => (
+                        <tr key={idx} className="hover:bg-red-50 transition-colors">
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="font-bold text-gray-900 truncate w-40" title={client.name}>{client.name}</div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {client.nip}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-center">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-800">
+                              {client.unpaid_count} szt.
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {topDebtors.length === 0 && (
+                        <tr>
+                          <td colSpan="3" className="px-4 py-8 text-center text-gray-500">Wszyscy klienci mają opłacone faktury!</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </ChartCard>
+            </div>
           </div>
         )}
 
@@ -451,6 +507,30 @@ const AdminReports = ({ onNavigate }) => {
             ========================================= */}
         {selectedReport === 'drums' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <StatCard
+                icon={Package}
+                title="Wszystkie bębny"
+                value={dStats.total_count || 0}
+                subtitle="W całej bazie"
+                color="text-blue-600 bg-blue-600"
+              />
+              <StatCard
+                icon={AlertTriangle}
+                title="Zagubione bębny"
+                value={dStats.lost_count || 0}
+                subtitle="Status 'Lost'"
+                color="text-red-600 bg-red-600"
+              />
+              <StatCard
+                icon={CheckCircle}
+                title="Poprawnie opłacone"
+                value={dStats.by_payment?.['Tak'] || 0}
+                subtitle="Liczba uregulowanych kaucji"
+                color="text-green-600 bg-green-600"
+              />
+            </div>
+            
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <ChartCard title="Dystrybucja według Rozmiaru (TOP 8)">
                 <SimpleBarChart data={drumSizesData} color="bg-teal-500" />

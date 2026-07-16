@@ -61,8 +61,25 @@ BEGIN
     ), '{}'::jsonb),
     'overdue_count', COALESCE((
       SELECT COUNT(*) FROM filtered_drums 
-      WHERE data_zwrotu_do_dostawcy < CURRENT_DATE
-    ), 0)
+      WHERE data_zwrotu_do_dostawcy < CURRENT_DATE::text
+        AND data_zwrotu_do_dostawcy != ''
+    ), 0),
+    'lost_count', COALESCE((
+      SELECT COUNT(*) FROM filtered_drums WHERE COALESCE(status, '') = 'Lost'
+    ), 0),
+    'longest_overdue', COALESCE((
+      SELECT jsonb_agg(jsonb_build_object(
+        'cecha', cecha,
+        'nazwa', nazwa,
+        'dni_przeterminowania', CURRENT_DATE - data_zwrotu_do_dostawcy::date
+      ))
+      FROM filtered_drums
+      WHERE data_zwrotu_do_dostawcy < CURRENT_DATE::text
+        AND data_zwrotu_do_dostawcy != ''
+        AND status != 'Lost'
+      ORDER BY data_zwrotu_do_dostawcy::date ASC
+      LIMIT 5
+    ), '[]'::jsonb)
   ) INTO result;
 
   RETURN COALESCE(result, '{}'::jsonb);
@@ -130,7 +147,7 @@ BEGIN
 
   WITH active_drums AS (
     SELECT nip, COALESCE(COUNT(*), 0) as drums_count,
-           COALESCE(SUM(CASE WHEN data_zwrotu_do_dostawcy < CURRENT_DATE THEN 1 ELSE 0 END), 0) as overdue_count
+           COALESCE(SUM(CASE WHEN data_zwrotu_do_dostawcy < CURRENT_DATE::text AND data_zwrotu_do_dostawcy != '' THEN 1 ELSE 0 END), 0) as overdue_count
     FROM drums
     WHERE (typ_opakowania = 'Bęben' OR typ_opakowania IS NULL)
       AND nip IS NOT NULL AND nip != ''
@@ -157,7 +174,25 @@ BEGIN
     ), '[]'::jsonb),
     'clients_with_overdue', COALESCE((
       SELECT COUNT(*) FROM active_drums WHERE overdue_count > 0
-    ), 0)
+    ), 0),
+    'top_debtors', COALESCE((
+      SELECT jsonb_agg(jsonb_build_object(
+        'nip', nip,
+        'name', COALESCE(c.name, COALESCE(c.pelna_nazwa_kontrahenta, 'Nieznana firma')),
+        'unpaid_count', unpaid
+      ))
+      FROM (
+        SELECT nip, COUNT(*) as unpaid
+        FROM drums
+        WHERE czy_zaplacona = 'Nie'
+          AND nip IS NOT NULL AND nip != ''
+          AND (allowed_nips IS NULL OR nip = ANY(allowed_nips))
+        GROUP BY nip
+        ORDER BY unpaid DESC
+        LIMIT 5
+      ) u
+      LEFT JOIN companies c ON c.nip = u.nip
+    ), '[]'::jsonb)
   ) INTO result;
 
   RETURN COALESCE(result, '{}'::jsonb);
