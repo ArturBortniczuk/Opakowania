@@ -72,6 +72,10 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
   const [extensionNotes, setExtensionNotes] = useState('');
   const [savingExtension, setSavingExtension] = useState(false);
 
+  // NOWE: Stany notatki klienta
+  const [clientNote, setClientNote] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [drumsData, setDrumsData] = useState({
     data: [],
@@ -161,8 +165,11 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
 
   const handleViewDrum = (drum) => {
     setSelectedDrum(drum);
-    setCustomReturnDate(drum.isExtended && drum.clientReturnDeadline ? new Date(drum.clientReturnDeadline) : null);
-    setExtensionNotes(drum.isExtended ? (drum.extensionNotes || '') : '');
+    setCustomReturnDate(
+      drum.clientReturnDeadline ? new Date(drum.clientReturnDeadline) : null
+    );
+    setExtensionNotes(drum.extensionNotes || '');
+    setClientNote(drum.clientNote || '');
     setShowDrumDetails(true);
   };
 
@@ -200,13 +207,46 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
         extensionCreatedBy: username,
         extensionCreatedAt: new Date().toISOString()
       }));
+      setDrumsData(prev => ({
+        ...prev,
+        data: prev.data.map(d => 
+          d.cecha === selectedDrum.cecha 
+            ? { ...d, clientReturnDeadline: customReturnDate, extensionNotes } 
+            : d
+        )
+      }));
+
     } catch (err) {
-      console.error('Błąd zapisu przedłużenia:', err);
-      alert('Nie udało się zapisać zmian: ' + err.message);
+      console.error('Błąd podczas przedłużania terminu:', err);
+      alert('Wystąpił błąd podczas zapisywania.');
     } finally {
       setSavingExtension(false);
     }
   };
+
+  const handleSaveNote = async () => {
+    setSavingNote(true);
+    try {
+      const nipToSave = selectedDrum.nip || urlClientNip; // Fallback do NIP z URL jeśli potrzebny
+      await drumsAPI.saveDrumNote(selectedDrum.cecha || selectedDrum.kod_bebna, nipToSave, clientNote);
+      setSelectedDrum(prev => ({ ...prev, clientNote }));
+      setDrumsData(prev => ({
+        ...prev,
+        data: prev.data.map(d => 
+          (d.cecha === selectedDrum.cecha && d.nip === nipToSave) 
+            ? { ...d, clientNote } 
+            : d
+        )
+      }));
+    } catch (err) {
+      console.error('Błąd zapisu notatki:', err);
+      alert('Nie udało się zapisać notatki.');
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const hasActiveFilters = useMemo(() => {
 
   const handleClearExtension = async () => {
     if (!window.confirm('Czy na pewno chcesz usunąć to przedłużenie i przywrócić domyślny termin?')) {
@@ -1415,6 +1455,40 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
                       <p className="font-bold text-sm text-white">
                         {selectedDrum.daysInPossession || 0} dni
                       </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notatka do bębna */}
+                <div className="mt-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center space-x-2">
+                    <FileText className="w-5 h-5 text-gray-500" />
+                    <span>Notatka klienta</span>
+                  </h3>
+                  <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-200">
+                    <textarea
+                      value={clientNote}
+                      onChange={(e) => setClientNote(e.target.value)}
+                      placeholder="Wpisz notatkę do tego bębna..."
+                      className="w-full p-3 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none mb-3"
+                      rows={3}
+                    />
+                    <div className="flex justify-end">
+                      <button
+                        onClick={handleSaveNote}
+                        disabled={savingNote}
+                        className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-70 flex items-center"
+                      >
+                        {savingNote ? (
+                          <span className="flex items-center">
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Zapisywanie...
+                          </span>
+                        ) : 'Zapisz notatkę'}
+                      </button>
                     </div>
                   </div>
                 </div>

@@ -144,6 +144,7 @@ const AdminPalletsList = () => {
                               <tr>
                                 <th className="px-4 py-2 text-left font-medium text-gray-600">Data</th>
                                 <th className="px-4 py-2 text-left font-medium text-gray-600">Dokument</th>
+                                <th className="px-4 py-2 text-left font-medium text-gray-600">Nazwa palety</th>
                                 <th className="px-4 py-2 text-left font-medium text-gray-600">Rozmiar palety</th>
                                 <th className="px-4 py-2 text-left font-medium text-gray-600">Operacja</th>
                                 <th className="px-4 py-2 text-right font-medium text-gray-600">Ilość</th>
@@ -157,6 +158,9 @@ const AdminPalletsList = () => {
                                   </td>
                                   <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-800">
                                     {h.document || '-'}
+                                  </td>
+                                  <td className="px-4 py-2 whitespace-nowrap text-gray-800 text-sm truncate max-w-[200px]" title={h.name}>
+                                    {h.name || '-'}
                                   </td>
                                   <td className="px-4 py-2 whitespace-nowrap text-gray-600 text-sm truncate max-w-[200px]" title={h.size}>
                                     {h.size || '-'}

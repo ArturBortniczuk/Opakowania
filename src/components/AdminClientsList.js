@@ -1,7 +1,7 @@
 // src/components/AdminClientsList.js - Zaktualizowany o prawdziwe dane
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { companiesAPI } from '../utils/supabaseApi';
+import { companiesAPI, drumsAPI } from '../utils/supabaseApi';
 import {
   Users,
   Search,
@@ -108,16 +108,27 @@ const AdminClientsList = ({ onNavigate }) => {
       setError(null);
 
       try {
-        const result = await companiesAPI.getCompanies({
-          page: currentPage,
-          limit: ITEMS_PER_PAGE,
-          search: debouncedSearchTerm,
-          sortBy,
-          sortOrder,
-          filterStatus
+        const [result, palletBalances] = await Promise.all([
+          companiesAPI.getCompanies({
+            page: currentPage,
+            limit: ITEMS_PER_PAGE,
+            search: debouncedSearchTerm,
+            sortBy,
+            sortOrder,
+            filterStatus
+          }),
+          drumsAPI.getPalletBalances(null)
+        ]);
+
+        const mappedClients = result.data.map(client => {
+          const palletData = palletBalances.find(p => p.nip === client.nip);
+          return {
+            ...client,
+            palletsCount: palletData ? palletData.totalBalance : 0
+          };
         });
 
-        setClients(result.data);
+        setClients(mappedClients);
         setTotalClients(result.pagination.total);
         setTotalPages(result.pagination.totalPages);
 
@@ -183,15 +194,27 @@ const AdminClientsList = ({ onNavigate }) => {
       await Promise.all([
         fetchGlobalStats(),
         (async () => {
-          const result = await companiesAPI.getCompanies({
-            page: 1,
-            limit: ITEMS_PER_PAGE,
-            search: debouncedSearchTerm,
-            sortBy,
-            sortOrder,
-            filterStatus
+          const [result, palletBalances] = await Promise.all([
+            companiesAPI.getCompanies({
+              page: 1,
+              limit: ITEMS_PER_PAGE,
+              search: debouncedSearchTerm,
+              sortBy,
+              sortOrder,
+              filterStatus
+            }),
+            drumsAPI.getPalletBalances(null)
+          ]);
+          
+          const mappedClients = result.data.map(client => {
+            const palletData = palletBalances.find(p => p.nip === client.nip);
+            return {
+              ...client,
+              palletsCount: palletData ? palletData.totalBalance : 0
+            };
           });
-          setClients(result.data);
+
+          setClients(mappedClients);
           setTotalClients(result.pagination.total);
           setTotalPages(result.pagination.totalPages);
         })()
@@ -229,13 +252,21 @@ const AdminClientsList = ({ onNavigate }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mb-4 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
+      <div className="grid grid-cols-4 gap-2 mb-4 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
         <div className="flex flex-col items-center justify-center text-center">
           <div className="flex items-center space-x-1 text-sm mb-1">
             <Package className="w-4 h-4 text-blue-600" />
             <span className="text-gray-500 font-medium text-xs">Bębny</span>
           </div>
           <span className="font-bold text-gray-900">{client.drumsCount}</span>
+        </div>
+
+        <div className="flex flex-col items-center justify-center text-center border-l border-gray-200">
+          <div className="flex items-center space-x-1 text-sm mb-1">
+            <Package className="w-4 h-4 text-indigo-600" />
+            <span className="text-gray-500 font-medium text-xs">Palety</span>
+          </div>
+          <span className="font-bold text-gray-900">{client.palletsCount}</span>
         </div>
 
         <div className="flex flex-col items-center justify-center text-center border-l border-r border-gray-200">
@@ -350,7 +381,7 @@ const AdminClientsList = ({ onNavigate }) => {
         onClick={handleCloseModal}
       >
         <div
-          className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-blue-50 transform transition-all scale-100 duration-300 animate-slideUp"
+          className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-blue-50 transform transition-all scale-100 duration-300 animate-slideUp"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -574,6 +605,10 @@ const AdminClientsList = ({ onNavigate }) => {
                           <span className="font-bold text-gray-900 bg-gray-200/50 px-2.5 py-0.5 rounded-lg">{selectedClient.drumsCount}</span>
                         </div>
                         <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-600 font-medium">Ilość palet</span>
+                          <span className="font-bold text-gray-900 bg-gray-200/50 px-2.5 py-0.5 rounded-lg">{selectedClient.palletsCount}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
                           <span className="text-gray-600 font-medium">Przeterminowane</span>
                           <span className={`font-bold px-2.5 py-0.5 rounded-lg ${selectedClient.overdueDrums > 0 ? 'text-red-700 bg-red-100' : 'text-gray-600 bg-gray-200/50'}`}>
                             {selectedClient.overdueDrums}
@@ -616,6 +651,16 @@ const AdminClientsList = ({ onNavigate }) => {
                   >
                     <Package className="w-4 h-4" />
                     <span>Zobacz bębny</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleCloseModal();
+                      onNavigate('admin-pallets', { clientNip: selectedClient.nip });
+                    }}
+                    className="flex-1 bg-gradient-to-r from-cyan-600 to-cyan-700 text-white py-3 px-4 rounded-xl font-bold hover:from-cyan-700 hover:to-cyan-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg hover:scale-[1.01]"
+                  >
+                    <Package className="w-4 h-4" />
+                    <span>Zobacz palety</span>
                   </button>
                   <button
                     onClick={() => {

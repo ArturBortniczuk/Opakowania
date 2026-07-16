@@ -922,7 +922,7 @@ export const drumsAPI = {
         
         let chunkQuery = supabase
           .from('drums')
-          .select(`nip, pelna_nazwa_kontrahenta, cecha, numer_faktury, data_wydania, data_przyjecia_na_stan, typ_dok, nr_dokumentupz, rozmiar_bebna, cena_netto_bebna`)
+          .select(`nip, pelna_nazwa_kontrahenta, cecha, nazwa, numer_faktury, data_faktury, data_wydania, data_przyjecia_na_stan, typ_dok, nr_dokumentupz, rozmiar_bebna, cena_netto_bebna`)
           .eq('typ_opakowania', 'Paleta')
           .range(from, to);
 
@@ -1004,10 +1004,11 @@ export const drumsAPI = {
         }
 
         clientsMap[row.nip].history.push({
-          date: row.data_wydania || row.data_przyjecia_na_stan,
+          date: row.data_faktury || row.data_wydania || row.data_przyjecia_na_stan,
           document: row.numer_faktury || row.nr_dokumentupz,
           quantity: finalQuantity,
           size: size,
+          name: row.nazwa,
           isReturn
         });
       });

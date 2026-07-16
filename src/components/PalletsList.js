@@ -121,6 +121,7 @@ const PalletsList = () => {
                     <tr>
                       <th className="px-6 py-4 text-left font-medium text-gray-500 uppercase tracking-wider">Data</th>
                       <th className="px-6 py-4 text-left font-medium text-gray-500 uppercase tracking-wider">Dokument</th>
+                      <th className="px-6 py-4 text-left font-medium text-gray-500 uppercase tracking-wider">Nazwa palety</th>
                       <th className="px-6 py-4 text-left font-medium text-gray-500 uppercase tracking-wider">Rozmiar palety</th>
                       <th className="px-6 py-4 text-left font-medium text-gray-500 uppercase tracking-wider">Operacja</th>
                       <th className="px-6 py-4 text-right font-medium text-gray-500 uppercase tracking-wider">Ilość</th>
@@ -134,6 +135,9 @@ const PalletsList = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
                           {h.document || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-gray-900 text-sm truncate max-w-[200px]" title={h.name}>
+                          {h.name || '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-gray-600 text-sm truncate max-w-[200px]" title={h.size}>
                           {h.size || '-'}
