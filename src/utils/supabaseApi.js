@@ -2187,6 +2187,25 @@ export const reportsAPI = {
       console.error('Błąd pobierania analityki klientów:', error);
       return {};
     }
+  },
+
+  /**
+   * Pobiera zaawansowane analityki palet korzystając z RPC
+   */
+  async getPalletsAnalytics() {
+    try {
+      const currentUser = _currentUserCache;
+      const allowedNips = await getAllowedNips(currentUser);
+
+      const { data, error } = await supabase.rpc('get_pallets_analytics', {
+        allowed_nips: allowedNips
+      });
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Błąd pobierania analityki palet:', error);
+      return {};
+    }
   }
 };
 

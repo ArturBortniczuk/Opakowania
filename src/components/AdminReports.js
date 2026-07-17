@@ -31,23 +31,26 @@ const AdminReports = ({ onNavigate }) => {
   const [analytics, setAnalytics] = useState({
     drums: {},
     returns: {},
-    clients: {}
+    clients: {},
+    pallets: {}
   });
 
   const fetchAnalyticsData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [drumsData, returnsData, clientsData] = await Promise.all([
+      const [drumsData, returnsData, clientsData, palletsData] = await Promise.all([
         reportsAPI.getDrumsAnalytics(),
         reportsAPI.getReturnsAnalytics(),
-        reportsAPI.getClientsAnalytics()
+        reportsAPI.getClientsAnalytics(),
+        reportsAPI.getPalletsAnalytics()
       ]);
 
       setAnalytics({
         drums: drumsData || {},
         returns: returnsData || {},
-        clients: clientsData || {}
+        clients: clientsData || {},
+        pallets: palletsData || {}
       });
     } catch (err) {
       console.error('Błąd podczas pobierania danych analitycznych:', err);
@@ -173,6 +176,7 @@ const AdminReports = ({ onNavigate }) => {
   const dStats = analytics.drums || {};
   const rStats = analytics.returns || {};
   const cStats = analytics.clients || {};
+  const pStats = analytics.pallets || {};
 
   // Formatyzowanie danych do wykresów
   const drumSizesData = Object.entries(dStats.by_size || {})
@@ -234,6 +238,7 @@ const AdminReports = ({ onNavigate }) => {
               { id: 'overview', label: 'Przegląd', icon: Activity },
               { id: 'clients', label: 'Analiza Klientów', icon: Building2 },
               { id: 'drums', label: 'Baza Bębnów', icon: Package },
+              { id: 'pallets', label: 'Logistyka Palet', icon: Package },
               { id: 'returns', label: 'Logistyka Zwrotów', icon: Truck }
             ].map(tab => {
               const Icon = tab.icon;
@@ -562,6 +567,82 @@ const AdminReports = ({ onNavigate }) => {
                       )
                     })
                   }
+                </div>
+              </ChartCard>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================
+            PALLETS DASHBOARD 
+            ========================================= */}
+        {selectedReport === 'pallets' && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <StatCard
+                icon={Package}
+                title="Wszystkie palety"
+                value={pStats.total_count || 0}
+                subtitle="W całej bazie"
+                color="text-blue-600 bg-blue-600"
+              />
+              <StatCard
+                icon={Building2}
+                title="Palety u klientów"
+                value={pStats.total_issued || 0}
+                subtitle="Wydane z magazynu"
+                color="text-orange-600 bg-orange-600"
+              />
+              <StatCard
+                icon={CheckCircle}
+                title="Palety na magazynie"
+                value={pStats.total_warehouse || 0}
+                subtitle="Dostępne do wydania"
+                color="text-green-600 bg-green-600"
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <ChartCard title="Dystrybucja według Rozmiaru">
+                <SimpleBarChart 
+                  data={Object.entries(pStats.by_size || {})
+                    .map(([name, value]) => ({ name, value }))
+                    .sort((a, b) => b.value - a.value)
+                    .slice(0, 8)} 
+                  color="bg-orange-500" 
+                />
+              </ChartCard>
+
+              <ChartCard title="Najwięksi Dłużnicy Palet (TOP 10)">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead>
+                      <tr>
+                        <th className="px-4 py-3 bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tl-lg">Firma</th>
+                        <th className="px-4 py-3 bg-gray-50 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider rounded-tr-lg">Ilość Palet</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-100">
+                      {(pStats.top_pallet_debtors || []).map((client, idx) => (
+                        <tr key={idx} className="hover:bg-orange-50 transition-colors">
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="font-bold text-gray-900 truncate w-40" title={client.name}>{client.name}</div>
+                            <div className="text-xs text-gray-500">{client.nip}</div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-center">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-800">
+                              {client.pallets_count}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {(pStats.top_pallet_debtors || []).length === 0 && (
+                        <tr>
+                          <td colSpan="2" className="px-4 py-8 text-center text-gray-500">Brak danych</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </ChartCard>
             </div>
