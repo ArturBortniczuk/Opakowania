@@ -1335,12 +1335,7 @@ export const drumsAPI = {
               ? clientReturnDeadline
               : finalReturnDate);
 
-        let reportedDate = null;
-        if (drum.cecha && reportedDrumsMap.has(drum.cecha)) {
-          reportedDate = reportedDrumsMap.get(drum.cecha);
-        } else if (drum.kod_bebna && reportedDrumsMap.has(drum.kod_bebna)) {
-          reportedDate = reportedDrumsMap.get(drum.kod_bebna);
-        }
+
 
         let statusObj = supabaseHelpers.getDrumStatus(dateForStatus, reportedDate);
 
