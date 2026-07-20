@@ -327,12 +327,6 @@ const AdminDashboard = ({ user, onNavigate }) => {
         <div className={`p-3 rounded-xl ${color} bg-opacity-10 group-hover:bg-opacity-20 transition-all duration-300`}>
           <Icon className={`w-6 h-6 ${color}`} />
         </div>
-        {trend && (
-          <div className={`flex items-center space-x-1 ${trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {trend > 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-            <span className="text-sm font-medium">{Math.abs(percentage)}%</span>
-          </div>
-        )}
       </div>
       
       <div className="space-y-1">
@@ -426,9 +420,6 @@ const AdminDashboard = ({ user, onNavigate }) => {
               <TrendingUp className="w-5 h-5 mr-2 text-blue-600 animate-pulse" />
               Podsumowanie finansowe (Wycena Netto)
             </h2>
-            <span className="text-[11px] font-semibold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full uppercase tracking-wider">
-              Real-Time
-            </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
