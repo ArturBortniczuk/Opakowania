@@ -285,29 +285,37 @@ export const drumsAPI = {
   async getWarehouseDrumSizes() {
     try {
       const allSizes = new Set();
-      let page = 0;
-      const pageSize = 1000;
-      let hasMore = true;
+      const chunkSize = 1000;
 
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('drums')
-          .select('rozmiar_bebna')
-          .or('typ_opakowania.eq.Bęben,typ_opakowania.is.null')
-          .in('status', ['pusty na magazynie', 'na magazynie z towarem'])
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-          
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          data.forEach(d => {
-            if (d.rozmiar_bebna) allSizes.add(d.rozmiar_bebna);
-          });
-          if (data.length < pageSize) hasMore = false;
+      const buildQuery = (isCount = false) => {
+        let q = supabase.from('drums');
+        if (isCount) {
+          q = q.select('*', { count: 'exact', head: true });
         } else {
-          hasMore = false;
+          q = q.select('rozmiar_bebna');
         }
-        page++;
+        return q.or('typ_opakowania.eq.Bęben,typ_opakowania.is.null').in('status', ['pusty na magazynie', 'na magazynie z towarem']);
+      };
+
+      const { count, error: countError } = await buildQuery(true);
+      if (countError) throw countError;
+
+      if (count && count > 0) {
+        const totalPages = Math.ceil(count / chunkSize);
+        const promises = [];
+        for (let i = 0; i < totalPages; i++) {
+          promises.push(buildQuery(false).range(i * chunkSize, (i + 1) * chunkSize - 1));
+        }
+
+        const results = await Promise.all(promises);
+        for (const res of results) {
+          if (res.error) throw res.error;
+          if (res.data) {
+            res.data.forEach(d => {
+              if (d.rozmiar_bebna) allSizes.add(d.rozmiar_bebna);
+            });
+          }
+        }
       }
       return [...allSizes].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
     } catch (error) {
@@ -322,28 +330,37 @@ export const drumsAPI = {
   async getAllDrumSizes() {
     try {
       const allSizes = new Set();
-      let page = 0;
-      const pageSize = 1000;
-      let hasMore = true;
+      const chunkSize = 1000;
 
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from('drums')
-          .select('rozmiar_bebna')
-          .or('typ_opakowania.eq.Bęben,typ_opakowania.is.null')
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-          
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          data.forEach(d => {
-            if (d.rozmiar_bebna) allSizes.add(d.rozmiar_bebna);
-          });
-          if (data.length < pageSize) hasMore = false;
+      const buildQuery = (isCount = false) => {
+        let q = supabase.from('drums');
+        if (isCount) {
+          q = q.select('*', { count: 'exact', head: true });
         } else {
-          hasMore = false;
+          q = q.select('rozmiar_bebna');
         }
-        page++;
+        return q.or('typ_opakowania.eq.Bęben,typ_opakowania.is.null');
+      };
+
+      const { count, error: countError } = await buildQuery(true);
+      if (countError) throw countError;
+
+      if (count && count > 0) {
+        const totalPages = Math.ceil(count / chunkSize);
+        const promises = [];
+        for (let i = 0; i < totalPages; i++) {
+          promises.push(buildQuery(false).range(i * chunkSize, (i + 1) * chunkSize - 1));
+        }
+
+        const results = await Promise.all(promises);
+        for (const res of results) {
+          if (res.error) throw res.error;
+          if (res.data) {
+            res.data.forEach(d => {
+              if (d.rozmiar_bebna) allSizes.add(d.rozmiar_bebna);
+            });
+          }
+        }
       }
       return [...allSizes].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
     } catch (error) {
@@ -913,38 +930,46 @@ export const drumsAPI = {
       }
 
       let allData = [];
-      let pageIndex = 0;
       const chunkSize = 1000;
 
-      while (true) {
-        const from = pageIndex * chunkSize;
-        const to = from + chunkSize - 1;
-        
-        let chunkQuery = supabase
-          .from('drums')
-          .select(`nip, pelna_nazwa_kontrahenta, cecha, nazwa, numer_faktury, data_wydania, data_przyjecia_na_stan, typ_dok, nr_dokumentupz, rozmiar_bebna, cena_netto_bebna`)
-          .eq('typ_opakowania', 'Paleta')
-          .range(from, to);
+      const buildQuery = (isCount = false) => {
+        let q = supabase.from('drums');
+        if (isCount) {
+          q = q.select('*', { count: 'exact', head: true });
+        } else {
+          q = q.select(`nip, pelna_nazwa_kontrahenta, cecha, nazwa, numer_faktury, data_wydania, data_przyjecia_na_stan, typ_dok, nr_dokumentupz, rozmiar_bebna, cena_netto_bebna`);
+        }
+        q = q.eq('typ_opakowania', 'Paleta');
 
         if (nip) {
-          chunkQuery = chunkQuery.eq('nip', nip);
+          q = q.eq('nip', nip);
         } else if (allowedNips) {
-          chunkQuery = chunkQuery.in('nip', allowedNips);
+          q = q.in('nip', allowedNips);
         }
+        return q;
+      };
 
-        const { data, error } = await chunkQuery;
-        if (error) throw error;
+      const countQuery = buildQuery(true);
+      if (countQuery) {
+        const { count, error: countError } = await countQuery;
+        if (countError) throw countError;
 
-        if (!data || data.length === 0) {
-          break;
+        if (count && count > 0) {
+          const totalPages = Math.ceil(count / chunkSize);
+          const promises = [];
+
+          for (let i = 0; i < totalPages; i++) {
+            const from = i * chunkSize;
+            const to = from + chunkSize - 1;
+            promises.push(buildQuery(false).range(from, to));
+          }
+
+          const results = await Promise.all(promises);
+          for (const res of results) {
+            if (res.error) throw res.error;
+            if (res.data) allData = allData.concat(res.data);
+          }
         }
-
-        allData = allData.concat(data);
-
-        if (data.length < chunkSize) {
-          break;
-        }
-        pageIndex++;
       }
 
       if (allData.length === 0) return [];
@@ -1361,32 +1386,34 @@ export const drumsAPI = {
    */
   async getUniqueSuppliers() {
     try {
-      // Pobieramy wszystkie wartości kon_dostawca z bazy przy użyciu paginacji
       let allData = [];
-      let pageIndex = 0;
       const chunkSize = 1000;
 
-      while (true) {
-        const from = pageIndex * chunkSize;
-        const to = from + chunkSize - 1;
-        
-        const { data, error } = await supabase
-          .from('drums')
-          .select('kon_dostawca')
-          .not('kon_dostawca', 'is', null)
-          .range(from, to);
+      const buildQuery = (isCount = false) => {
+        let q = supabase.from('drums');
+        if (isCount) {
+          q = q.select('*', { count: 'exact', head: true });
+        } else {
+          q = q.select('kon_dostawca');
+        }
+        return q.not('kon_dostawca', 'is', null);
+      };
 
-        if (error) throw error;
+      const { count, error: countError } = await buildQuery(true);
+      if (countError) throw countError;
 
-        if (!data || data.length === 0) {
-          break;
+      if (count && count > 0) {
+        const totalPages = Math.ceil(count / chunkSize);
+        const promises = [];
+        for (let i = 0; i < totalPages; i++) {
+          promises.push(buildQuery(false).range(i * chunkSize, (i + 1) * chunkSize - 1));
         }
 
-        allData = allData.concat(data);
-        if (data.length < chunkSize) {
-          break;
+        const results = await Promise.all(promises);
+        for (const res of results) {
+          if (res.error) throw res.error;
+          if (res.data) allData = allData.concat(res.data);
         }
-        pageIndex++;
       }
 
       // Wyodrębniamy unikalne wartości, usuwamy puste i sortujemy
