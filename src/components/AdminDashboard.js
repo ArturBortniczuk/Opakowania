@@ -3,11 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { statsAPI, drumsAPI, returnsAPI } from '../utils/supabaseApi';
 import { parsePriceRaw, getClientPrice } from '../utils/priceHelpers';
 import InviteClientModal from './InviteClientModal';
-import { 
-  Users, 
-  Package, 
+import {
+  Users,
+  Package,
   Mail,
-  Truck, 
+  Truck,
   AlertTriangle,
   TrendingUp,
   Clock,
@@ -53,18 +53,18 @@ const AdminDashboard = ({ user, onNavigate }) => {
     const fetchDashboardData = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
         // Pobierz statystyki dla administratora
         const dashboardStats = await statsAPI.getDashboardStats();
         setStats(dashboardStats);
-        
+
         // Pobierz dane do aktywności i pilnych spraw
         const [allDrums, allReturns] = await Promise.all([
           drumsAPI.getAllDrums(),
           returnsAPI.getReturns()
         ]);
-        
+
         generateRecentActivity(allDrums, allReturns);
         findUrgentItems(allDrums, allReturns);
 
@@ -93,20 +93,20 @@ const AdminDashboard = ({ user, onNavigate }) => {
 
             // Logika "Nasze" (własne) bębny
             const nameUpper = (drum.nazwa || '').toUpperCase();
-            
+
             // Oryginalna data zwrotu do dostawcy (db_data_zwrotu_do_dostawcy, którą dodaliśmy do API)
-            const returnDeadline = drum.db_data_zwrotu_do_dostawcy 
-              ? new Date(drum.db_data_zwrotu_do_dostawcy) 
+            const returnDeadline = drum.db_data_zwrotu_do_dostawcy
+              ? new Date(drum.db_data_zwrotu_do_dostawcy)
               : null;
 
             // Dni od terminu zwrotu
-            const daysSinceDeadline = returnDeadline 
+            const daysSinceDeadline = returnDeadline
               ? Math.floor((new Date() - returnDeadline) / (1000 * 60 * 60 * 24))
               : 0;
 
-            const isOurDrum = 
+            const isOurDrum =
               !drum.db_data_zwrotu_do_dostawcy || // Brak w bazie pierwotnej daty zwrotu = własny
-              nameUpper.startsWith('BĘBEN ELTRON') || 
+              nameUpper.startsWith('BĘBEN ELTRON') ||
               daysSinceDeadline > 360; // Przeterminowane zwrotu do kablowni powyżej 360 dni
 
             if (isOurDrum) {
@@ -118,7 +118,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
             if (!isWarehouse && drum.czy_zaplacona === 'Nie' && drum.termin_platnosci) {
               const paymentDeadline = parsePaymentDate(drum.termin_platnosci);
               const now = new Date();
-              now.setHours(0,0,0,0);
+              now.setHours(0, 0, 0, 0);
               if (paymentDeadline && paymentDeadline < now) {
                 const clientPriceRaw = getClientPrice(drum);
                 overduePaymentVal += (clientPriceRaw * 1.23); // Cena z marżą + VAT 23%
@@ -146,16 +146,16 @@ const AdminDashboard = ({ user, onNavigate }) => {
                 const cecha = typeof d === 'object' ? d.cecha : d;
                 if (cecha && !countedReturningDrums.has(cecha)) {
                   countedReturningDrums.add(cecha);
-                  
+
                   let drumData = drumMap[cecha];
                   if (!drumData && typeof d === 'object') {
                     drumData = d;
                   }
-                  
+
                   if (drumData) {
                     const price = parsePriceRaw(drumData.cena_netto_bebna || drumData.CENA_NETTO_BEBNA || drumData.cena_netto);
                     const clientPrice = getClientPrice(drumData);
-                    
+
                     if (price > 0) {
                       returnBaseVal += price;
                       returnClientVal += clientPrice;
@@ -174,7 +174,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
           inReturnClientValue: returnClientVal,
           overduePaymentValue: overduePaymentVal
         });
-        
+
       } catch (err) {
         console.error('Błąd podczas pobierania danych dashboardu:', err);
         setError('Nie udało się pobrać danych. Spróbuj ponownie.');
@@ -189,9 +189,9 @@ const AdminDashboard = ({ user, onNavigate }) => {
   const generateRecentActivity = (drums, returns) => {
     const activities = [];
     const now = new Date();
-    
+
     // Dodaj aktywność na podstawie rzeczywistych danych
-    
+
     // Nowe zgłoszenia zwrotów
     const recentReturns = returns.filter(ret => {
       const createdDate = new Date(ret.created_at);
@@ -303,19 +303,19 @@ const AdminDashboard = ({ user, onNavigate }) => {
     const now = new Date();
     const date = new Date(dateString);
     const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
-    
+
     if (diffInHours < 1) return 'mniej niż godzinę temu';
     if (diffInHours < 24) return `${diffInHours} godzin temu`;
-    
+
     const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays === 1) return 'wczoraj';
     if (diffInDays < 7) return `${diffInDays} dni temu`;
-    
+
     return date.toLocaleDateString('pl-PL');
   };
 
   const StatCard = ({ icon: Icon, title, value, subtitle, color, trend, percentage, onClick }) => (
-    <div 
+    <div
       onClick={onClick}
       className={`
         bg-white/90 rounded-2xl p-6 shadow-lg border border-blue-100 
@@ -328,7 +328,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
           <Icon className={`w-6 h-6 ${color}`} />
         </div>
       </div>
-      
+
       <div className="space-y-1">
         <h3 className="text-sm font-medium text-gray-600">{title}</h3>
         <div className="text-3xl font-bold text-gray-900">{value}</div>
@@ -340,14 +340,12 @@ const AdminDashboard = ({ user, onNavigate }) => {
   const ActivityItem = ({ activity }) => {
     const Icon = activity.icon;
     return (
-      <div 
+      <div
         onClick={activity.action}
-        className={`flex items-start space-x-3 p-3 rounded-lg transition-colors duration-200 ${
-        activity.priority === 'high' ? 'hover:bg-red-50' : 'hover:bg-blue-50'
-      } ${activity.action ? 'cursor-pointer' : ''}`}>
-        <div className={`p-2 rounded-lg ${
-          activity.priority === 'high' ? 'bg-red-100' : 'bg-gray-100'
-        }`}>
+        className={`flex items-start space-x-3 p-3 rounded-lg transition-colors duration-200 ${activity.priority === 'high' ? 'hover:bg-red-50' : 'hover:bg-blue-50'
+          } ${activity.action ? 'cursor-pointer' : ''}`}>
+        <div className={`p-2 rounded-lg ${activity.priority === 'high' ? 'bg-red-100' : 'bg-gray-100'
+          }`}>
           <Icon className={`w-4 h-4 ${activity.color}`} />
         </div>
         <div className="flex-1 min-w-0">
@@ -379,7 +377,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center py-12">
             <div className="text-red-600 mb-4">{error}</div>
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors duration-200"
             >
@@ -499,7 +497,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
             percentage={8}
             onClick={() => onNavigate('admin-clients')}
           />
-          
+
           <StatCard
             icon={Package}
             title="Wszystkie bębny"
@@ -510,7 +508,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
             percentage={12}
             onClick={() => onNavigate('admin-drums')}
           />
-          
+
           <StatCard
             icon={Clock}
             title="Oczekujące zwroty"
@@ -521,7 +519,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
             percentage={5}
             onClick={() => onNavigate('admin-returns', { filterStatus: 'Pending' })}
           />
-          
+
           <StatCard
             icon={AlertTriangle}
             title="Przekroczenia"
@@ -532,10 +530,10 @@ const AdminDashboard = ({ user, onNavigate }) => {
             percentage={15}
             onClick={() => onNavigate('admin-drums', { filterDateRange: 'overdue' })}
           />
-          
+
           <StatCard
             icon={Truck}
-            title="Aktywne zgłoszenia"
+            title="Zgłoszenia"
             value={stats.activeRequests}
             subtitle="W trakcie"
             color="text-purple-600"
@@ -543,7 +541,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
             percentage={20}
             onClick={() => onNavigate('admin-returns', { filterStatus: 'Approved' })}
           />
-          
+
           <StatCard
             icon={CheckCircle}
             title="Zakończone"
@@ -565,131 +563,131 @@ const AdminDashboard = ({ user, onNavigate }) => {
                 <Activity className="w-5 h-5 mr-2 text-blue-600" />
                 Szybkie akcje
               </h2>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {!isMagazyn && (
                   <>
                     <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                         onClick={() => setIsInviteModalOpen(true)}>
-                  <div className="flex items-start space-x-4">
-                    <div className="p-3 rounded-xl bg-indigo-100 group-hover:bg-indigo-200 transition-colors duration-300">
-                      <Mail className="w-8 h-8 text-indigo-600" />
+                      onClick={() => setIsInviteModalOpen(true)}>
+                      <div className="flex items-start space-x-4">
+                        <div className="p-3 rounded-xl bg-indigo-100 group-hover:bg-indigo-200 transition-colors duration-300">
+                          <Mail className="w-8 h-8 text-indigo-600" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">Zaproś klienta</h3>
+                          <p className="text-gray-600 text-sm mb-4">Wyślij e-mail z zaproszeniem do korzystania z systemu</p>
+                          <button className="text-indigo-600 font-medium text-sm hover:text-indigo-800 transition-colors duration-200">
+                            Zaproś →
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Zaproś klienta</h3>
-                      <p className="text-gray-600 text-sm mb-4">Wyślij e-mail z zaproszeniem do korzystania z systemu</p>
-                      <button className="text-indigo-600 font-medium text-sm hover:text-indigo-800 transition-colors duration-200">
-                        Zaproś →
-                      </button>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                     onClick={() => onNavigate('admin-clients')}>
-                  <div className="flex items-start space-x-4">
-                    <div className="p-3 rounded-xl bg-blue-100 group-hover:bg-blue-200 transition-colors duration-300">
-                      <Users className="w-8 h-8 text-blue-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Zarządzaj klientami</h3>
-                      <p className="text-gray-600 text-sm mb-4">Przeglądaj wszystkich klientów, ich dane i aktywność</p>
-                      <button className="text-blue-600 font-medium text-sm hover:text-blue-800 transition-colors duration-200">
-                        Zobacz klientów →
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                
-                {(!isSalesperson) && (
-                  <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-teal-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                       onClick={() => onNavigate('admin-users', null) || (window.location.href='/admin/users')}>
-                    <div className="flex items-start space-x-4">
-                      <div className="p-3 rounded-xl bg-teal-100 group-hover:bg-teal-200 transition-colors duration-300">
-                        <Users className="w-8 h-8 text-teal-600" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Użytkownicy i Uprawnienia</h3>
-                        <p className="text-gray-600 text-sm mb-4">Zarządzaj dostępami pracowników i klientów</p>
-                        <button className="text-teal-600 font-medium text-sm hover:text-teal-800 transition-colors duration-200">
-                          Panel Użytkowników →
-                        </button>
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                      onClick={() => onNavigate('admin-clients')}>
+                      <div className="flex items-start space-x-4">
+                        <div className="p-3 rounded-xl bg-blue-100 group-hover:bg-blue-200 transition-colors duration-300">
+                          <Users className="w-8 h-8 text-blue-600" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">Zarządzaj klientami</h3>
+                          <p className="text-gray-600 text-sm mb-4">Przeglądaj wszystkich klientów, ich dane i aktywność</p>
+                          <button className="text-blue-600 font-medium text-sm hover:text-blue-800 transition-colors duration-200">
+                            Zobacz klientów →
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-                
-                <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                     onClick={() => onNavigate('admin-drums')}>
-                  <div className="flex items-start space-x-4">
-                    <div className="p-3 rounded-xl bg-green-100 group-hover:bg-green-200 transition-colors duration-300">
-                      <Package className="w-8 h-8 text-green-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Wszystkie bębny</h3>
-                      <p className="text-gray-600 text-sm mb-4">Monitoruj wszystkie bębny w systemie</p>
-                      <button className="text-green-600 font-medium text-sm hover:text-green-800 transition-colors duration-200">
-                        Zobacz bębny →
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                     onClick={() => onNavigate('admin-returns')}>
-                  <div className="flex items-start space-x-4">
-                    <div className="p-3 rounded-xl bg-purple-100 group-hover:bg-purple-200 transition-colors duration-300">
-                      <Truck className="w-8 h-8 text-purple-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Zgłoszenia zwrotów</h3>
-                      <p className="text-gray-600 text-sm mb-4">Zarządzaj wszystkimi zgłoszeniami zwrotów</p>
-                      <button className="text-purple-600 font-medium text-sm hover:text-purple-800 transition-colors duration-200">
-                        Zobacz zgłoszenia →
-                      </button>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-emerald-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                     onClick={() => window.location.href = '/return'}>
-                  <div className="flex items-start space-x-4">
-                    <div className="p-3 rounded-xl bg-emerald-100 group-hover:bg-emerald-200 transition-colors duration-300">
-                      <Truck className="w-8 h-8 text-emerald-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Nowe zgłoszenie</h3>
-                      <p className="text-gray-600 text-sm mb-4">Wygeneruj zgłoszenie zwrotu dla klienta</p>
-                      <button className="text-emerald-600 font-medium text-sm hover:text-emerald-800 transition-colors duration-200">
-                        Utwórz zgłoszenie →
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                
-                {!isSalesperson && (
-                  <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                       onClick={() => onNavigate('admin-return-periods')}>
-                    <div className="flex items-start space-x-4">
-                      <div className="p-3 rounded-xl bg-indigo-100 group-hover:bg-indigo-200 transition-colors duration-300">
-                        <Settings className="w-8 h-8 text-indigo-600" />
+                    {(!isSalesperson) && (
+                      <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-teal-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                        onClick={() => onNavigate('admin-users', null) || (window.location.href = '/admin/users')}>
+                        <div className="flex items-start space-x-4">
+                          <div className="p-3 rounded-xl bg-teal-100 group-hover:bg-teal-200 transition-colors duration-300">
+                            <Users className="w-8 h-8 text-teal-600" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">Użytkownicy i Uprawnienia</h3>
+                            <p className="text-gray-600 text-sm mb-4">Zarządzaj dostępami pracowników i klientów</p>
+                            <button className="text-teal-600 font-medium text-sm hover:text-teal-800 transition-colors duration-200">
+                              Panel Użytkowników →
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Terminy zwrotu</h3>
-                        <p className="text-gray-600 text-sm mb-4">Ustaw indywidualne terminy zwrotu dla klientów</p>
-                        <button className="text-indigo-600 font-medium text-sm hover:text-indigo-800 transition-colors duration-200">
-                          Zarządzaj terminami →
-                        </button>
+                    )}
+
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                      onClick={() => onNavigate('admin-drums')}>
+                      <div className="flex items-start space-x-4">
+                        <div className="p-3 rounded-xl bg-green-100 group-hover:bg-green-200 transition-colors duration-300">
+                          <Package className="w-8 h-8 text-green-600" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">Wszystkie bębny</h3>
+                          <p className="text-gray-600 text-sm mb-4">Monitoruj wszystkie bębny w systemie</p>
+                          <button className="text-green-600 font-medium text-sm hover:text-green-800 transition-colors duration-200">
+                            Zobacz bębny →
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                      onClick={() => onNavigate('admin-returns')}>
+                      <div className="flex items-start space-x-4">
+                        <div className="p-3 rounded-xl bg-purple-100 group-hover:bg-purple-200 transition-colors duration-300">
+                          <Truck className="w-8 h-8 text-purple-600" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">Zgłoszenia zwrotów</h3>
+                          <p className="text-gray-600 text-sm mb-4">Zarządzaj wszystkimi zgłoszeniami zwrotów</p>
+                          <button className="text-purple-600 font-medium text-sm hover:text-purple-800 transition-colors duration-200">
+                            Zobacz zgłoszenia →
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-emerald-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                      onClick={() => window.location.href = '/return'}>
+                      <div className="flex items-start space-x-4">
+                        <div className="p-3 rounded-xl bg-emerald-100 group-hover:bg-emerald-200 transition-colors duration-300">
+                          <Truck className="w-8 h-8 text-emerald-600" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">Nowe zgłoszenie</h3>
+                          <p className="text-gray-600 text-sm mb-4">Wygeneruj zgłoszenie zwrotu dla klienta</p>
+                          <button className="text-emerald-600 font-medium text-sm hover:text-emerald-800 transition-colors duration-200">
+                            Utwórz zgłoszenie →
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {!isSalesperson && (
+                      <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                        onClick={() => onNavigate('admin-return-periods')}>
+                        <div className="flex items-start space-x-4">
+                          <div className="p-3 rounded-xl bg-indigo-100 group-hover:bg-indigo-200 transition-colors duration-300">
+                            <Settings className="w-8 h-8 text-indigo-600" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">Terminy zwrotu</h3>
+                            <p className="text-gray-600 text-sm mb-4">Ustaw indywidualne terminy zwrotu dla klientów</p>
+                            <button className="text-indigo-600 font-medium text-sm hover:text-indigo-800 transition-colors duration-200">
+                              Zarządzaj terminami →
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
-                
+
                 {(!isSalesperson) && (
                   <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-emerald-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                       onClick={() => onNavigate('admin-warehouse-drums', null) || (window.location.href='/admin/warehouse-drums')}>
+                    onClick={() => onNavigate('admin-warehouse-drums', null) || (window.location.href = '/admin/warehouse-drums')}>
                     <div className="flex items-start space-x-4">
                       <div className="p-3 rounded-xl bg-emerald-100 group-hover:bg-emerald-200 transition-colors duration-300">
                         <Package className="w-8 h-8 text-emerald-600" />
@@ -704,9 +702,9 @@ const AdminDashboard = ({ user, onNavigate }) => {
                     </div>
                   </div>
                 )}
-                
+
                 <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-indigo-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                     onClick={() => onNavigate('admin-map', null) || (window.location.href='/admin/map')}>
+                  onClick={() => onNavigate('admin-map', null) || (window.location.href = '/admin/map')}>
                   <div className="flex items-start space-x-4">
                     <div className="p-3 rounded-xl bg-indigo-100 group-hover:bg-indigo-200 transition-colors duration-300">
                       <MapPin className="w-8 h-8 text-indigo-600" />
@@ -720,10 +718,10 @@ const AdminDashboard = ({ user, onNavigate }) => {
                     </div>
                   </div>
                 </div>
- 
+
                 {(!isSalesperson && !isMagazyn) && (
                   <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                       onClick={() => onNavigate('admin-supplier-rules')}>
+                    onClick={() => onNavigate('admin-supplier-rules')}>
                     <div className="flex items-start space-x-4">
                       <div className="p-3 rounded-xl bg-orange-100 group-hover:bg-orange-200 transition-colors duration-300">
                         <Settings className="w-8 h-8 text-orange-600" />
@@ -750,13 +748,13 @@ const AdminDashboard = ({ user, onNavigate }) => {
                 <Clock className="w-5 h-5 mr-2 text-blue-600" />
                 Ostatnia aktywność
               </h3>
-              
+
               <div className="space-y-2">
                 {recentActivity.map((activity) => (
                   <ActivityItem key={activity.id} activity={activity} />
                 ))}
               </div>
-              
+
               <button className="w-full mt-4 py-2 px-4 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200 border border-blue-200 rounded-lg hover:bg-blue-50">
                 Zobacz wszystkie aktywności
               </button>
@@ -769,7 +767,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
                   <AlertTriangle className="w-5 h-5 mr-2 text-red-600" />
                   Pilne sprawy
                 </h3>
-                
+
                 <div className="space-y-3">
                   {urgentItems.map((item, index) => (
                     <div key={index} className="p-3 bg-red-50 rounded-lg border border-red-200 hover:bg-red-100 transition-colors duration-200">
@@ -787,8 +785,8 @@ const AdminDashboard = ({ user, onNavigate }) => {
           </div>
         </div>
       </div>
-      
-      <InviteClientModal 
+
+      <InviteClientModal
         isOpen={isInviteModalOpen}
         onClose={() => setIsInviteModalOpen(false)}
       />
