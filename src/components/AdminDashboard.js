@@ -413,18 +413,6 @@ const AdminDashboard = ({ user, onNavigate }) => {
               <p className="text-gray-600">Zarządzaj systemem i monitoruj aktywność</p>
             </div>
           </div>
-          
-          <div className="flex items-center space-x-2 text-sm text-gray-500">
-            <Calendar className="w-4 h-4" />
-            <span>Ostatnia aktualizacja: {new Date().toLocaleDateString('pl-PL', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            })}</span>
-          </div>
         </div>
 
         {/* Podsumowanie finansowe */}

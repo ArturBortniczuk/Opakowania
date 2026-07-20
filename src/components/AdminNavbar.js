@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Menu, X, Home, Users, Package, Truck, BarChart3, LogOut, Building2,
-  UserCheck, ChevronRight, Shield, Settings, Bell, Crown, Pin, PinOff, Map, MapPin, HelpCircle, Calculator
+  UserCheck, ChevronRight, Shield, Settings, Crown, Pin, PinOff, Map, MapPin, HelpCircle, Calculator
 } from 'lucide-react';
 import { statsAPI } from '../utils/supabaseApi';
 
@@ -163,15 +163,7 @@ const AdminNavbar = ({
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <button className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors duration-200 relative">
-              <Bell className="w-5 h-5" />
-              {quickStats.overdueReturns > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
-                  {quickStats.overdueReturns}
-                </span>
-              )}
-            </button>
-            <div className="flex items-center space-x-3 pl-4 border-l border-gray-200">
+            <div className="flex items-center space-x-3">
               <div className="hidden sm:block text-right">
                 <div className="text-sm font-medium text-gray-900">{user.name}</div>
                 <div className="text-xs text-gray-500">{user.email}</div>
