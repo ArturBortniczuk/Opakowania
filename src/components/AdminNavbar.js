@@ -111,8 +111,8 @@ const AdminNavbar = ({
     const Icon = config.icon;
     return (
       <div className={`inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-gradient-to-r ${config.gradient} text-white text-xs font-semibold shadow-lg`}>
-        <Icon className="w-3 h-3" />
-        {!isCollapsed && <span>{config.label}</span>}
+        <Icon className="w-3 h-3 shrink-0" />
+        {!isCollapsed && <span className="whitespace-nowrap overflow-hidden">{config.label}</span>}
       </div>
     );
   };
@@ -133,13 +133,13 @@ const AdminNavbar = ({
         `}
       >
         <div className={`
-          p-2 rounded-lg transition-all duration-300
+          p-2 rounded-lg transition-all duration-300 shrink-0
           ${isActive ? 'bg-white/20' : `bg-purple-100 text-purple-600 group-hover:bg-opacity-80`}
         `}>
           <Icon className={`w-5 h-5 ${isActive ? 'text-white' : ''}`} />
         </div>
         {!isCollapsed && (
-          <div className="flex-1 text-left ml-4">
+          <div className="flex-1 text-left ml-4 whitespace-nowrap overflow-hidden">
             <div className="font-semibold">{item.label}</div>
           </div>
         )}
@@ -238,23 +238,23 @@ const AdminNavbar = ({
           <div className="p-4 border-t border-purple-100">
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="w-full p-4 rounded-xl text-gray-600 hover:bg-gray-100 transition-all duration-200 flex items-center space-x-3 group"
+              className={`w-full p-4 rounded-xl text-gray-600 hover:bg-gray-100 transition-all duration-200 flex items-center group ${isCollapsed ? 'justify-center' : 'space-x-3'}`}
               title={isCollapsed ? "Rozwiń menu" : "Zwiń menu"}
             >
-              <div className="p-2 rounded-lg bg-gray-100 group-hover:bg-gray-200 transition-colors duration-200">
+              <div className="p-2 rounded-lg bg-gray-100 group-hover:bg-gray-200 transition-colors duration-200 shrink-0">
                 {isCollapsed ? <PinOff className="w-5 h-5" /> : <Pin className="w-5 h-5" />}
               </div>
-              {!isCollapsed && <span className="font-medium">Zwiń menu</span>}
+              {!isCollapsed && <span className="font-medium whitespace-nowrap overflow-hidden">Zwiń menu</span>}
             </button>
             <button
               onClick={onLogout}
-              className="w-full mt-2 p-4 rounded-xl text-red-600 hover:bg-red-50 transition-all duration-200 flex items-center space-x-3 group"
+              className={`w-full mt-2 p-4 rounded-xl text-red-600 hover:bg-red-50 transition-all duration-200 flex items-center group ${isCollapsed ? 'justify-center' : 'space-x-3'}`}
               title="Wyloguj się"
             >
-              <div className="p-2 rounded-lg bg-red-100 group-hover:bg-red-200 transition-colors duration-200">
+              <div className="p-2 rounded-lg bg-red-100 group-hover:bg-red-200 transition-colors duration-200 shrink-0">
                 <LogOut className="w-5 h-5" />
               </div>
-              {!isCollapsed && <span className="font-medium">Wyloguj się</span>}
+              {!isCollapsed && <span className="font-medium whitespace-nowrap overflow-hidden">Wyloguj się</span>}
             </button>
           </div>
         </div>
