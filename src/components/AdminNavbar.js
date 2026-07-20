@@ -54,7 +54,7 @@ const AdminNavbar = ({
 
 
   const menuItems = [
-    { path: '/admin', label: 'Dashboard', icon: Home, description: 'Panel główny' },
+    { path: '/admin', label: 'Strona główna', icon: Home, description: 'Panel główny' },
     { path: '/admin/users', label: 'Użytkownicy i Uprawnienia', icon: Shield, description: 'Zarządzaj dostępami' },
     { path: '/admin/clients', label: 'Zarządzaj klientami', icon: Users, description: 'Klienci w systemie' },
     { path: '/admin/registrations', label: 'Weryfikacja kont', icon: UserCheck, description: 'Zatwierdzaj nowych użytkowników' },
@@ -158,7 +158,7 @@ const AdminNavbar = ({
             >
               {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/admin')}>
               <img src="/logo40.png" alt="Grupa Eltron" className="h-10 w-auto object-contain" />
             </div>
           </div>

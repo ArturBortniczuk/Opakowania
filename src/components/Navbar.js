@@ -27,7 +27,7 @@ const Navbar = ({
   const location = useLocation();
 
   const menuItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: Home },
+    { path: '/dashboard', label: 'Strona główna', icon: Home },
     { path: '/drums', label: 'Moje bębny', icon: Package },
     { path: '/pallets', label: 'Moje Palety', icon: Package },
     { path: '/my-returns', label: 'Moje zgłoszenia', icon: FileText },
@@ -77,7 +77,7 @@ const Navbar = ({
               >
                 {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => navigate('/dashboard')}>
                 <img src="/logo40.png" alt="Grupa Eltron" className="h-10 w-auto object-contain" />
               </div>
             </div>
