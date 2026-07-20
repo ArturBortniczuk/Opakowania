@@ -22,7 +22,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 // Helper functions
 export const supabaseHelpers = {
-  getDrumStatus(returnDate) {
+  getDrumStatus(returnDate, reportedDate = null) {
     if (!returnDate) {
       return {
         status: 'own',
@@ -34,7 +34,7 @@ export const supabaseHelpers = {
       };
     }
 
-    const now = new Date();
+    const now = reportedDate ? new Date(reportedDate) : new Date();
     const returnDateTime = new Date(returnDate);
     // Resetujemy czas do północy, aby uniknąć problemów ze strefami czasowymi
     now.setHours(0, 0, 0, 0);

@@ -104,7 +104,7 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
                   const deadline = drum.clientReturnDeadline ? new Date(drum.clientReturnDeadline) : null;
                   
                   if (deadline) {
-                    const now = new Date();
+                    const now = drum.reportedDate ? new Date(drum.reportedDate) : new Date();
                     now.setHours(0,0,0,0);
                     deadline.setHours(0,0,0,0);
                     const daysPastDeadline = Math.ceil((now - deadline) / (1000 * 60 * 60 * 24));
@@ -164,7 +164,14 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
             {drum.daysInPossession !== undefined && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500">Dni w posiadaniu</span>
-                <span className="text-sm font-medium text-gray-900">{drum.daysInPossession}</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {drum.daysInPossession}
+                  {drum.reportedDate && (
+                    <span className="ml-1 text-[10px] font-bold text-purple-600 bg-purple-50 px-1 py-0.5 rounded" title={`Czas zatrzymany na dacie zgłoszenia: ${new Date(drum.reportedDate).toLocaleDateString('pl-PL')}`}>
+                      Zamrożone
+                    </span>
+                  )}
+                </span>
               </div>
             )}
 

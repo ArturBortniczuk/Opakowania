@@ -506,62 +506,50 @@ export const drumsAPI = {
         .select(`*, companies (name, email, phone, address, custom_return_periods(return_period_days))`, { count: 'exact' })
         .or('typ_opakowania.eq.Bęben,typ_opakowania.is.null');
 
-      // Filtrowanie po zgłoszonych bębnach w aktywnych zleceniach zwrotu
+      // Zawsze pobieramy aktywne zlecenia zwrotu, by znać datę ich zgłoszenia
+      let reqQuery = supabase
+        .from('return_requests')
+        .select('selected_drums, created_at')
+        .in('status', ['Pending', 'Approved', 'InTransit']);
+      
+      if (nip) {
+        reqQuery = reqQuery.eq('user_nip', nip);
+      }
+
+      const { data: activeRequests, error: reqError } = await reqQuery;
+      if (reqError) {
+        console.error('Błąd pobierania zgłoszeń:', reqError);
+      }
+
+      const reportedDrumsMap = new Map();
+      if (activeRequests) {
+        activeRequests.forEach(req => {
+          const drums = req.selected_drums;
+          if (Array.isArray(drums)) {
+            drums.forEach(d => {
+              const cecha = typeof d === 'object' ? d.cecha : d;
+              // Zapisujemy datę zgłoszenia
+              if (cecha) reportedDrumsMap.set(cecha, req.created_at);
+            });
+          }
+        });
+      }
+
+      // Jeśli włączony jest filtr "Tylko zgłoszone", filtrujemy zapytanie
       if (reportedOnly) {
-        let reqQuery = supabase
-          .from('return_requests')
-          .select('selected_drums')
-          .in('status', ['Pending', 'Approved', 'InTransit']);
-        
-        if (nip) {
-          reqQuery = reqQuery.eq('user_nip', nip);
-        }
-
-        const { data: activeRequests, error: reqError } = await reqQuery;
-        if (reqError) {
-          console.error('Błąd pobierania zgłoszeń do filtra:', reqError);
-          throw reqError;
-        }
-
-        const reportedCechas = new Set();
-        if (activeRequests) {
-          activeRequests.forEach(req => {
-            const drums = req.selected_drums;
-            if (Array.isArray(drums)) {
-              drums.forEach(d => {
-                const cecha = typeof d === 'object' ? d.cecha : d;
-                if (cecha) reportedCechas.add(cecha);
-              });
-            }
-          });
-        }
-
-        const cechaArray = Array.from(reportedCechas);
+        const cechaArray = Array.from(reportedDrumsMap.keys());
         if (cechaArray.length === 0) {
           // Brak zgłoszonych bębnów - zwracamy pustą listę bezpośrednio
           return {
             data: [],
             pagination: {
-              page,
-              limit,
-              total: 0,
-              totalPages: 0,
-              hasNext: false,
-              hasPrev: false
+              page, limit, total: 0, totalPages: 0, hasNext: false, hasPrev: false
             },
             meta: {
-              sortBy,
-              sortOrder,
-              search,
-              status,
-              supplierDateRange,
-              clientDateRange,
-              nip,
-              reportedOnly
+              sortBy, sortOrder, search, status, supplierDateRange, clientDateRange, nip, reportedOnly
             }
           };
         }
-        
         query = query.in('cecha', cechaArray);
       }
 
@@ -792,8 +780,17 @@ export const drumsAPI = {
         }
         
         const returnPeriodDays = drum.companies?.custom_return_periods?.[0]?.return_period_days || 120;
+        
+        let reportedDate = null;
+        if (drum.cecha && reportedDrumsMap && reportedDrumsMap.has(drum.cecha)) {
+          reportedDate = reportedDrumsMap.get(drum.cecha);
+        } else if (drum.kod_bebna && reportedDrumsMap && reportedDrumsMap.has(drum.kod_bebna)) {
+          reportedDate = reportedDrumsMap.get(drum.kod_bebna);
+        }
+
+        const refDateForPossession = reportedDate ? new Date(reportedDate) : new Date();
         const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
-        const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
+        const daysInPossession = Math.ceil((refDateForPossession - issueDate) / (1000 * 60 * 60 * 24));
 
         let clientReturnDeadline = null;
         if (extension) {
@@ -812,7 +809,18 @@ export const drumsAPI = {
               ? clientReturnDeadline
               : finalReturnDate);
 
-        let statusObj = supabaseHelpers.getDrumStatus(dateForStatus);
+        let statusObj = supabaseHelpers.getDrumStatus(dateForStatus, reportedDate);
+
+        if (reportedDate) {
+          statusObj = {
+            ...statusObj,
+            status: 'reported',
+            text: 'Zgłoszony do zwrotu',
+            color: 'text-purple-700',
+            bgColor: 'bg-purple-100',
+            borderColor: 'border-purple-200'
+          };
+        }
 
         // Nadpisanie statusu jeśli bęben jest w wyjątkach
         const exception = exceptions.find(e => (e.kod_bebna === drum.cecha || e.kod_bebna === drum.kod_bebna) && e.nip === drum.nip);
@@ -853,6 +861,12 @@ export const drumsAPI = {
           kontrahent: drum.kontrahent,
           db_status: drum.status,
           status: statusObj.status, // Używamy statusu obliczonego na podstawie finalReturnDate
+          statusColor: statusObj.color,
+          statusBgColor: statusObj.bgColor,
+          statusBorderColor: statusObj.borderColor,
+          statusText: statusObj.text,
+          daysDiff: statusObj.daysDiff,
+          reportedDate: reportedDate,
           data_wydania: drum.data_wydania,
           adres_dostawy: drum.adres_dostawy,
           nazwa_punktu_dostawy: drum.nazwa_punktu_dostawy,
@@ -1135,6 +1149,7 @@ export const drumsAPI = {
 
       let allData = [];
       const chunkSize = 1000;
+      const reportedDrumsMap = new Map();
 
       const buildQuery = (isCount = false) => {
         let q = supabase.from('drums');
@@ -1248,6 +1263,31 @@ export const drumsAPI = {
         if (adminNotesData) {
           adminNotes = adminNotesData;
         }
+
+        // --- Zgłoszenia zwrotu ---
+        let reqQuery = supabase
+          .from('return_requests')
+          .select('selected_drums, created_at')
+          .in('status', ['Pending', 'Approved', 'InTransit']);
+        
+        if (nip) {
+          reqQuery = reqQuery.eq('user_nip', nip);
+        } else if (allowedNips && allowedNips.length > 0) {
+          reqQuery = reqQuery.in('user_nip', allowedNips);
+        }
+
+        const { data: activeRequests } = await reqQuery;
+        if (activeRequests) {
+          activeRequests.forEach(req => {
+            const drums = req.selected_drums;
+            if (Array.isArray(drums)) {
+              drums.forEach(d => {
+                const cecha = typeof d === 'object' ? d.cecha : d;
+                if (cecha) reportedDrumsMap.set(cecha, req.created_at);
+              });
+            }
+          });
+        }
       }
 
       // Mapowanie danych (z mapowaniem wyjątków)
@@ -1267,9 +1307,16 @@ export const drumsAPI = {
         // Zabezpieczone pobieranie dni z relacji
         const returnPeriodDays = drum.companies?.custom_return_periods?.[0]?.return_period_days || 120;
         
-        // Obliczamy STATUS TERMINOWY
+        let reportedDate = null;
+        if (drum.cecha && reportedDrumsMap && reportedDrumsMap.has(drum.cecha)) {
+          reportedDate = reportedDrumsMap.get(drum.cecha);
+        } else if (drum.kod_bebna && reportedDrumsMap && reportedDrumsMap.has(drum.kod_bebna)) {
+          reportedDate = reportedDrumsMap.get(drum.kod_bebna);
+        }
+
+        const refDateForPossession = reportedDate ? new Date(reportedDate) : new Date();
         const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
-        const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
+        const daysInPossession = Math.ceil((refDateForPossession - issueDate) / (1000 * 60 * 60 * 24));
 
         let clientReturnDeadline = null;
         if (extension) {
@@ -1288,7 +1335,25 @@ export const drumsAPI = {
               ? clientReturnDeadline
               : finalReturnDate);
 
-        let statusObj = supabaseHelpers.getDrumStatus(dateForStatus);
+        let reportedDate = null;
+        if (drum.cecha && reportedDrumsMap.has(drum.cecha)) {
+          reportedDate = reportedDrumsMap.get(drum.cecha);
+        } else if (drum.kod_bebna && reportedDrumsMap.has(drum.kod_bebna)) {
+          reportedDate = reportedDrumsMap.get(drum.kod_bebna);
+        }
+
+        let statusObj = supabaseHelpers.getDrumStatus(dateForStatus, reportedDate);
+
+        if (reportedDate) {
+          statusObj = {
+            ...statusObj,
+            status: 'reported',
+            text: 'Zgłoszony do zwrotu',
+            color: 'text-purple-700',
+            bgColor: 'bg-purple-100',
+            borderColor: 'border-purple-200'
+          };
+        }
 
         // Nadpisanie statusu jeśli bęben jest w wyjątkach
         const exception = exceptions.find(e => (e.kod_bebna === drum.cecha || e.kod_bebna === drum.kod_bebna) && e.nip === drum.nip);
@@ -1326,6 +1391,12 @@ export const drumsAPI = {
           // Ujednolicony dostęp do formatu dającego "active", "due-soon", "overdue"
           db_status: drum.status,
           status: statusObj.status,
+          statusColor: statusObj.color,
+          statusBgColor: statusObj.bgColor,
+          statusBorderColor: statusObj.borderColor,
+          statusText: statusObj.text,
+          daysDiff: statusObj.daysDiff,
+          reportedDate: reportedDate,
           
           // Kompatybilność z WIELKIMI LITERAMI
           KOD_BEBNA: drum.kod_bebna,

@@ -59,33 +59,9 @@ const Dashboard = ({ user, profile }) => {
         
         setCompanyData({ ...companyDetails, salespersonEmail });
 
-        // 1. Zidentyfikuj zgłoszone bębny (identycznie jak w widoku DrumsList)
-        const reportedDrums = new Set();
-        if (Array.isArray(userReturns)) {
-          userReturns.forEach(req => {
-            if (req.status !== 'Rejected' && req.status !== 'Cancelled') {
-              if (Array.isArray(req.selected_drums)) {
-                req.selected_drums.forEach(d => reportedDrums.add(d.cecha));
-              }
-            }
-          });
-        }
-
-        // Zmapuj bębny z ich rzeczywistymi statusami z uwzględnieniem zgłoszonych
-        const mappedDrums = userDrums.map(d => {
-          if (reportedDrums.has(d.cecha)) {
-            return {
-              ...d,
-              isReported: true,
-              status: 'reported',
-              text: 'Zgłoszony do zwrotu',
-              color: 'text-purple-700',
-              bgColor: 'bg-purple-100',
-              borderColor: 'border-purple-200'
-            };
-          }
-          return d;
-        });
+        // Usunięto lokalne mapowanie zgłoszonych bębnów, ponieważ od teraz
+        // za poprawne statusy i dni "daysInPossession" oraz daty `reportedDate` odpowiada API (supabaseApi.js)
+        const mappedDrums = userDrums;
 
         // 2. Oblicz statystyki dla kafelków
         const total = mappedDrums.length;
@@ -124,7 +100,8 @@ const Dashboard = ({ user, profile }) => {
 
             // Oblicz stratę amortyzacyjną ze względu na czas posiadania
             const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
-            const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
+            const refDateForPossession = drum.reportedDate ? new Date(drum.reportedDate) : new Date();
+            const daysInPossession = Math.ceil((refDateForPossession - issueDate) / (1000 * 60 * 60 * 24));
             
             let returnPercentage = 100;
             if (isNaN(daysInPossession) || daysInPossession <= 120) returnPercentage = 100;

@@ -63,7 +63,6 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
   const [filterClientDateRange, setFilterClientDateRange] = useState('all');
   const [filterPaymentStatus, setFilterPaymentStatus] = useState('all');
   const [filterReportedOnly, setFilterReportedOnly] = useState(false);
-  const [reportedCechas, setReportedCechas] = useState(new Set());
   const [selectedDrum, setSelectedDrum] = useState(null);
   const [showDrumDetails, setShowDrumDetails] = useState(false);
 
@@ -501,25 +500,8 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
 
   const fetchStatsData = useCallback(async () => {
     try {
-      const [allDrums, activeReqs] = await Promise.all([
-        drumsAPI.getAllDrums(),
-        returnsAPI.getReturns()
-      ]);
+      const allDrums = await drumsAPI.getAllDrums();
       setAllAdminDrums(allDrums || []);
-
-      const cechas = new Set();
-      activeReqs.forEach(req => {
-        if (['Pending', 'Approved', 'InTransit'].includes(req.status)) {
-          const drums = req.selected_drums;
-          if (Array.isArray(drums)) {
-            drums.forEach(d => {
-              const cecha = typeof d === 'object' ? d.cecha : d;
-              if (cecha) cechas.add(cecha);
-            });
-          }
-        }
-      });
-      setReportedCechas(cechas);
     } catch (err) {
       console.error('Error fetching data for stats:', err);
     }
@@ -539,7 +521,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
     }
 
     if (filterReportedOnly) {
-      filtered = filtered.filter(d => reportedCechas.has(d.cecha));
+      filtered = filtered.filter(d => !!d.reportedDate || d.status === 'reported' || d.status === 'Zgłoszone do zwrotu');
     }
 
     // 1. Wyszukiwanie (Search)
@@ -676,7 +658,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
     });
 
     setLoading(false);
-  }, [allAdminDrums, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, selectedSizes, filterPaymentStatus, urlClientNip, filterReportedOnly, reportedCechas, currentPage, sortBy, sortOrder]);
+  }, [allAdminDrums, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, selectedSizes, filterPaymentStatus, urlClientNip, filterReportedOnly, currentPage, sortBy, sortOrder]);
 
   const stats = dynamicStats;
 
@@ -699,7 +681,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
     }
 
     const isAnyOverdue = isSupplierOverdue || isClientOverdue;
-    const isReturned = reportedCechas.has(drum.cecha) || reportedCechas.has(drum.kod_bebna) || drum.status === 'reported' || drum.status === 'Zgłoszone do zwrotu';
+    const isReturned = !!drum.reportedDate || drum.status === 'reported' || drum.status === 'Zgłoszone do zwrotu';
 
     return (
       <div
