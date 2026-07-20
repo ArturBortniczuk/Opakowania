@@ -1109,51 +1109,56 @@ export const drumsAPI = {
       const allowedNips = await getAllowedNips(currentUser);
 
       let allData = [];
-      let pageIndex = 0;
       const chunkSize = 1000;
 
-      while (true) {
-        const from = pageIndex * chunkSize;
-        const to = from + chunkSize - 1;
-        
-        let chunkQuery = supabase
-          .from('drums')
-          .select(`*, companies (name, email, phone, address, custom_return_periods(return_period_days))`)
-          .range(from, to)
-          .or('typ_opakowania.eq.Bęben,typ_opakowania.is.null')
-          .order('kod_bebna');
+      const buildQuery = (isCount = false) => {
+        let q = supabase.from('drums');
+        if (isCount) {
+          q = q.select('*', { count: 'exact', head: true });
+        } else {
+          q = q.select(`*, companies (name, email, phone, address, custom_return_periods(return_period_days))`);
+        }
+        q = q.or('typ_opakowania.eq.Bęben,typ_opakowania.is.null');
 
         if (nip) {
-          chunkQuery = chunkQuery.eq('nip', nip);
-          chunkQuery = chunkQuery.neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%');
-
+          q = q.eq('nip', nip);
+          q = q.neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%');
           if (isClient) {
             const maxDate = new Date(Date.now() - 456 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            chunkQuery = chunkQuery.or(`data_wydania.gte.${maxDate},and(data_wydania.is.null,data_przyjecia_na_stan.gte.${maxDate})`);
+            q = q.or(`data_wydania.gte.${maxDate},and(data_wydania.is.null,data_przyjecia_na_stan.gte.${maxDate})`);
           }
         } else if (allowedNips) {
-          if (allowedNips.length === 0) {
-            break;
+          if (allowedNips.length === 0) return null;
+          q = q.in('nip', allowedNips);
+          q = q.neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%');
+        }
+        return q;
+      };
+
+      const countQuery = buildQuery(true);
+      if (countQuery) {
+        const { count, error: countError } = await countQuery;
+        if (countError) throw countError;
+
+        if (count && count > 0) {
+          const totalPages = Math.ceil(count / chunkSize);
+          const promises = [];
+
+          for (let i = 0; i < totalPages; i++) {
+            const from = i * chunkSize;
+            const to = from + chunkSize - 1;
+            promises.push(buildQuery(false).range(from, to).order('kod_bebna'));
           }
-          chunkQuery = chunkQuery.in('nip', allowedNips);
-          chunkQuery = chunkQuery.neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%');
-        }
 
-        const { data, error } = await chunkQuery;
-        if (error) throw error;
-
-        if (!data || data.length === 0) {
-          break;
+          const results = await Promise.all(promises);
+          for (const res of results) {
+            if (res.error) throw res.error;
+            if (res.data) allData = allData.concat(res.data);
+          }
         }
-
-        allData = allData.concat(data);
-        if (data.length < chunkSize) {
-          break;
-        }
-        pageIndex++;
       }
 
-      console.log(`✅ getAllDrums pobrał ${allData.length} bębnów z bazy w ${pageIndex + 1} zapytaniach`);
+      console.log(`✅ getAllDrums pobrał ${allData.length} bębnów z bazy (równolegle)`);
 
       // Pobranie niestandardowych terminów i wyjątków dla pobranych bębnów
       let customDeadlines = [];
