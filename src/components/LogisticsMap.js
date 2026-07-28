@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
 import { supabase } from '../lib/supabase';
 import { returnsAPI, drumsAPI, transportAPI } from '../utils/supabaseApi';
@@ -33,6 +33,8 @@ const LogisticsMap = ({ user }) => {
   });
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const urlFilter = searchParams.get('filter');
 
   const [map, setMap] = useState(null);
   const [locations, setLocations] = useState([]);
@@ -40,7 +42,7 @@ const LogisticsMap = ({ user }) => {
   const [selectedLocation, setSelectedLocation] = useState(null);
   
   // Filtry i wyszukiwanie
-  const [filter, setFilter] = useState('pickups'); // domyślnie 'pickups' (Odbiory), opcje: 'all', 'drums', 'pickups'
+  const [filter, setFilter] = useState(urlFilter || 'pickups'); // domyślnie 'pickups', opcje: 'all', 'drums', 'pickups', 'warehouse_ready'
   const [searchQuery, setSearchQuery] = useState(''); // Po cechach
   const [clientSearch, setClientSearch] = useState(''); // Po nazwie klienta
   const [sizeFilter, setSizeFilter] = useState(''); // Po rozmiar_bebna
@@ -350,7 +352,43 @@ const LogisticsMap = ({ user }) => {
 
       const groupedPickups = Object.values(pickupsByLoc);
 
-      setLocations([...groupedDrums, ...groupedPickups]);
+      // 3. Pobieramy bębny gotowe do zwrotu z magazynu (Czarna pineska)
+      let warehouseReadyLoc = null;
+      try {
+        const readyCechy = await drumsAPI.getReadyForReturnCechy();
+        if (readyCechy && readyCechy.length > 0) {
+          const warehouseDrumsRes = await drumsAPI.getWarehouseDrums({ limit: 5000 });
+          const readyWarehouseDrums = (warehouseDrumsRes.data || []).filter(d => 
+            readyCechy.includes(d.cecha) || readyCechy.includes(d.kod_bebna)
+          );
+
+          if (readyWarehouseDrums.length > 0) {
+            const whLat = readyWarehouseDrums.find(d => d.latitude)?.latitude || 53.1325;
+            const whLng = readyWarehouseDrums.find(d => d.longitude)?.longitude || 23.1688;
+
+            warehouseReadyLoc = {
+              id: 'loc_warehouse_ready',
+              lat: parseFloat(whLat),
+              lng: parseFloat(whLng),
+              title: `Magazyn Główny - Gotowe do zwrotu do Kablowni (${readyWarehouseDrums.length} szt.)`,
+              type: 'warehouse_ready',
+              companyName: 'Magazyn Centralny Eltron',
+              address: 'Gotowe do zwrotu do Kablowni (Czarna Pineska)',
+              drums: readyWarehouseDrums,
+              visibleCount: readyWarehouseDrums.length
+            };
+          }
+        }
+      } catch (err) {
+        console.error('Błąd pobierania bębnów gotowych z magazynu do mapy:', err);
+      }
+
+      const allLocs = [...groupedDrums, ...groupedPickups];
+      if (warehouseReadyLoc) {
+        allLocs.push(warehouseReadyLoc);
+      }
+
+      setLocations(allLocs);
     } catch (error) {
       console.error('Błąd pobierania danych do mapy:', error);
     }
@@ -366,7 +404,9 @@ const LogisticsMap = ({ user }) => {
 
     let fillColor = '#3B82F6'; // Domyślny niebieski
     
-    if (type === 'pickup') {
+    if (type === 'warehouse_ready') {
+      fillColor = '#000000'; // Czarna pineska dla bębnów gotowych z magazynu do zwrotu!
+    } else if (type === 'pickup') {
       if (priority === 'High') {
         fillColor = '#EF4444'; // Czerwony dla priorytetowych zgłoszeń
       } else if (status === 'InTransit') {
@@ -403,6 +443,7 @@ const LogisticsMap = ({ user }) => {
 
     if (filter === 'drums') filtered = filtered.filter(l => l.type === 'drums');
     if (filter === 'pickups') filtered = filtered.filter(l => l.type === 'pickup');
+    if (filter === 'warehouse_ready') filtered = filtered.filter(l => l.type === 'warehouse_ready');
 
     const sQuery = searchQuery.trim().toLowerCase();
     const cQuery = clientSearch.trim().toLowerCase();
@@ -609,8 +650,12 @@ const LogisticsMap = ({ user }) => {
           
           <div className="flex flex-wrap gap-2">
             <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Wszystko</button>
-            <button onClick={() => setFilter('drums')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'drums' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>Bębny</button>
+            <button onClick={() => setFilter('drums')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'drums' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>Bębny (Klienci)</button>
             <button onClick={() => setFilter('pickups')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'pickups' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'}`}>Odbiory</button>
+            <button onClick={() => setFilter('warehouse_ready')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 transition-colors ${filter === 'warehouse_ready' ? 'bg-black text-white shadow-md' : 'bg-gray-900/10 text-gray-900 hover:bg-gray-900/20'}`}>
+              <span className="w-2.5 h-2.5 rounded-full bg-black border border-white"></span>
+              Gotowe z Magazynu (Czarna pineska)
+            </button>
           </div>
         </div>
 
@@ -874,7 +919,38 @@ const LogisticsMap = ({ user }) => {
                         </>
                       )}
                       
-                      {selectedLocation.type === 'pickup' && (
+                      {selectedLocation.type === 'warehouse_ready' && (
+                        <>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-extrabold text-gray-900 uppercase">Bębny gotowe do zwrotu do kablowni ({selectedLocation.drums.length})</span>
+                          </div>
+                          
+                          <div className="max-h-56 overflow-y-auto pr-1 space-y-1.5 mb-3">
+                            {selectedLocation.drums.map((drum, idx) => (
+                              <div key={drum.id || idx} className="flex flex-col p-2.5 rounded-lg border bg-gray-900 text-white border-gray-800 shadow-sm">
+                                <div className="flex justify-between items-start">
+                                  <span className="font-mono text-sm font-bold text-emerald-400">{drum.cecha || drum.kod_bebna}</span>
+                                  <span className="text-xs font-bold text-gray-200">{drum.kon_dostawca || 'Kablownia'}</span>
+                                </div>
+                                <div className="flex justify-between items-end mt-1 text-[11px] text-gray-400">
+                                  <span>Rozmiar: {drum.nazwa || drum.rozmiar_bebna}</span>
+                                  <span>WMS: {drum.lokalizacja_wms || 'Brak'}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          <button
+                            onClick={() => {
+                              navigate('/admin/warehouse-drums?readyOnly=true');
+                            }}
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-3 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
+                          >
+                            <Truck className="w-4 h-4" />
+                            <span>Zarządzaj w magazynie bębnów</span>
+                          </button>
+                        </>
+                      )}
                         <div className="max-h-[400px] overflow-y-auto pr-1">
                           {selectedLocation.pickups.map(pickup => (
                             <div key={pickup.id} className="mb-4 last:mb-0 border-b last:border-0 pb-4 last:pb-0 border-gray-200">

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { drumsAPI } from '../utils/supabaseApi';
 import {
   Package,
@@ -21,6 +22,7 @@ import {
 import * as XLSX from 'xlsx';
 
 const AdminWarehouseDrums = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [localSearchTerm, setLocalSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('data_zwrotu_do_dostawcy');
@@ -362,11 +364,20 @@ const AdminWarehouseDrums = () => {
               </p>
             </div>
 
-            <div className="flex space-x-3">
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => navigate('/admin/map?filter=warehouse_ready')}
+                className="flex items-center space-x-2 px-4 py-2 bg-gray-900 hover:bg-black text-white rounded-xl font-bold transition-all shadow-md border border-gray-800 text-sm"
+                title="Pokaż czarną pineskę na mapie z bębnami gotowymi do zwrotu do kablowni"
+              >
+                <MapPin className="w-4 h-4 text-emerald-400" />
+                <span>Pokaż czarną pineskę na mapie ({readyCechy.size})</span>
+              </button>
+
               <button
                 onClick={handleExportXLSX}
                 disabled={exporting || loading || drumsData.data.length === 0}
-                className="flex items-center space-x-2 px-4 py-2 bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 rounded-xl font-medium transition-all shadow-sm disabled:opacity-50"
+                className="flex items-center space-x-2 px-4 py-2 bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 rounded-xl font-medium transition-all shadow-sm disabled:opacity-50 text-sm"
               >
                 {exporting ? <Loader className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
                 <span>Eksportuj XLSX</span>
