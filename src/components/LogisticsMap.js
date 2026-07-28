@@ -40,7 +40,7 @@ const LogisticsMap = ({ user }) => {
   const [selectedLocation, setSelectedLocation] = useState(null);
   
   // Filtry i wyszukiwanie
-  const [filter, setFilter] = useState('all'); // 'all', 'drums', 'pickups'
+  const [filter, setFilter] = useState('pickups'); // domyślnie 'pickups' (Odbiory), opcje: 'all', 'drums', 'pickups'
   const [searchQuery, setSearchQuery] = useState(''); // Po cechach
   const [clientSearch, setClientSearch] = useState(''); // Po nazwie klienta
   const [sizeFilter, setSizeFilter] = useState(''); // Po rozmiar_bebna
@@ -60,6 +60,61 @@ const LogisticsMap = ({ user }) => {
   // Transport z mapy
   const [showTransportModal, setShowTransportModal] = useState(false);
   const [requestForTransport, setRequestForTransport] = useState(null);
+
+  // Wyszukiwanie miejscowości na mapie
+  const [citySearchInput, setCitySearchInput] = useState('');
+  const [searchingCity, setSearchingCity] = useState(false);
+
+  const handleSearchCity = (e) => {
+    if (e) e.preventDefault();
+    const query = citySearchInput.trim();
+    if (!query) return;
+
+    if (!map || !window.google || !window.google.maps) {
+      alert('Mapa nie została jeszcze załadowana.');
+      return;
+    }
+
+    setSearchingCity(true);
+    const geocoder = new window.google.maps.Geocoder();
+
+    geocoder.geocode(
+      { address: query, componentRestrictions: { country: 'PL' } },
+      (results, status) => {
+        setSearchingCity(false);
+        if (status === 'OK' && results && results[0]) {
+          const first = results[0];
+          if (first.geometry.viewport) {
+            map.fitBounds(first.geometry.viewport);
+          } else if (first.geometry.location) {
+            map.setCenter(first.geometry.location);
+            map.setZoom(12);
+          }
+        } else {
+          // Spróbuj bez restrykcji kraju
+          geocoder.geocode({ address: query }, (res2, status2) => {
+            if (status2 === 'OK' && res2 && res2[0]) {
+              if (res2[0].geometry.viewport) {
+                map.fitBounds(res2[0].geometry.viewport);
+              } else if (res2[0].geometry.location) {
+                map.setCenter(res2[0].geometry.location);
+                map.setZoom(12);
+              }
+            } else {
+              alert(`Nie znaleziono miejscowości "${query}". Sprawdź poprawność nazwy.`);
+            }
+          });
+        }
+      }
+    );
+  };
+
+  const handleResetMap = () => {
+    if (map) {
+      map.setCenter({ lat: 52.2297, lng: 21.0122 });
+      map.setZoom(6);
+    }
+  };
 
   const onLoad = useCallback(function callback(map) {
     setMap(map);
@@ -558,6 +613,56 @@ const LogisticsMap = ({ user }) => {
             <button onClick={() => setFilter('pickups')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'pickups' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'}`}>Odbiory</button>
           </div>
         </div>
+
+        {/* WYSZUKIWARKA MIEJSCOWOŚCI I PRZYBLIŻANIE */}
+        <form onSubmit={handleSearchCity} className="bg-blue-50/70 border border-blue-100 p-4 rounded-xl mb-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center space-x-3 w-full md:w-auto">
+            <div className="w-10 h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center shrink-0 shadow-sm">
+              <MapPin className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900 text-sm">Wyszukiwarka Miejscowości</h3>
+              <p className="text-xs text-gray-500">Wpisz miasto lub miejscowość, aby automatycznie przybliżyć do niej widok mapy</p>
+            </div>
+          </div>
+
+          <div className="flex w-full md:w-auto items-center space-x-2">
+            <div className="relative flex-1 md:w-72">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                placeholder="Np. Warszawa, Białystok, Poznań..."
+                value={citySearchInput}
+                onChange={(e) => setCitySearchInput(e.target.value)}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={searchingCity}
+              className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center space-x-1 shrink-0"
+            >
+              {searchingCity ? (
+                <span>Szukam...</span>
+              ) : (
+                <>
+                  <Search className="w-4 h-4 mr-1" />
+                  <span>Przybliż</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleResetMap}
+              className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 px-3 py-2 rounded-lg text-sm font-semibold transition-colors shrink-0"
+              title="Zresetuj widok do całej Polski"
+            >
+              Cała Polska
+            </button>
+          </div>
+        </form>
 
         {/* NOWY PANEL FILTROWANIA ZAAWANSOWANEGO */}
         <div className="bg-gray-50 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
