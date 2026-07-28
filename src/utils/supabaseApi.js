@@ -1916,13 +1916,27 @@ export const returnsAPI = {
         status_updated_at: nowIso
       };
 
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('return_requests')
         .insert([payload])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.message?.includes('status_history') || error.message?.includes('status_updated_at') || error.code === 'PGRST204') {
+          console.warn('Kolumna status_history nie istnieje w bazie DB - powtarzanie zapisu bez kolumn historii');
+          delete payload.status_history;
+          delete payload.status_updated_at;
+          const retry = await supabase
+            .from('return_requests')
+            .insert([payload])
+            .select()
+            .single();
+          if (retry.error) throw retry.error;
+          return retry.data;
+        }
+        throw error;
+      }
       return data;
     } catch (error) {
       console.error('Błąd tworzenia zwrotu:', error);
@@ -1951,7 +1965,7 @@ export const returnsAPI = {
         try {
           const { data: currentReq } = await supabase
             .from('return_requests')
-            .select('status, status_history, created_at')
+            .select('*')
             .eq('id', id)
             .single();
 
@@ -1984,14 +1998,29 @@ export const returnsAPI = {
         }
       }
 
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('return_requests')
         .update(updatePayload)
         .eq('id', id)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.message?.includes('status_history') || error.message?.includes('status_updated_at') || error.code === 'PGRST204') {
+          console.warn('Brak kolumny status_history w bazie DB - ponawianie update bez tych pól');
+          delete updatePayload.status_history;
+          delete updatePayload.status_updated_at;
+          const retry = await supabase
+            .from('return_requests')
+            .update(updatePayload)
+            .eq('id', id)
+            .select()
+            .single();
+          if (retry.error) throw retry.error;
+          return retry.data;
+        }
+        throw error;
+      }
       return data;
     } catch (error) {
       console.error('Błąd aktualizacji zgłoszenia zwrotu:', error);
