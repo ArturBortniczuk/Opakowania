@@ -29,6 +29,9 @@ const AdminWarehouseDrums = () => {
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'empty', 'full'
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [withLocationOnly, setWithLocationOnly] = useState(false);
+  const [readyOnly, setReadyOnly] = useState(false);
+
+  const [readyCechy, setReadyCechy] = useState(new Set());
 
   const [availableSizes, setAvailableSizes] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
@@ -75,14 +78,27 @@ const AdminWarehouseDrums = () => {
       };
 
       const result = await drumsAPI.getWarehouseDrums(requestOptions);
-      setDrumsData(result);
+
+      if (readyOnly) {
+        const filteredData = (result.data || []).filter(drum => readyCechy.has(drum.cecha || drum.kod_bebna));
+        setDrumsData({
+          ...result,
+          data: filteredData,
+          pagination: {
+            ...result.pagination,
+            total: filteredData.length
+          }
+        });
+      } else {
+        setDrumsData(result);
+      }
     } catch (err) {
       console.error('Błąd pobierania bębnów magazynowych:', err);
       setError('Nie udało się pobrać listy bębnów. Spróbuj ponownie.');
     } finally {
       setLoading(false);
     }
-  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly, withLocationOnly, selectedSizes, selectedMagazyny]);
+  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly, withLocationOnly, readyOnly, readyCechy, selectedSizes, selectedMagazyny]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -104,9 +120,32 @@ const AdminWarehouseDrums = () => {
     fetchDropdowns();
   }, []);
 
+  const loadReadyCechy = useCallback(async () => {
+    const cechy = await drumsAPI.getReadyForReturnCechy();
+    setReadyCechy(new Set(cechy));
+  }, []);
+
+  useEffect(() => {
+    loadReadyCechy();
+  }, [loadReadyCechy]);
+
   useEffect(() => {
     fetchDrums({ page: 1 });
-  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly, withLocationOnly, selectedSizes, selectedMagazyny]);
+  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly, withLocationOnly, readyOnly, selectedSizes, selectedMagazyny]);
+
+  const handleToggleReady = async (cecha) => {
+    if (!cecha) return;
+    const newIsReady = !readyCechy.has(cecha);
+
+    setReadyCechy(prev => {
+      const updated = new Set(prev);
+      if (newIsReady) updated.add(cecha);
+      else updated.delete(cecha);
+      return updated;
+    });
+
+    await drumsAPI.toggleDrumReadyForReturn(cecha, newIsReady);
+  };
 
   const goToPage = (page) => {
     setDrumsData(prev => ({ ...prev, pagination: { ...prev.pagination, page } }));
@@ -197,18 +236,30 @@ const AdminWarehouseDrums = () => {
   };
 
   const DrumCard = ({ drum, index }) => {
+    const drumCecha = drum.cecha || drum.kod_bebna;
+    const isReady = readyCechy.has(drumCecha);
     const overdue = isOverdue(drum.data_zwrotu_do_dostawcy);
     const urgent = !overdue && isUrgent(drum.data_zwrotu_do_dostawcy);
-    
-    // Jeśli przeterminowany, traktujemy go jako "Własny" - bez czerwonego alarmu
+
     let borderColor = 'border-blue-100';
     if (urgent) borderColor = 'border-orange-400 bg-orange-50/30';
 
     return (
       <div
-        className={`bg-white/90 backdrop-blur-lg rounded-2xl p-6 shadow-lg border-2 transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] h-full flex flex-col ${borderColor}`}
+        className={`bg-white/90 backdrop-blur-lg rounded-2xl p-6 shadow-lg border-2 transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] h-full flex flex-col ${
+          isReady ? 'border-emerald-500 bg-emerald-50/20 shadow-emerald-100' : borderColor
+        }`}
         style={{ animationDelay: `${index * 50}ms` }}
       >
+        {isReady && (
+          <div className="mb-3 flex items-center justify-between bg-emerald-100/90 text-emerald-800 border border-emerald-300 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+              GOTOWY DO ZWROTU DO KABLOWNI
+            </span>
+          </div>
+        )}
+
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-3 min-w-0 flex-1">
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg ${
@@ -273,6 +324,24 @@ const AdminWarehouseDrums = () => {
                 'Własny')}
             </span>
           </div>
+        </div>
+
+        <div className="mt-4 pt-3 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleReady(drumCecha);
+            }}
+            className={`w-full py-2.5 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 border ${
+              isReady
+                ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 shadow-sm'
+                : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300'
+            }`}
+          >
+            <CheckCircle className={`w-4 h-4 ${isReady ? 'text-white' : 'text-gray-400'}`} />
+            <span>{isReady ? 'Odznacz "Gotowy do zwrotu"' : 'Oznacz jako gotowy do zwrotu'}</span>
+          </button>
         </div>
       </div>
     );
@@ -423,8 +492,21 @@ const AdminWarehouseDrums = () => {
               </div>
             </div>
             
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-              <div className="flex items-center space-x-4">
+            <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4 items-center">
+              <div className="flex flex-wrap items-center gap-3 lg:col-span-2">
+                <label className="flex items-center space-x-3 p-3 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-emerald-50/50 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={readyOnly}
+                    onChange={(e) => setReadyOnly(e.target.checked)}
+                    className="w-5 h-5 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
+                  />
+                  <span className="font-bold text-emerald-800 text-sm flex items-center">
+                    <CheckCircle className="w-4 h-4 mr-1 text-emerald-600" />
+                    Tylko gotowe do zwrotu ({readyCechy.size})
+                  </span>
+                </label>
+
                 <label className="flex items-center space-x-3 p-3 bg-gray-50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors">
                   <input
                     type="checkbox"
@@ -432,7 +514,7 @@ const AdminWarehouseDrums = () => {
                     onChange={(e) => setWithLocationOnly(e.target.checked)}
                     className="w-5 h-5 text-emerald-500 rounded border-gray-300 focus:ring-emerald-500"
                   />
-                  <span className="font-medium text-gray-700 flex items-center">
+                  <span className="font-medium text-gray-700 flex items-center text-sm">
                     <MapPin className="w-4 h-4 mr-1 text-emerald-500" />
                     Z lokalizacją WMS
                   </span>
@@ -445,7 +527,7 @@ const AdminWarehouseDrums = () => {
                     onChange={(e) => setUrgentOnly(e.target.checked)}
                     className="w-5 h-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
                   />
-                  <span className="font-medium text-gray-700 flex items-center">
+                  <span className="font-medium text-gray-700 flex items-center text-sm">
                     <Clock className="w-4 h-4 mr-1 text-orange-500" />
                     Tylko pilne (≤ 30 dni)
                   </span>

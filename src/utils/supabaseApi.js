@@ -1614,6 +1614,76 @@ export const drumsAPI = {
       throw error;
     }
   },
+
+  /**
+   * Pobiera listę cech bębnów oznaczonych jako gotowe do zwrotu do kablowni.
+   */
+  async getReadyForReturnCechy() {
+    try {
+      const { data, error } = await supabase
+        .from('ready_for_return_drums')
+        .select('cecha, is_ready')
+        .eq('is_ready', true);
+
+      let dbSet = new Set();
+      if (!error && data) {
+        data.forEach(item => dbSet.add(item.cecha));
+      }
+
+      try {
+        const local = JSON.parse(localStorage.getItem('warehouse_ready_drums') || '{}');
+        Object.keys(local).forEach(k => {
+          if (local[k]) dbSet.add(k);
+        });
+      } catch (e) {}
+
+      return Array.from(dbSet);
+    } catch (err) {
+      console.warn('Nie udało się pobrać gotowych bębnów z bazy, odczytuję z pamięci lokalnej:', err);
+      try {
+        const local = JSON.parse(localStorage.getItem('warehouse_ready_drums') || '{}');
+        return Object.keys(local).filter(k => local[k]);
+      } catch (e) {
+        return [];
+      }
+    }
+  },
+
+  /**
+   * Przełącza status bębna magazynowego na "Gotowy do zwrotu do kablowni".
+   */
+  async toggleDrumReadyForReturn(cecha, isReady, username = 'Administrator') {
+    if (!cecha) return;
+    
+    try {
+      const local = JSON.parse(localStorage.getItem('warehouse_ready_drums') || '{}');
+      if (isReady) local[cecha] = true;
+      else delete local[cecha];
+      localStorage.setItem('warehouse_ready_drums', JSON.stringify(local));
+    } catch (e) {}
+
+    try {
+      const { data, error } = await supabase
+        .from('ready_for_return_drums')
+        .upsert({
+          cecha: cecha,
+          is_ready: isReady,
+          updated_by: username,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'cecha'
+        });
+
+      if (error && error.code === '42P01') {
+        console.warn('Tabela ready_for_return_drums nie istnieje w bazie - użyto pamięci lokalnej.');
+      } else if (error) {
+        console.error('Błąd zapisu stanu gotowości do zwrotu:', error);
+      }
+      return data;
+    } catch (err) {
+      console.warn('Błąd połączenia z bazą przy zmianie stanu gotowości:', err);
+    }
+  },
 };
 
 // ==================================
