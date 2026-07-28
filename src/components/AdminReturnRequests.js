@@ -1011,10 +1011,19 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                         
                         <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100">
                           <div>
+                            <span className="text-gray-400 font-bold uppercase block">Zgłoszono:</span>
+                            <span className="text-indigo-700 font-bold">
+                              {drum.reported_at ? new Date(drum.reported_at).toLocaleDateString('pl-PL') : (selectedRequest.created_at ? new Date(selectedRequest.created_at).toLocaleDateString('pl-PL') : '-')}
+                              {drum.original_request_id && drum.original_request_id !== selectedRequest.id && (
+                                <span className="text-[10px] text-gray-500 font-normal block">(źródłowe #{drum.original_request_id})</span>
+                              )}
+                            </span>
+                          </div>
+                          <div>
                             <span className="text-gray-400 font-bold uppercase block">W posiadaniu:</span>
                             <span className="text-gray-900 font-bold">{daysInPossession} dni</span>
                           </div>
-                          <div>
+                          <div className="col-span-2">
                             <span className="text-gray-400 font-bold uppercase block">Termin Kablownia:</span>
                             <span className="text-gray-900 font-bold">
                               {returnDeadline ? returnDeadline.toLocaleDateString('pl-PL') : 'Brak'}
@@ -1134,6 +1143,15 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                               <span className="text-gray-600 font-medium">Ilość zgłoszona:</span>
                               <span className="text-xl font-bold text-blue-700">{pallet.quantity} szt.</span>
                             </div>
+                            <div className="text-[11px] text-gray-500 flex justify-between items-center pt-1 border-t border-gray-100">
+                              <span>Data zgłoszenia:</span>
+                              <span className="font-bold text-indigo-700">
+                                {pallet.reported_at ? new Date(pallet.reported_at).toLocaleDateString('pl-PL') : (selectedRequest.created_at ? new Date(selectedRequest.created_at).toLocaleDateString('pl-PL') : '-')}
+                                {pallet.original_request_id && pallet.original_request_id !== selectedRequest.id && (
+                                  <span className="text-gray-400 font-normal ml-1">(#{pallet.original_request_id})</span>
+                                )}
+                              </span>
+                            </div>
                             {pallet.transportedQuantity !== undefined && (
                               <div className="flex justify-between items-center p-3 bg-indigo-50/50 rounded-lg border border-indigo-100 mt-2">
                                 <span className="text-gray-600 font-medium">Faktycznie odebrano:</span>
@@ -1150,10 +1168,39 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
             </div>
 
             {selectedRequest.notes && (
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Uwagi do odbioru</h3>
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Uwagi do odbioru</h3>
                 <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-gray-700">{selectedRequest.notes}</p>
+                  <p className="text-gray-700 whitespace-pre-line">{selectedRequest.notes}</p>
+                </div>
+              </div>
+            )}
+
+            {/* HISTORIA ZMIAN STATUSÓW (ARCHIWUM) */}
+            {Array.isArray(selectedRequest.status_history) && selectedRequest.status_history.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-sm font-extrabold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-indigo-600" />
+                  Historia zmian statusu zgłoszenia
+                </h3>
+                <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-4 space-y-3">
+                  {selectedRequest.status_history.map((hist, idx) => (
+                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200/60 pb-2.5 last:border-b-0 last:pb-0 text-xs gap-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0"></span>
+                        <div>
+                          <span className="font-extrabold text-gray-900">{hist.status}</span>
+                          {hist.note && <span className="text-gray-600 ml-2 italic">({hist.note})</span>}
+                        </div>
+                      </div>
+                      <div className="text-left sm:text-right text-[11px] text-gray-500 pl-4 sm:pl-0">
+                        <span className="font-semibold text-gray-700">{hist.updated_by || 'System'}</span>
+                        <span className="ml-2 text-gray-400">
+                          {hist.timestamp ? `${new Date(hist.timestamp).toLocaleDateString('pl-PL')} ${new Date(hist.timestamp).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -1304,7 +1351,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
     if (!showMergeModal || selectedMergeIds.length < 2) return null;
 
-    // Scalanie pozycji z wybranym asortymentem
+    // Scalanie pozycji z wybranym asortymentem przy zachowaniu pierwotnych dat zgłoszenia
     const mergedDrumsAndPallets = (() => {
       const items = [];
       const palletsMap = {};
@@ -1312,18 +1359,36 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
       selectedRequests.forEach(req => {
         if (Array.isArray(req.selected_drums)) {
           req.selected_drums.forEach(item => {
+            const itemReportedAt = (typeof item === 'object' && item !== null && item.reported_at) ? item.reported_at : req.created_at;
+            const itemOriginalReqId = (typeof item === 'object' && item !== null && item.original_request_id) ? item.original_request_id : req.id;
+
             if (typeof item === 'object' && item !== null && item.type === 'pallet') {
-              const key = item.size || 'EURO';
+              const key = `${item.size || 'EURO'}_${itemReportedAt}`;
               if (palletsMap[key]) {
                 palletsMap[key].quantity = (palletsMap[key].quantity || 0) + (item.quantity || 0);
                 if (item.transportedQuantity !== undefined) {
                   palletsMap[key].transportedQuantity = (palletsMap[key].transportedQuantity || 0) + (item.transportedQuantity || 0);
                 }
               } else {
-                palletsMap[key] = { ...item };
+                palletsMap[key] = {
+                  ...item,
+                  reported_at: itemReportedAt,
+                  original_request_id: itemOriginalReqId
+                };
               }
+            } else if (typeof item === 'object' && item !== null) {
+              items.push({
+                ...item,
+                reported_at: itemReportedAt,
+                original_request_id: itemOriginalReqId
+              });
             } else {
-              items.push(item);
+              items.push({
+                cecha: item,
+                type: 'drum',
+                reported_at: itemReportedAt,
+                original_request_id: itemOriginalReqId
+              });
             }
           });
         }

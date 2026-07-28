@@ -528,9 +528,9 @@ export const drumsAPI = {
           const drums = req.selected_drums;
           if (Array.isArray(drums)) {
             drums.forEach(d => {
-              const cecha = typeof d === 'object' ? d.cecha : d;
-              // Zapisujemy datę zgłoszenia
-              if (cecha) reportedDrumsMap.set(cecha, req.created_at);
+              const cecha = typeof d === 'object' ? (d.cecha || d.kod_bebna) : d;
+              const reportedAt = (typeof d === 'object' && d.reported_at) ? d.reported_at : req.created_at;
+              if (cecha) reportedDrumsMap.set(cecha, reportedAt);
             });
           }
         });
@@ -1877,9 +1877,48 @@ export const returnsAPI = {
    */
   async createReturn(returnData) {
     try {
+      const nowIso = new Date().toISOString();
+      const createdAt = returnData.created_at || nowIso;
+
+      // Zapewniamy, że każdy bęben/paleta w zgłoszeniu ma zapisaną swoją pierwotną datę zgłoszenia (reported_at)
+      const enrichedDrums = Array.isArray(returnData.selected_drums) 
+        ? returnData.selected_drums.map(item => {
+            if (typeof item === 'object' && item !== null) {
+              return {
+                ...item,
+                reported_at: item.reported_at || createdAt
+              };
+            }
+            return {
+              cecha: item,
+              type: 'drum',
+              reported_at: createdAt
+            };
+          })
+        : [];
+
+      const initialStatus = returnData.status || 'Pending';
+      const initialHistory = Array.isArray(returnData.status_history) && returnData.status_history.length > 0
+        ? returnData.status_history
+        : [{
+            status: initialStatus,
+            timestamp: createdAt,
+            updated_by: returnData.profile_name || returnData.user_name || _currentUserCache?.name || 'Klient',
+            note: returnData.notes ? 'Utworzono zgłoszenie zwrotu' : 'Zgłoszenie wniesione'
+          }];
+
+      const payload = {
+        ...returnData,
+        status: initialStatus,
+        priority: returnData.priority || 'Normal',
+        selected_drums: enrichedDrums,
+        status_history: initialHistory,
+        status_updated_at: nowIso
+      };
+
       const { data, error } = await supabase
         .from('return_requests')
-        .insert([{ ...returnData, status: 'Pending', priority: 'Normal' }])
+        .insert([payload])
         .select()
         .single();
 
@@ -1892,24 +1931,62 @@ export const returnsAPI = {
   },
 
   /**
-   * Aktualizuje zgłoszenie zwrotu (status, daty, numer korekty itp.).
+   * Aktualizuje zgłoszenie zwrotu (status, daty, numer korekty itp.) z archiwizacją zmian.
    * @param {number} id - ID zgłoszenia.
-   * @param {object} updates - Obiekt z polami do aktualizacji (np. { status, transport_date }).
+   * @param {object|string} updates - Obiekt z polami do aktualizacji (np. { status, transport_date }).
+   * @param {object|null} currentUser - Opcjonalnie zalogowany użytkownik dokonujący zmiany.
    * @returns {Promise<object>} Zaktualizowane zgłoszenie.
    */
-  async updateReturnStatus(id, updates) {
+  async updateReturnStatus(id, updates, currentUser = null) {
     try {
-      // Jeśli updates jest stringiem, traktujemy to jako sam status (kompatybilność wsteczna)
       const updatePayload = typeof updates === 'string' 
         ? { status: updates } 
-        : updates;
+        : { ...updates };
+
+      const nowIso = new Date().toISOString();
+      updatePayload.updated_at = nowIso;
+
+      // Jeśli następuje zmiana statusu, pobieramy obecny stan zgłoszenia i archiwizujemy historię
+      if (updatePayload.status) {
+        try {
+          const { data: currentReq } = await supabase
+            .from('return_requests')
+            .select('status, status_history, created_at')
+            .eq('id', id)
+            .single();
+
+          if (currentReq) {
+            let history = Array.isArray(currentReq.status_history) ? [...currentReq.status_history] : [];
+            if (history.length === 0) {
+              history.push({
+                status: currentReq.status || 'Pending',
+                timestamp: currentReq.created_at || nowIso,
+                updated_by: 'System',
+                note: 'Zgłoszenie początkowe'
+              });
+            }
+
+            if (currentReq.status !== updatePayload.status || updatePayload.forceHistoryLog) {
+              const activeUser = currentUser || _currentUserCache;
+              const updatedBy = activeUser?.name || activeUser?.email || 'Administrator';
+              history.push({
+                status: updatePayload.status,
+                timestamp: nowIso,
+                updated_by: updatedBy,
+                note: updatePayload.notes || (updatePayload.correction_number ? `Korekta: ${updatePayload.correction_number}` : '')
+              });
+              updatePayload.status_history = history;
+              updatePayload.status_updated_at = nowIso;
+            }
+          }
+        } catch (fetchErr) {
+          console.warn('Nie udało się zapisać historii statusu:', fetchErr);
+        }
+      }
 
       const { data, error } = await supabase
         .from('return_requests')
-        .update({ 
-          ...updatePayload, 
-          updated_at: new Date().toISOString() 
-        })
+        .update(updatePayload)
         .eq('id', id)
         .select()
         .single();
