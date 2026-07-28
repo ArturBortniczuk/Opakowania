@@ -43,7 +43,7 @@ export async function getAllowedNips(user) {
       return null;
     }
     
-    let q = supabase.from('companies').select('nip');
+    let q = supabase.from('companies').select('nip').limit(50000);
     
     if (roleLower === 'specjalista') {
       q = q.eq('salesperson_name', user.name);
@@ -52,14 +52,15 @@ export async function getAllowedNips(user) {
       const { data: sps } = await supabase
         .from('salespeople')
         .select('name')
-        .eq('market', myMarket);
+        .eq('market', myMarket)
+        .limit(10000);
       const spNames = sps ? sps.map(s => s.name) : [];
       
       if (spNames.length === 0) return [];
       q = q.in('salesperson_name', spNames);
     } else if (roleLower === 'dyrektor') {
       // Pobierz wszystkich handlowców z tego samego regionu
-      let spQuery = supabase.from('salespeople').select('name');
+      let spQuery = supabase.from('salespeople').select('name').limit(10000);
       if (myRegion && myRegion !== 'Wszystkie') {
         spQuery = spQuery.eq('region', myRegion);
       }
@@ -953,7 +954,7 @@ export const drumsAPI = {
         } else {
           q = q.select(`nip, pelna_nazwa_kontrahenta, cecha, nazwa, numer_faktury, data_wydania, data_przyjecia_na_stan, typ_dok, nr_dokumentupz, rozmiar_bebna, cena_netto_bebna`);
         }
-        q = q.eq('typ_opakowania', 'Paleta');
+        q = q.or('typ_opakowania.ilike.%palet%,typ_opakowania.eq.Paleta,nazwa.ilike.%palet%');
 
         if (nip) {
           q = q.eq('nip', nip);
