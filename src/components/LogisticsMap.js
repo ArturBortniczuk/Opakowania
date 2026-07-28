@@ -1028,6 +1028,8 @@ const LogisticsMap = ({ user }) => {
                           </button>
                         </>
                       )}
+
+                      {selectedLocation.type === 'pickup' && selectedLocation.pickups && (
                         <div className="max-h-[400px] overflow-y-auto pr-1">
                           {selectedLocation.pickups.map(pickup => (
                             <div key={pickup.id} className="mb-4 last:mb-0 border-b last:border-0 pb-4 last:pb-0 border-gray-200">
