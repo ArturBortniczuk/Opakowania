@@ -14,9 +14,18 @@ const ReturnFormWrapper = ({ currentUser, profile }) => {
   const [selectedClient, setSelectedClient] = useState(null);
   const [clients, setClients] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [error, setError] = useState(null);
 
   const isStaff = ['admin', 'supervisor', 'dyrektor', 'kierownik', 'wsparcie', 'magazyn', 'specjalista'].includes(currentUser?.role?.toLowerCase());
+
+  // Debounce dla wyszukiwarki klientów
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Pobierz dane wybranego klienta (jeśli NIP jest w URL)
   useEffect(() => {
@@ -59,14 +68,17 @@ const ReturnFormWrapper = ({ currentUser, profile }) => {
     }
   }, [clientNip, isStaff]);
 
-  // Pobierz listę wszystkich dostępnych klientów dla pracownika
+  // Pobierz listę dostępnych klientów dla pracownika z uwzględnieniem wyszukiwania w całej bazie
   useEffect(() => {
     const fetchClients = async () => {
       if (!isStaff || clientNip) return;
       setLoading(true);
       setError(null);
       try {
-        const result = await companiesAPI.getCompanies({ limit: 1000 });
+        const result = await companiesAPI.getCompanies({
+          search: debouncedSearchTerm,
+          limit: 5000
+        });
         setClients(result.data || []);
       } catch (err) {
         console.error('Błąd pobierania listy klientów:', err);
@@ -77,10 +89,11 @@ const ReturnFormWrapper = ({ currentUser, profile }) => {
     };
 
     fetchClients();
-  }, [isStaff, clientNip]);
+  }, [isStaff, clientNip, debouncedSearchTerm]);
 
-  // Filtrowanie klientów po wyszukiwaniu
+  // Lokalne filtrowanie dla płynności
   const filteredClients = clients.filter(c => 
+    !searchTerm ||
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.nip.includes(searchTerm) ||
     (c.salesperson_name && c.salesperson_name.toLowerCase().includes(searchTerm.toLowerCase()))

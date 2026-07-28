@@ -4,6 +4,15 @@ import { calculatorAPI } from '../utils/calculatorApi';
 import { getSalespersonMpk } from '../utils/supabaseApi';
 import { supabase } from '../lib/supabase';
 
+const formatPalletName = (size) => {
+  if (!size) return 'Paleta';
+  const str = String(size).trim();
+  if (str.toLowerCase().startsWith('paleta')) {
+    return str;
+  }
+  return `Paleta ${str}`;
+};
+
 const KABLOWNIE_DATA = {
   'STYROBUD': { address: 'ul. Górna 194, 36-050 Trzeboś', contact: '+48 663 896 832' },
   'Skierniewice Bruk-bet': { address: 'ul. Czerwona 18A, 96-100 Skierniewice', contact: '884 106 616' },
@@ -343,7 +352,7 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
                 <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 bg-white p-3 space-y-3">
                   {palletsToTransport.map((pallet, idx) => (
                     <div key={`pallet-${idx}`} className="flex items-center justify-between py-2">
-                      <span className="text-sm font-semibold text-gray-900">Paleta {pallet.size}</span>
+                      <span className="text-sm font-semibold text-gray-900">{formatPalletName(pallet.size)}</span>
                       <div className="flex items-center gap-2">
                         <input
                           type="number"

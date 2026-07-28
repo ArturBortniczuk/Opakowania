@@ -3,6 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { returnsAPI } from '../utils/supabaseApi';
 import { Truck, Clock, CheckCircle, XCircle, Calendar, Package, MapPin, Plus, RefreshCw, ChevronDown, ChevronUp, User, AlertTriangle } from 'lucide-react';
 
+const formatPalletName = (size) => {
+  if (!size) return 'Paleta';
+  const str = String(size).trim();
+  if (str.toLowerCase().startsWith('paleta')) {
+    return str;
+  }
+  return `Paleta ${str}`;
+};
+
 const ClientReturnRequests = ({ user }) => {
   const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
@@ -58,6 +67,9 @@ const ClientReturnRequests = ({ user }) => {
 
   const getDrumLabel = (drum) => {
     if (typeof drum === 'object' && drum !== null) {
+      if (drum.type === 'pallet') {
+        return `${formatPalletName(drum.size)} (${drum.quantity} szt.)`;
+      }
       const parts = [drum.cecha || drum.kod_bebna || 'Nieznany'];
       if (drum.rozmiar || drum.rozmiar_bebna) {
         parts.push(`(Rozmiar: ${drum.rozmiar || drum.rozmiar_bebna})`);

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { returnsAPI, companiesAPI, drumsAPI, transportAPI, rulesAPI } from '../utils/supabaseApi';
 import { parsePriceRaw, getClientPrice } from '../utils/priceHelpers';
@@ -25,6 +25,15 @@ import {
   Square
 } from 'lucide-react';
 
+const formatPalletName = (size) => {
+  if (!size) return 'Paleta';
+  const str = String(size).trim();
+  if (str.toLowerCase().startsWith('paleta')) {
+    return str;
+  }
+  return `Paleta ${str}`;
+};
+
 const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -32,6 +41,8 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
   const userRole = user?.role?.toLowerCase() || '';
   const canChangeStatus = ['admin', 'supervisor', 'magazyn'].includes(userRole);
+
+  const lastScrollYRef = useRef(0);
 
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -56,10 +67,8 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   const [selectedMergeIds, setSelectedMergeIds] = useState([]);
   const [showMergeModal, setShowMergeModal] = useState(false);
 
-
-
-  const fetchRequests = useCallback(async () => {
-    setLoading(true);
+  const fetchRequests = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError(null);
     try {
       const data = await returnsAPI.getReturns(urlClientNip);
@@ -68,17 +77,17 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
       console.error('Błąd pobierania zgłoszeń:', err);
       setError('Nie udało się pobrać zgłoszeń.');
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [urlClientNip]);
 
   useEffect(() => {
-    fetchRequests();
+    fetchRequests(false);
     rulesAPI.getRules().then(setSupplierRules).catch(console.error);
   }, [fetchRequests]);
 
-  const handleRefresh = () => {
-    fetchRequests();
+  const handleRefresh = (isSilent = true) => {
+    fetchRequests(isSilent);
   };
 
   const handleStatusChange = async (requestId, newStatus) => {
@@ -126,7 +135,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
         const drumsDescParts = selectedDrumsDetails.map(d => {
             if (typeof d === 'object') {
-                if (d.type === 'pallet') return `Paleta ${d.size} - ${d.transportedQuantity || d.quantity} szt.`;
+                if (d.type === 'pallet') return `${formatPalletName(d.size)} - ${d.transportedQuantity || d.quantity} szt.`;
                 const cecha = d.cecha || d.kod_bebna || '';
                 const size = d.rozmiar_bebna || d.nazwa || '';
                 const weight = d.waga_bebna || d.WAGA_BEBNA || d.weight || d.waga || '';
@@ -256,6 +265,9 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   };
 
   const handleViewRequest = useCallback(async (request) => {
+    if (typeof window !== 'undefined') {
+      lastScrollYRef.current = window.scrollY || window.pageYOffset || 0;
+    }
     setSelectedRequest(request);
     setShowRequestDetails(true);
     setEnriching(true);
@@ -298,10 +310,17 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   }, [requests, searchParams, hasOpenedFromUrl, handleViewRequest]);
 
   const handleCloseModal = () => {
+    const savedY = lastScrollYRef.current;
     setShowRequestDetails(false);
     setSelectedRequest(null);
     setSplitMode(false);
     setSplitSelectedDrums([]);
+
+    if (typeof window !== 'undefined') {
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: savedY, behavior: 'instant' });
+      });
+    }
   };
 
   const handleSplitConfirm = async () => {
@@ -452,7 +471,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
   const getDrumLabel = (drum) => {
     if (typeof drum === 'object' && drum !== null) {
-      if (drum.type === 'pallet') return `Paleta ${drum.size} (${drum.quantity} szt.)`;
+      if (drum.type === 'pallet') return `${formatPalletName(drum.size)} (${drum.quantity} szt.)`;
       return drum.cecha || drum.kod_bebna || 'Nieznany';
     }
     return drum;
@@ -1094,7 +1113,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                           <div className="flex items-center justify-between mb-4">
                             <div className="flex flex-col">
                               <span className={`font-bold text-lg ${isNotTransported ? 'text-gray-500 line-through' : 'text-blue-700'}`}>
-                                Paleta {pallet.size}
+                                {formatPalletName(pallet.size)}
                               </span>
                               {isNotTransported && <span className="text-[10px] font-bold text-red-600 uppercase">Nie zabrano / Odrzucono</span>}
                             </div>

@@ -4,6 +4,7 @@ import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { pl } from 'date-fns/locale/pl';
 import { format, addDays, differenceInDays } from 'date-fns';
+
 import {
   Calendar,
   MapPin,
@@ -28,6 +29,15 @@ import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
 import { parsePriceRaw, getClientPrice } from '../utils/priceHelpers';
 
 registerLocale('pl', pl);
+
+const formatPalletName = (size) => {
+  if (!size) return 'Paleta';
+  const str = String(size).trim();
+  if (str.toLowerCase().startsWith('paleta')) {
+    return str;
+  }
+  return `Paleta ${str}`;
+};
 
 const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
   const navigate = useNavigate();
@@ -1031,7 +1041,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
                       return (
                         <div key={size} className={`p-5 rounded-xl border-2 transition-all duration-200 flex flex-col justify-between ${currentQuantity > 0 ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
                           <div>
-                            <h4 className="text-lg font-bold text-gray-900 mb-1">Paleta {size}</h4>
+                            <h4 className="text-lg font-bold text-gray-900 mb-1">{formatPalletName(size)}</h4>
                             <p className="text-sm text-gray-500 mb-4">Dostępne saldo: <span className="font-semibold text-gray-700">{maxQuantity} szt.</span></p>
                           </div>
                           
