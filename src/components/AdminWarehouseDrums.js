@@ -366,7 +366,7 @@ const AdminWarehouseDrums = () => {
 
             <div className="flex flex-wrap gap-3">
               <button
-                onClick={() => navigate('/admin/map?filter=warehouse_ready')}
+                onClick={() => navigate('/admin/map?filter=pickups')}
                 className="flex items-center space-x-2 px-4 py-2 bg-gray-900 hover:bg-black text-white rounded-xl font-bold transition-all shadow-md border border-gray-800 text-sm"
                 title="Pokaż czarną pineskę na mapie z bębnami gotowymi do zwrotu do kablowni"
               >

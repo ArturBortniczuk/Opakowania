@@ -352,8 +352,8 @@ const LogisticsMap = ({ user }) => {
 
       const groupedPickups = Object.values(pickupsByLoc);
 
-      // 3. Pobieramy bębny gotowe do zwrotu z magazynu (Czarna pineska)
-      let warehouseReadyLoc = null;
+      // 3. Pobieramy bębny gotowe do zwrotu z magazynu (Czarna pineska z podziałem na miejscowości z pola 'magazyn')
+      const warehouseReadyLocations = [];
       try {
         const readyCechy = await drumsAPI.getReadyForReturnCechy();
         if (readyCechy && readyCechy.length > 0) {
@@ -363,32 +363,86 @@ const LogisticsMap = ({ user }) => {
           );
 
           if (readyWarehouseDrums.length > 0) {
-            const whLat = readyWarehouseDrums.find(d => d.latitude)?.latitude || 53.1325;
-            const whLng = readyWarehouseDrums.find(d => d.longitude)?.longitude || 23.1688;
+            // Grupowanie według nazwy magazynu / miejscowości
+            const drumsByWarehouse = {};
+            readyWarehouseDrums.forEach(d => {
+              const magName = d.magazyn || 'Magazyn Białystok';
+              if (!drumsByWarehouse[magName]) {
+                drumsByWarehouse[magName] = [];
+              }
+              drumsByWarehouse[magName].push(d);
+            });
 
-            warehouseReadyLoc = {
-              id: 'loc_warehouse_ready',
-              lat: parseFloat(whLat),
-              lng: parseFloat(whLng),
-              title: `Magazyn Główny - Gotowe do zwrotu do Kablowni (${readyWarehouseDrums.length} szt.)`,
-              type: 'warehouse_ready',
-              companyName: 'Magazyn Centralny Eltron',
-              address: 'Gotowe do zwrotu do Kablowni (Czarna Pineska)',
-              drums: readyWarehouseDrums,
-              visibleCount: readyWarehouseDrums.length
+            const cityCoordsFallback = {
+              'białystok': { lat: 53.1325, lng: 23.1688 },
+              'bialystok': { lat: 53.1325, lng: 23.1688 },
+              'poznan': { lat: 52.4064, lng: 16.9252 },
+              'poznań': { lat: 52.4064, lng: 16.9252 },
+              'warszawa': { lat: 52.2297, lng: 21.0122 },
+              'elk': { lat: 53.8266, lng: 22.3619 },
+              'ełk': { lat: 53.8266, lng: 22.3619 },
+              'katowice': { lat: 50.2649, lng: 19.0238 },
+              'wroclaw': { lat: 51.1100, lng: 17.0333 },
+              'wrocław': { lat: 51.1100, lng: 17.0333 },
+              'gdansk': { lat: 54.3520, lng: 18.6466 },
+              'gdańsk': { lat: 54.3520, lng: 18.6466 },
+              'rzeszow': { lat: 50.0412, lng: 21.9991 },
+              'rzeszów': { lat: 50.0412, lng: 21.9991 },
+              'lublin': { lat: 51.2465, lng: 22.5684 }
             };
+
+            Object.entries(drumsByWarehouse).forEach(([magName, drums]) => {
+              const cleanCity = magName.replace(/^magazyn\s+/i, '').trim();
+              const lowerCity = cleanCity.toLowerCase();
+              
+              let lat = drums.find(d => d.latitude)?.latitude;
+              let lng = drums.find(d => d.longitude)?.longitude;
+
+              if (!lat || !lng) {
+                if (cacheMap[lowerCity]) {
+                  lat = cacheMap[lowerCity].latitude;
+                  lng = cacheMap[lowerCity].longitude;
+                } else if (cityCoordsFallback[lowerCity]) {
+                  lat = cityCoordsFallback[lowerCity].lat;
+                  lng = cityCoordsFallback[lowerCity].lng;
+                } else {
+                  const words = lowerCity.split(/\s+/);
+                  for (const w of words) {
+                    if (cacheMap[w]) {
+                      lat = cacheMap[w].latitude;
+                      lng = cacheMap[w].longitude;
+                      break;
+                    } else if (cityCoordsFallback[w]) {
+                      lat = cityCoordsFallback[w].lat;
+                      lng = cityCoordsFallback[w].lng;
+                      break;
+                    }
+                  }
+                }
+              }
+
+              lat = lat ? parseFloat(lat) : 53.1325;
+              lng = lng ? parseFloat(lng) : 23.1688;
+
+              warehouseReadyLocations.push({
+                id: `loc_wh_ready_${magName.replace(/[^a-zA-Z0-9]/g, '_')}`,
+                lat,
+                lng,
+                title: `${magName} - Gotowe do zwrotu (${drums.length} szt.)`,
+                type: 'warehouse_ready',
+                companyName: magName,
+                address: `Miejscowość: ${cleanCity || magName}`,
+                drums,
+                visibleCount: drums.length
+              });
+            });
           }
         }
       } catch (err) {
         console.error('Błąd pobierania bębnów gotowych z magazynu do mapy:', err);
       }
 
-      const allLocs = [...groupedDrums, ...groupedPickups];
-      if (warehouseReadyLoc) {
-        allLocs.push(warehouseReadyLoc);
-      }
-
-      setLocations(allLocs);
+      setLocations([...groupedDrums, ...groupedPickups, ...warehouseReadyLocations]);
     } catch (error) {
       console.error('Błąd pobierania danych do mapy:', error);
     }
@@ -441,9 +495,14 @@ const LogisticsMap = ({ user }) => {
   const filteredLocations = useMemo(() => {
     let filtered = locations;
 
-    if (filter === 'drums') filtered = filtered.filter(l => l.type === 'drums');
-    if (filter === 'pickups') filtered = filtered.filter(l => l.type === 'pickup');
-    if (filter === 'warehouse_ready') filtered = filtered.filter(l => l.type === 'warehouse_ready');
+    if (filter === 'drums') {
+      filtered = filtered.filter(l => l.type === 'drums');
+    } else if (filter === 'pickups') {
+      // W zakładce "Odbiory" wyświetlamy zgłoszenia odbiorów ORAZ czarne pineski bębnów gotowych z magazynów
+      filtered = filtered.filter(l => l.type === 'pickup' || l.type === 'warehouse_ready');
+    } else if (filter === 'warehouse_ready') {
+      filtered = filtered.filter(l => l.type === 'warehouse_ready');
+    }
 
     const sQuery = searchQuery.trim().toLowerCase();
     const cQuery = clientSearch.trim().toLowerCase();
@@ -651,10 +710,9 @@ const LogisticsMap = ({ user }) => {
           <div className="flex flex-wrap gap-2">
             <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Wszystko</button>
             <button onClick={() => setFilter('drums')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'drums' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>Bębny (Klienci)</button>
-            <button onClick={() => setFilter('pickups')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'pickups' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'}`}>Odbiory</button>
-            <button onClick={() => setFilter('warehouse_ready')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 transition-colors ${filter === 'warehouse_ready' ? 'bg-black text-white shadow-md' : 'bg-gray-900/10 text-gray-900 hover:bg-gray-900/20'}`}>
-              <span className="w-2.5 h-2.5 rounded-full bg-black border border-white"></span>
-              Gotowe z Magazynu (Czarna pineska)
+            <button onClick={() => setFilter('pickups')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 transition-colors ${filter === 'pickups' ? 'bg-purple-700 text-white shadow-sm' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'}`}>
+              <span>Odbiory (w tym czarne pineski z magazynów)</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-black border border-white shrink-0"></span>
             </button>
           </div>
         </div>
