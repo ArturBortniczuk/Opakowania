@@ -671,11 +671,15 @@ const LogisticsMap = ({ user }) => {
         await transportAPI.createTransportOrder(spedycjaPayload);
       }
 
-      await returnsAPI.updateReturnStatus(requestForTransport.id, {
-        status: 'InTransit',
-        transport_date: transportData.transportDate,
-        selected_drums: updatedDrums
-      });
+      if (String(requestForTransport.id).startsWith('MAG_')) {
+        alert(`Pomyślnie utworzono zlecenie transportu dla bębnów z magazynu!`);
+      } else {
+        await returnsAPI.updateReturnStatus(requestForTransport.id, {
+          status: 'InTransit',
+          transport_date: transportData.transportDate,
+          selected_drums: updatedDrums
+        });
+      }
       
       setShowTransportModal(false);
       setRequestForTransport(null);
@@ -711,8 +715,8 @@ const LogisticsMap = ({ user }) => {
             <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Wszystko</button>
             <button onClick={() => setFilter('drums')} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === 'drums' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>Bębny (Klienci)</button>
             <button onClick={() => setFilter('pickups')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 transition-colors ${filter === 'pickups' ? 'bg-purple-700 text-white shadow-sm' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'}`}>
-              <span>Odbiory (w tym czarne pineski z magazynów)</span>
-              <span className="w-2.5 h-2.5 rounded-full bg-black border border-white shrink-0"></span>
+              <span>Odbiory</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-black border border-white shrink-0" title="Zawiera czarne pineski bębnów z magazynów"></span>
             </button>
           </div>
         </div>
@@ -1000,12 +1004,27 @@ const LogisticsMap = ({ user }) => {
 
                           <button
                             onClick={() => {
-                              navigate('/admin/warehouse-drums?readyOnly=true');
+                              const syntheticRequest = {
+                                id: `MAG_${selectedLocation.companyName.replace(/[^a-zA-Z0-9]/g, '_')}`,
+                                company_name: selectedLocation.companyName,
+                                street: 'Magazynowa 1',
+                                postal_code: '15-001',
+                                city: selectedLocation.address.replace(/^Miejscowość:\s*/i, '') || 'Białystok',
+                                user_nip: '0000000000',
+                                selected_drums: selectedLocation.drums.map(d => ({
+                                  cecha: d.cecha || d.kod_bebna,
+                                  kon_dostawca: d.kon_dostawca,
+                                  rozmiar_bebna: d.nazwa || d.rozmiar_bebna
+                                })),
+                                notes: `[Zlecenie zwrotu bębnów z magazynu do kablowni]: ${selectedLocation.drums.map(d => d.cecha || d.kod_bebna).join(', ')}`
+                              };
+                              setRequestForTransport(syntheticRequest);
+                              setShowTransportModal(true);
                             }}
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-3 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
+                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
                           >
                             <Truck className="w-4 h-4" />
-                            <span>Zarządzaj w magazynie bębnów</span>
+                            <span>Zleć transport (Otwórz modal zlecenia)</span>
                           </button>
                         </>
                       )}
