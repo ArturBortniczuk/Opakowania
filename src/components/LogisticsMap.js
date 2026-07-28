@@ -984,19 +984,25 @@ const LogisticsMap = ({ user }) => {
                       {selectedLocation.type === 'warehouse_ready' && (
                         <>
                           <div className="flex justify-between items-center mb-2">
-                            <span className="text-xs font-extrabold text-gray-900 uppercase">Bębny gotowe do zwrotu do kablowni ({selectedLocation.drums.length})</span>
+                            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                              Bębny gotowe do zwrotu ({selectedLocation.drums.length} szt.)
+                            </span>
                           </div>
                           
-                          <div className="max-h-56 overflow-y-auto pr-1 space-y-1.5 mb-3">
+                          <div className="max-h-56 overflow-y-auto pr-1 space-y-2 mb-3">
                             {selectedLocation.drums.map((drum, idx) => (
-                              <div key={drum.id || idx} className="flex flex-col p-2.5 rounded-lg border bg-gray-900 text-white border-gray-800 shadow-sm">
+                              <div key={drum.id || idx} className="flex flex-col p-2.5 rounded-xl border border-emerald-200/80 bg-emerald-50/40 shadow-xs">
                                 <div className="flex justify-between items-start">
-                                  <span className="font-mono text-sm font-bold text-emerald-400">{drum.cecha || drum.kod_bebna}</span>
-                                  <span className="text-xs font-bold text-gray-200">{drum.kon_dostawca || 'Kablownia'}</span>
+                                  <span className="font-mono text-sm font-bold text-gray-900">
+                                    {drum.cecha || drum.kod_bebna || 'Brak cechy'}
+                                  </span>
+                                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                                    {drum.kon_dostawca || 'Kablownia'}
+                                  </span>
                                 </div>
-                                <div className="flex justify-between items-end mt-1 text-[11px] text-gray-400">
-                                  <span>Rozmiar: {drum.nazwa || drum.rozmiar_bebna}</span>
-                                  <span>WMS: {drum.lokalizacja_wms || 'Brak'}</span>
+                                <div className="flex justify-between items-end mt-1.5 text-xs text-gray-600">
+                                  <span>Rozmiar: {drum.nazwa || drum.rozmiar_bebna || 'Brak'}</span>
+                                  <span className="font-medium text-gray-500">WMS: {drum.lokalizacja_wms || 'Brak'}</span>
                                 </div>
                               </div>
                             ))}
@@ -1021,10 +1027,10 @@ const LogisticsMap = ({ user }) => {
                               setRequestForTransport(syntheticRequest);
                               setShowTransportModal(true);
                             }}
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
                           >
                             <Truck className="w-4 h-4" />
-                            <span>Zleć transport (Otwórz modal zlecenia)</span>
+                            <span>Zleć transport</span>
                           </button>
                         </>
                       )}
