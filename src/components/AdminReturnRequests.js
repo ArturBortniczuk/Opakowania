@@ -337,7 +337,21 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
       const drumsToMove = selectedRequest.selected_drums.filter(d => splitSelectedDrums.includes(getDrumLabel(d)));
       const drumsToKeep = selectedRequest.selected_drums.filter(d => !splitSelectedDrums.includes(getDrumLabel(d)));
 
-      await returnsAPI.updateReturnStatus(selectedRequest.id, { selected_drums: drumsToKeep });
+      const enrichedDrumsToMove = drumsToMove.map(d => {
+        if (typeof d === 'object' && d !== null) {
+          return {
+            ...d,
+            reported_at: d.reported_at || selectedRequest.created_at,
+            original_request_id: d.original_request_id || selectedRequest.id
+          };
+        }
+        return {
+          cecha: d,
+          type: 'drum',
+          reported_at: selectedRequest.created_at,
+          original_request_id: selectedRequest.id
+        };
+      });
 
       const newReturnData = {
         user_nip: selectedRequest.user_nip,
@@ -350,7 +364,10 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
         loading_hours: selectedRequest.loading_hours || '',
         available_equipment: selectedRequest.available_equipment || '',
         notes: (selectedRequest.notes || '') + '\n\n[Zgłoszenie wydzielone ze zgłoszenia #' + selectedRequest.id + ']',
-        selected_drums: drumsToMove,
+        selected_drums: enrichedDrumsToMove,
+        created_at: selectedRequest.created_at,
+        status: selectedRequest.status || 'Pending',
+        priority: selectedRequest.priority || 'Normal',
         profile_id: selectedRequest.profile_id || null,
         profile_name: selectedRequest.profile_name || null,
         profile_email: selectedRequest.profile_email || null,
