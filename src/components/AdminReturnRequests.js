@@ -19,7 +19,10 @@ import {
   RefreshCw,
   Circle,
   ArrowDown,
-  Trash2
+  Trash2,
+  GitMerge,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 
 const AdminReturnRequests = ({ user, initialFilter = {} }) => {
@@ -47,6 +50,11 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   const [splitMode, setSplitMode] = useState(false);
   const [splitSelectedDrums, setSplitSelectedDrums] = useState([]);
   const [supplierRules, setSupplierRules] = useState([]);
+
+  // Stany dla łączenia zgłoszeń
+  const [mergeMode, setMergeMode] = useState(false);
+  const [selectedMergeIds, setSelectedMergeIds] = useState([]);
+  const [showMergeModal, setShowMergeModal] = useState(false);
 
 
 
@@ -454,7 +462,16 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     return typeof drum === 'object' && drum !== null && drum.isDamaged;
   };
 
+  const toggleSelectMerge = (requestId) => {
+    setSelectedMergeIds(prev =>
+      prev.includes(requestId)
+        ? prev.filter(id => id !== requestId)
+        : [...prev, requestId]
+    );
+  };
+
   const RequestCard = ({ request }) => {
+    const isSelectedForMerge = selectedMergeIds.includes(request.id);
     const drumsList = Array.isArray(request.selected_drums) ? request.selected_drums.filter(d => typeof d !== 'object' || d.type !== 'pallet') : [];
     const palletsList = Array.isArray(request.selected_drums) ? request.selected_drums.filter(d => typeof d === 'object' && d.type === 'pallet') : [];
     
@@ -466,10 +483,29 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
     return (
       <div
-        className={`bg-white rounded-2xl p-6 shadow-sm border transition-all duration-300 hover:shadow-md relative flex flex-col h-full ${request.priority === 'High' ? 'border-red-200 bg-red-50/10' : 'border-gray-100'}`}
+        onClick={() => {
+          if (mergeMode) {
+            toggleSelectMerge(request.id);
+          }
+        }}
+        className={`bg-white rounded-2xl p-6 shadow-sm border transition-all duration-300 relative flex flex-col h-full ${
+          mergeMode
+            ? (isSelectedForMerge ? 'border-indigo-500 bg-indigo-50/40 ring-2 ring-indigo-500 cursor-pointer shadow-md' : 'border-gray-200 hover:border-indigo-300 cursor-pointer opacity-80')
+            : (request.priority === 'High' ? 'border-red-200 bg-red-50/10' : 'border-gray-100')
+        }`}
       >
+        {mergeMode && (
+          <div className="absolute top-4 right-4 z-10">
+            <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+              isSelectedForMerge ? 'bg-indigo-600 border-indigo-600 text-white shadow' : 'bg-white border-gray-300 text-transparent'
+            }`}>
+              {isSelectedForMerge && <CheckCircle className="w-4 h-4" />}
+            </div>
+          </div>
+        )}
+
         <div className="flex items-start justify-between gap-4 mb-6">
-          <div className="min-w-0">
+          <div className="min-w-0 pr-6">
             <h3 className="text-lg font-bold text-gray-900 leading-tight">Zgłoszenie #{request.id}</h3>
             <p className="text-sm font-medium text-blue-600 truncate mt-0.5">{request.company_name}</p>
             <p className="text-xs font-semibold text-gray-600 mt-1">
@@ -548,7 +584,14 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
         <div className="flex gap-2 mt-auto pt-4 border-t border-gray-100">
           <button
-            onClick={() => handleViewRequest(request)}
+            onClick={(e) => {
+              if (mergeMode) {
+                e.stopPropagation();
+                toggleSelectMerge(request.id);
+                return;
+              }
+              handleViewRequest(request);
+            }}
             className="flex-1 bg-gray-100 text-gray-700 py-2.5 px-4 rounded-xl font-bold hover:bg-gray-200 transition-colors text-sm"
           >
             Szczegóły
@@ -556,7 +599,14 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
           {request.status === 'Pending' && canChangeStatus && (
             <button
-              onClick={() => handleStatusChange(request.id, 'Approved')}
+              onClick={(e) => {
+                if (mergeMode) {
+                  e.stopPropagation();
+                  toggleSelectMerge(request.id);
+                  return;
+                }
+                handleStatusChange(request.id, 'Approved');
+              }}
               className="flex-1 bg-emerald-600 text-white py-2.5 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors text-sm"
             >
               Zatwierdź
@@ -565,7 +615,12 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
           {request.status === 'Approved' && canChangeStatus && (
             <button
-              onClick={() => {
+              onClick={(e) => {
+                if (mergeMode) {
+                  e.stopPropagation();
+                  toggleSelectMerge(request.id);
+                  return;
+                }
                 setRequestForTransport(request);
                 setShowTransportModal(true);
               }}
@@ -577,7 +632,14 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
           {request.status === 'InTransit' && canChangeStatus && (
             <button
-              onClick={() => handleStatusChange(request.id, 'Completed')}
+              onClick={(e) => {
+                if (mergeMode) {
+                  e.stopPropagation();
+                  toggleSelectMerge(request.id);
+                  return;
+                }
+                handleStatusChange(request.id, 'Completed');
+              }}
               className="flex-1 bg-emerald-600 text-white py-2.5 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors text-sm"
             >
               Zakończ
@@ -586,7 +648,14 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
           {request.status === 'Completed' && canChangeStatus && (
             <button
-              onClick={() => handleAddCorrectionNumber(request.id)}
+              onClick={(e) => {
+                if (mergeMode) {
+                  e.stopPropagation();
+                  toggleSelectMerge(request.id);
+                  return;
+                }
+                handleAddCorrectionNumber(request.id);
+              }}
               className={`flex-1 py-2.5 px-4 rounded-xl font-bold transition-colors text-sm border ${
                 request.correction_number 
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100' 
@@ -1143,6 +1212,503 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     );
   };
 
+  const MergeRequestsModal = () => {
+    const selectedRequests = requests.filter(r => selectedMergeIds.includes(r.id));
+
+    // Ekstrakcja unikalnych opcji dla poszczególnych pól
+    const clientOptions = (() => {
+      const map = new Map();
+      selectedRequests.forEach(r => {
+        const key = `${r.user_nip}_${r.company_name}`;
+        if (!map.has(key)) {
+          map.set(key, { user_nip: r.user_nip, company_name: r.company_name });
+        }
+      });
+      return Array.from(map.values());
+    })();
+
+    const streetOptions = Array.from(new Set(selectedRequests.map(r => r.street).filter(Boolean)));
+    const postalOptions = Array.from(new Set(selectedRequests.map(r => r.postal_code).filter(Boolean)));
+    const cityOptions = Array.from(new Set(selectedRequests.map(r => r.city).filter(Boolean)));
+    const dateOptions = Array.from(new Set(selectedRequests.map(r => r.collection_date).filter(Boolean)));
+    const loadingHoursOptions = Array.from(new Set(selectedRequests.map(r => r.loading_hours || 'Brak').filter(Boolean)));
+    const equipmentOptions = Array.from(new Set(selectedRequests.map(r => r.available_equipment || 'Brak').filter(Boolean)));
+    const emailOptions = Array.from(new Set(selectedRequests.map(r => r.email).filter(Boolean)));
+
+    const profileOptions = (() => {
+      const map = new Map();
+      selectedRequests.forEach(r => {
+        if (r.profile_name) {
+          const key = `${r.profile_name}_${r.profile_email || ''}_${r.profile_phone || ''}`;
+          if (!map.has(key)) {
+            map.set(key, {
+              profile_id: r.profile_id || null,
+              profile_name: r.profile_name,
+              profile_email: r.profile_email || '',
+              profile_phone: r.profile_phone || ''
+            });
+          }
+        }
+      });
+      return Array.from(map.values());
+    })();
+
+    const initialClient = clientOptions[0] || { user_nip: '', company_name: '' };
+    const hasApproved = selectedRequests.some(r => r.status === 'Approved');
+    const hasInTransit = selectedRequests.some(r => r.status === 'InTransit');
+    const hasHighPriority = selectedRequests.some(r => r.priority === 'High');
+
+    const initialStatus = hasInTransit ? 'InTransit' : (hasApproved ? 'Approved' : 'Pending');
+    const initialPriority = hasHighPriority ? 'High' : 'Normal';
+
+    const combinedNotes = selectedRequests
+      .map(r => `[Zgłoszenie #${r.id}]: ${r.notes ? r.notes.trim() : 'Brak dodatkowych uwag'}`)
+      .join('\n\n') + `\n\n[Połączono ze zgłoszeń: #${selectedRequests.map(r => r.id).join(', #')}]`;
+
+    const [formData, setFormData] = useState({
+      user_nip: initialClient.user_nip,
+      company_name: initialClient.company_name,
+      street: streetOptions[0] || '',
+      postal_code: postalOptions[0] || '',
+      city: cityOptions[0] || '',
+      collection_date: dateOptions[0] || '',
+      loading_hours: loadingHoursOptions[0] || '',
+      available_equipment: equipmentOptions[0] || '',
+      email: emailOptions[0] || '',
+      profileIndex: 0,
+      status: initialStatus,
+      priority: initialPriority,
+      notes: combinedNotes
+    });
+
+    const [submitting, setSubmitting] = useState(false);
+
+    if (!showMergeModal || selectedMergeIds.length < 2) return null;
+
+    // Scalanie pozycji z wybranym asortymentem
+    const mergedDrumsAndPallets = (() => {
+      const items = [];
+      const palletsMap = {};
+
+      selectedRequests.forEach(req => {
+        if (Array.isArray(req.selected_drums)) {
+          req.selected_drums.forEach(item => {
+            if (typeof item === 'object' && item !== null && item.type === 'pallet') {
+              const key = item.size || 'EURO';
+              if (palletsMap[key]) {
+                palletsMap[key].quantity = (palletsMap[key].quantity || 0) + (item.quantity || 0);
+                if (item.transportedQuantity !== undefined) {
+                  palletsMap[key].transportedQuantity = (palletsMap[key].transportedQuantity || 0) + (item.transportedQuantity || 0);
+                }
+              } else {
+                palletsMap[key] = { ...item };
+              }
+            } else {
+              items.push(item);
+            }
+          });
+        }
+      });
+
+      Object.values(palletsMap).forEach(p => items.push(p));
+      return items;
+    })();
+
+    const totalDrumsCount = mergedDrumsAndPallets.filter(d => typeof d !== 'object' || d.type !== 'pallet').length;
+    const totalPalletsCount = mergedDrumsAndPallets
+      .filter(d => typeof d === 'object' && d.type === 'pallet')
+      .reduce((sum, p) => sum + (p.quantity || 0), 0);
+
+    const handleMergeSubmit = async (e) => {
+      e.preventDefault();
+      setSubmitting(true);
+      try {
+        const selectedProf = profileOptions[formData.profileIndex] || null;
+        const payload = {
+          user_nip: formData.user_nip,
+          company_name: formData.company_name,
+          street: formData.street,
+          postal_code: formData.postal_code,
+          city: formData.city,
+          collection_date: formData.collection_date,
+          loading_hours: formData.loading_hours === 'Brak' ? '' : formData.loading_hours,
+          available_equipment: formData.available_equipment === 'Brak' ? '' : formData.available_equipment,
+          email: formData.email,
+          profile_id: selectedProf?.profile_id || null,
+          profile_name: selectedProf?.profile_name || null,
+          profile_email: selectedProf?.profile_email || null,
+          profile_phone: selectedProf?.profile_phone || null,
+          status: formData.status,
+          priority: formData.priority,
+          notes: formData.notes,
+          selected_drums: mergedDrumsAndPallets
+        };
+
+        const newReturn = await returnsAPI.createReturn(payload);
+        await returnsAPI.deleteReturn(selectedMergeIds);
+
+        setShowMergeModal(false);
+        setSelectedMergeIds([]);
+        setMergeMode(false);
+        handleRefresh();
+
+        alert(`Pomyślnie połączono zgłoszenia #${selectedMergeIds.join(', #')} w nowe zgłoszenie #${newReturn.id}!`);
+      } catch (err) {
+        console.error('Błąd podczas łączenia zgłoszeń:', err);
+        alert('Wystąpił błąd podczas łączenia zgłoszeń: ' + err.message);
+      } finally {
+        setSubmitting(false);
+      }
+    };
+
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        onClick={() => setShowMergeModal(false)}
+      >
+        <div
+          className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-indigo-900 via-indigo-800 to-blue-900 text-white rounded-t-3xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                  <GitMerge className="w-6 h-6 text-indigo-200" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold">Łączenie zgłoszeń zwrotu</h2>
+                  <p className="text-xs text-indigo-200 mt-1 font-medium">
+                    Wybrano {selectedRequests.length} zgłoszeń: {selectedRequests.map(r => `#${r.id}`).join(', ')}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMergeModal(false)}
+                className="p-2 text-indigo-200 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <form onSubmit={handleMergeSubmit} className="p-6 space-y-6">
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-amber-900 text-sm mb-1">Konfiguracja połączonego zgłoszenia</p>
+                <p>
+                  Poniżej możesz wybrać, które odpowiedzi mają się pojawić w nowym połączonym zgłoszeniu. Gdy zgłoszenia różnią się w danym polu, z listy rozwijanej możesz wybrać właściwą opcję ze scalanych zgłoszeń.
+                </p>
+              </div>
+            </div>
+
+            {/* Klient / Firma */}
+            <div className="p-5 bg-gray-50/80 rounded-2xl border border-gray-200/80 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                  <Package className="w-4 h-4 text-indigo-600" />
+                  Klient / Firma
+                </h3>
+                {clientOptions.length > 1 ? (
+                  <span className="text-[11px] font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full border border-amber-200">
+                    ⚠️ Wykryto {clientOptions.length} różnych klientów
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full border border-emerald-200">
+                    ✓ Zgodny klient
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                  Wybierz firmę i NIP
+                </label>
+                <select
+                  value={`${formData.user_nip}_${formData.company_name}`}
+                  onChange={(e) => {
+                    const found = clientOptions.find(c => `${c.user_nip}_${c.company_name}` === e.target.value);
+                    if (found) {
+                      setFormData(prev => ({ ...prev, user_nip: found.user_nip, company_name: found.company_name }));
+                    }
+                  }}
+                  className="w-full p-3 border border-gray-300 rounded-xl bg-white text-sm font-semibold focus:ring-2 focus:ring-indigo-500"
+                >
+                  {clientOptions.map((c, idx) => (
+                    <option key={idx} value={`${c.user_nip}_${c.company_name}`}>
+                      {c.company_name} (NIP: {c.user_nip})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Adres odbioru */}
+            <div className="p-5 bg-gray-50/80 rounded-2xl border border-gray-200/80 space-y-4">
+              <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-indigo-600" />
+                Adres odbioru
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Ulica</label>
+                    {streetOptions.length > 1 && <span className="text-[10px] font-bold text-amber-600 uppercase">Różne opcje ({streetOptions.length})</span>}
+                  </div>
+                  <select
+                    value={formData.street}
+                    onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
+                    className={`w-full p-3 border rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-indigo-500 ${streetOptions.length > 1 ? 'border-amber-300 bg-amber-50/30' : 'border-gray-300'}`}
+                  >
+                    {streetOptions.map((opt, i) => (
+                      <option key={i} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Kod pocztowy</label>
+                    {postalOptions.length > 1 && <span className="text-[10px] font-bold text-amber-600 uppercase">Różne opcje ({postalOptions.length})</span>}
+                  </div>
+                  <select
+                    value={formData.postal_code}
+                    onChange={(e) => setFormData(prev => ({ ...prev, postal_code: e.target.value }))}
+                    className={`w-full p-3 border rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-indigo-500 ${postalOptions.length > 1 ? 'border-amber-300 bg-amber-50/30' : 'border-gray-300'}`}
+                  >
+                    {postalOptions.map((opt, i) => (
+                      <option key={i} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Miasto</label>
+                    {cityOptions.length > 1 && <span className="text-[10px] font-bold text-amber-600 uppercase">Różne opcje ({cityOptions.length})</span>}
+                  </div>
+                  <select
+                    value={formData.city}
+                    onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                    className={`w-full p-3 border rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-indigo-500 ${cityOptions.length > 1 ? 'border-amber-300 bg-amber-50/30' : 'border-gray-300'}`}
+                  >
+                    {cityOptions.map((opt, i) => (
+                      <option key={i} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Szczegóły odbioru i kontakt */}
+            <div className="p-5 bg-gray-50/80 rounded-2xl border border-gray-200/80 space-y-4">
+              <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-indigo-600" />
+                Szczegóły odbioru i kontakt
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Sugerowana data odbioru</label>
+                    {dateOptions.length > 1 && <span className="text-[10px] font-bold text-amber-600 uppercase">Różne opcje ({dateOptions.length})</span>}
+                  </div>
+                  <select
+                    value={formData.collection_date}
+                    onChange={(e) => setFormData(prev => ({ ...prev, collection_date: e.target.value }))}
+                    className={`w-full p-3 border rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-indigo-500 ${dateOptions.length > 1 ? 'border-amber-300 bg-amber-50/30' : 'border-gray-300'}`}
+                  >
+                    {dateOptions.map((opt, i) => (
+                      <option key={i} value={opt}>
+                        {new Date(opt).toLocaleDateString('pl-PL')} ({opt})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Godziny załadunku</label>
+                    {loadingHoursOptions.length > 1 && <span className="text-[10px] font-bold text-amber-600 uppercase">Różne opcje ({loadingHoursOptions.length})</span>}
+                  </div>
+                  <select
+                    value={formData.loading_hours}
+                    onChange={(e) => setFormData(prev => ({ ...prev, loading_hours: e.target.value }))}
+                    className={`w-full p-3 border rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-indigo-500 ${loadingHoursOptions.length > 1 ? 'border-amber-300 bg-amber-50/30' : 'border-gray-300'}`}
+                  >
+                    {loadingHoursOptions.map((opt, i) => (
+                      <option key={i} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Dostępny sprzęt</label>
+                    {equipmentOptions.length > 1 && <span className="text-[10px] font-bold text-amber-600 uppercase">Różne opcje ({equipmentOptions.length})</span>}
+                  </div>
+                  <select
+                    value={formData.available_equipment}
+                    onChange={(e) => setFormData(prev => ({ ...prev, available_equipment: e.target.value }))}
+                    className={`w-full p-3 border rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-indigo-500 ${equipmentOptions.length > 1 ? 'border-amber-300 bg-amber-50/30' : 'border-gray-300'}`}
+                  >
+                    {equipmentOptions.map((opt, i) => (
+                      <option key={i} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Email kontaktowy</label>
+                    {emailOptions.length > 1 && <span className="text-[10px] font-bold text-amber-600 uppercase">Różne opcje ({emailOptions.length})</span>}
+                  </div>
+                  <select
+                    value={formData.email}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    className={`w-full p-3 border rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-indigo-500 ${emailOptions.length > 1 ? 'border-amber-300 bg-amber-50/30' : 'border-gray-300'}`}
+                  >
+                    {emailOptions.map((opt, i) => (
+                      <option key={i} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {profileOptions.length > 0 && (
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase">Osoba zgłaszająca (Profil)</label>
+                    {profileOptions.length > 1 && <span className="text-[10px] font-bold text-amber-600 uppercase">Różne opcje ({profileOptions.length})</span>}
+                  </div>
+                  <select
+                    value={formData.profileIndex}
+                    onChange={(e) => setFormData(prev => ({ ...prev, profileIndex: Number(e.target.value) }))}
+                    className="w-full p-3 border border-gray-300 rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {profileOptions.map((p, i) => (
+                      <option key={i} value={i}>
+                        {p.profile_name} {p.profile_email ? `(${p.profile_email})` : ''} {p.profile_phone ? `- tel. ${p.profile_phone}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Status & Priorytet */}
+            <div className="p-5 bg-gray-50/80 rounded-2xl border border-gray-200/80 space-y-4">
+              <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                <Clock className="w-4 h-4 text-indigo-600" />
+                Status i Priorytet zgłoszenia
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Status zgłoszenia</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                    className="w-full p-3 border border-gray-300 rounded-xl text-sm font-semibold bg-white focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="Pending">Oczekujące (Pending)</option>
+                    <option value="Approved">Przekazane do transportu (Approved)</option>
+                    <option value="InTransit">W trakcie transportu (InTransit)</option>
+                    <option value="Completed">Zakończone (Completed)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Priorytet</label>
+                  <select
+                    value={formData.priority}
+                    onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
+                    className="w-full p-3 border border-gray-300 rounded-xl text-sm font-semibold bg-white focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="Normal">Normalny</option>
+                    <option value="High">Wysoki</option>
+                    <option value="Low">Niski</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Scalony asortyment */}
+            <div className="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-indigo-900 text-base flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                  Scalony asortyment ({mergedDrumsAndPallets.length} pozycji)
+                </h3>
+                <span className="text-xs font-bold text-indigo-700 bg-indigo-100 px-3 py-1 rounded-full">
+                  Bębny: {totalDrumsCount} szt. {totalPalletsCount > 0 && `| Palety: ${totalPalletsCount} szt.`}
+                </span>
+              </div>
+
+              <div className="p-3 bg-white rounded-xl border border-indigo-100 max-h-36 overflow-y-auto space-y-2 text-xs">
+                {mergedDrumsAndPallets.map((item, idx) => {
+                  const label = getDrumLabel(item);
+                  return (
+                    <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                      <span className="font-semibold text-gray-800">{label}</span>
+                      <span className="text-[10px] font-bold text-indigo-600 uppercase bg-indigo-50 px-2 py-0.5 rounded">
+                        {typeof item === 'object' && item.type === 'pallet' ? 'Paleta' : 'Bęben'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Uwagi */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                Połączone uwagi do odbioru
+              </label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                rows={5}
+                className="w-full p-3 border border-gray-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            {/* Stopka */}
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowMergeModal(false)}
+                className="px-5 py-3 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+              >
+                Anuluj
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-6 py-3 text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 rounded-xl shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                {submitting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Łączenie...</span>
+                  </>
+                ) : (
+                  <>
+                    <GitMerge className="w-4 h-4" />
+                    <span>Utwórz połączone zgłoszenie</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
   const stats = getStatistics();
 
   if (loading) {
@@ -1175,6 +1741,22 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
             </div>
 
             <div className="flex space-x-2">
+              {canChangeStatus && (
+                <button
+                  onClick={() => {
+                    setMergeMode(!mergeMode);
+                    if (mergeMode) setSelectedMergeIds([]);
+                  }}
+                  className={`px-4 py-2 rounded-xl font-semibold flex items-center space-x-2 transition-all duration-200 shadow-sm ${
+                    mergeMode
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-700 ring-2 ring-indigo-400'
+                      : 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'
+                  }`}
+                >
+                  <GitMerge className="w-4 h-4" />
+                  <span>{mergeMode ? 'Anuluj łączenie' : 'Łączenie zgłoszeń'}</span>
+                </button>
+              )}
               <button
                 onClick={() => navigate('/return')}
                 className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 flex items-center space-x-2 shadow-sm font-semibold"
@@ -1298,7 +1880,60 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
           </div>
         )}
 
+        {/* Pływający pasek wyboru zgłoszeń w trybie łączenia */}
+        {(selectedMergeIds.length > 0 || mergeMode) && (
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-40 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-6 animate-bounce-in">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center font-bold text-sm">
+                {selectedMergeIds.length}
+              </div>
+              <span className="font-semibold text-sm">
+                {selectedMergeIds.length === 1 ? 'Wybrano 1 zgłoszenie' : `Wybrano ${selectedMergeIds.length} zgłoszeń do połączenia`}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedMergeIds([]);
+                  setMergeMode(false);
+                }}
+                className="px-4 py-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors"
+              >
+                Anuluj
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (filteredAndSortedRequests.length === selectedMergeIds.length) {
+                    setSelectedMergeIds([]);
+                  } else {
+                    setSelectedMergeIds(filteredAndSortedRequests.map(r => r.id));
+                  }
+                }}
+                className="px-3 py-2 text-xs font-semibold text-indigo-300 hover:text-indigo-200"
+              >
+                {filteredAndSortedRequests.length === selectedMergeIds.length ? 'Odznacz wszystkie' : 'Zaznacz widoczne'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowMergeModal(true)}
+                disabled={selectedMergeIds.length < 2}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-xl shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <GitMerge className="w-4 h-4" />
+                <span>Połącz zgłoszenia ({selectedMergeIds.length})</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         <RequestDetailsModal />
+
+        <MergeRequestsModal />
 
         <TransportOrderModal
           isOpen={showTransportModal}

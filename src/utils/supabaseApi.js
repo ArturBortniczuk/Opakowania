@@ -1919,6 +1919,27 @@ export const returnsAPI = {
       console.error('Błąd aktualizacji zgłoszenia zwrotu:', error);
       throw error;
     }
+  },
+
+  /**
+   * Usuwa zgłoszenie lub tablicę zgłoszeń o danych ID.
+   * @param {number|Array<number>} idOrIds - ID zgłoszenia lub tablica ID zgłoszeń.
+   * @returns {Promise<boolean>}
+   */
+  async deleteReturn(idOrIds) {
+    try {
+      const ids = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
+      const { error } = await supabase
+        .from('return_requests')
+        .delete()
+        .in('id', ids);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Błąd usuwania zgłoszenia:', error);
+      throw error;
+    }
   }
 };
 
