@@ -153,7 +153,7 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white w-full max-w-5xl h-[85vh] rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden">
-        {/* Nagłówek okna czatu admina */}
+        {/* Górny Nagłówek okna czatu admina */}
         <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
           <div className="flex items-center space-x-3">
             <div className="p-2.5 bg-blue-600/30 border border-blue-400/30 rounded-xl">
@@ -230,7 +230,7 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
               </div>
             </div>
 
-            {/* Lista wątków */}
+            {/* Lista wątków po lewej stronie */}
             <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
               {loadingThreads ? (
                 <div className="p-6 text-center text-gray-400 flex flex-col items-center justify-center space-y-2">
@@ -239,7 +239,7 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
                 </div>
               ) : filteredThreads.length === 0 ? (
                 <div className="p-6 text-center text-gray-400 text-xs">
-                  Brak aktywnych konwersacji spełniających kryteria.
+                  Brak aktywnych konwersacji.
                 </div>
               ) : (
                 filteredThreads.map((t) => {
@@ -256,20 +256,20 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
                         setSelectedThread(t);
                         chatAPI.markMessagesAsRead(t.id, 'staff');
                       }}
-                      className={`w-full text-left p-3.5 transition-all duration-150 flex items-start space-x-3 relative ${
+                      className={`w-full text-left p-3.5 transition-all duration-150 flex items-center space-x-3 relative ${
                         isSelected
                           ? 'bg-blue-50/90 border-l-4 border-blue-600 shadow-sm'
                           : 'hover:bg-white bg-slate-50/50'
                       }`}
                     >
-                      <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-inner mt-0.5">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-sm">
                         {t.company_name ? t.company_name.charAt(0).toUpperCase() : 'K'}
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center justify-between mb-0.5">
                           <h4 className="font-bold text-xs text-gray-900 truncate pr-1">
-                            {t.company_name || t.client_name || 'Klient'}
+                            {t.company_name || 'Klient'}
                           </h4>
                           <span className="text-[10px] text-gray-400 flex-shrink-0 font-medium">{lastTime}</span>
                         </div>
@@ -281,14 +281,14 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
                         </p>
 
                         {t.last_message && (
-                          <p className="text-xs text-gray-600 truncate italic font-sans bg-white/60 p-1 rounded border border-gray-100">
+                          <p className="text-xs text-gray-600 truncate italic font-sans bg-white/70 px-1.5 py-0.5 rounded border border-gray-100">
                             "{t.last_message}"
                           </p>
                         )}
                       </div>
 
                       {hasUnread && (
-                        <span className="ml-1 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 animate-pulse self-center">
+                        <span className="ml-1 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 animate-pulse">
                           {t.unread_admin_count}
                         </span>
                       )}
@@ -303,31 +303,32 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
           <div className="flex-1 flex flex-col bg-white min-w-0">
             {selectedThread ? (
               <>
-                {/* Estetyczny Nagłówek wątku */}
-                <div className="p-4 bg-gray-50/90 border-b border-gray-200 flex items-center justify-between flex-wrap gap-2 shrink-0">
-                  <div className="flex items-center space-x-3 min-w-0">
-                    <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-md flex-shrink-0">
+                {/* Nowy, idealnie symetryczny i czytelny nagłówek rozmowy */}
+                <div className="px-6 py-3.5 bg-slate-50 border-b border-gray-200 flex items-center justify-between shrink-0">
+                  <div className="flex items-center space-x-3.5 min-w-0">
+                    <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-md flex-shrink-0">
                       <Building2 className="w-5 h-5" />
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-                        <h3 className="font-bold text-sm text-gray-900 truncate max-w-md">
+                      <div className="flex items-center space-x-2">
+                        <h3 className="font-bold text-sm text-gray-900 truncate">
                           {selectedThread.company_name || 'Klient'}
                         </h3>
                         {selectedThread.nip && (
-                          <span className="text-[11px] font-semibold text-gray-700 bg-gray-200/80 px-2 py-0.5 rounded-md font-mono flex-shrink-0">
+                          <span className="text-[11px] font-medium text-gray-600 bg-gray-200/80 px-2 py-0.5 rounded-md font-mono flex-shrink-0">
                             NIP: {selectedThread.nip}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Rozmówca: <strong className="text-gray-800">{selectedThread.client_name}</strong>
+                      <p className="text-xs text-gray-500 flex items-center space-x-1 mt-0.5">
+                        <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                        <span>Klient: <strong className="text-gray-700 font-semibold">{selectedThread.client_name}</strong></span>
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2 text-xs flex-shrink-0">
-                    <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-bold text-xs rounded-full border border-emerald-200 flex items-center space-x-1.5 shadow-sm">
+                  <div className="flex items-center space-x-2 flex-shrink-0">
+                    <span className="px-3 py-1 bg-emerald-50 text-emerald-700 font-semibold text-xs rounded-full border border-emerald-200 flex items-center space-x-1.5 shadow-2xs">
                       <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
                       <span>Aktywny wątek</span>
                     </span>
