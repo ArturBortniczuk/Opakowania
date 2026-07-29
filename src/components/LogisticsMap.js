@@ -4,7 +4,7 @@ import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-m
 import { supabase } from '../lib/supabase';
 import { returnsAPI, drumsAPI, transportAPI } from '../utils/supabaseApi';
 import GeocodeMigration from './GeocodeMigration';
-import { MapPin, Map as MapIcon, X, Check, Search, AlertTriangle, Filter, Building, User, Eye, Truck, Mail } from 'lucide-react';
+import { MapPin, Map as MapIcon, X, Check, Search, AlertTriangle, Filter, Building, User, Eye, Truck, Mail, Save, CheckCircle } from 'lucide-react';
 import TransportOrderModal from './TransportOrderModal';
 
 const containerStyle = {
@@ -46,6 +46,7 @@ const LogisticsMap = ({ user }) => {
   const urlFilter = searchParams.get('filter');
 
   const [map, setMap] = useState(null);
+  const [requests, setRequests] = useState([]);
   const [locations, setLocations] = useState([]);
   const [missingAddresses, setMissingAddresses] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState(null);
@@ -75,6 +76,53 @@ const LogisticsMap = ({ user }) => {
   // Wyszukiwanie miejscowości na mapie
   const [citySearchInput, setCitySearchInput] = useState('');
   const [searchingCity, setSearchingCity] = useState(false);
+
+  // Stany dla panelu PILNE zgłoszenia
+  const [urgentReasons, setUrgentReasons] = useState({});
+  const [savingUrgentId, setSavingUrgentId] = useState(null);
+
+  const urgentRequests = useMemo(() => {
+    return requests.filter(r => r.priority === 'High' && r.status !== 'Completed' && r.status !== 'Rejected');
+  }, [requests]);
+
+  const handleSaveUrgentReason = async (reqId, reasonText) => {
+    setSavingUrgentId(reqId);
+    try {
+      await returnsAPI.updateReturnStatus(reqId, { urgent_reason: reasonText });
+      setRequests(prev => prev.map(r => r.id === reqId ? { ...r, urgent_reason: reasonText } : r));
+    } catch (err) {
+      console.error('Błąd zapisu powodu pilności:', err);
+      alert('Nie udało się zapisać powodu pilności: ' + err.message);
+    } finally {
+      setSavingUrgentId(null);
+    }
+  };
+
+  const handleFocusUrgentOnMap = (req) => {
+    const targetLoc = locations.find(loc => 
+      loc.type === 'pickup' && 
+      loc.pickups && 
+      loc.pickups.some(p => p.requestId === req.id || p.originalRequest?.id === req.id)
+    );
+
+    if (targetLoc && targetLoc.lat && targetLoc.lng && map) {
+      map.panTo({ lat: targetLoc.lat, lng: targetLoc.lng });
+      map.setZoom(14);
+      setSelectedLocation(targetLoc);
+    } else if (req.latitude && req.longitude && map) {
+      const lat = parseFloat(req.latitude);
+      const lng = parseFloat(req.longitude);
+      map.panTo({ lat, lng });
+      map.setZoom(14);
+      
+      const locByCoords = locations.find(l => Math.abs(l.lat - lat) < 0.001 && Math.abs(l.lng - lng) < 0.001);
+      if (locByCoords) {
+        setSelectedLocation(locByCoords);
+      }
+    } else {
+      alert(`Zgłoszenie ${returnsAPI.getRequestDisplayId(req, requests)} nie posiada przypisanych współrzędnych na mapie. Możesz przypisać adres w sekcji poniżej mapy.`);
+    }
+  };
 
   const handleSearchCity = (e) => {
     if (e) e.preventDefault();
@@ -250,6 +298,7 @@ const LogisticsMap = ({ user }) => {
 
       // 2. Pobieramy aktywne zwroty
       const retRes = await returnsAPI.getReturns();
+      setRequests(retRes || []);
       
       // 2b. Pobieramy mapowanie MPK
       let mpkByNip = {};
@@ -1375,84 +1424,184 @@ const LogisticsMap = ({ user }) => {
             </div>
           </div>
 
-          {/* Panel Boczny: Niezidentyfikowane Adresy */}
+          {/* Panel Boczny: PILNE ZGŁOSZENIA */}
           <div className="w-full xl:w-96 flex-shrink-0">
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm h-full max-h-[800px] flex flex-col">
-              <div className="p-4 border-b border-gray-200 bg-red-50 rounded-t-xl flex items-center justify-between">
-                <div className="flex items-center">
-                  <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
-                  <div>
-                    <h3 className="font-bold text-gray-900">Brak współrzędnych</h3>
-                    <p className="text-xs text-red-600">Nie znaleziono w Google ({missingAddresses.filter(m => {
-                      if (filter === 'pickups') return m.pickupIds && m.pickupIds.length > 0;
-                      if (filter === 'drums') return m.drumIds && m.drumIds.length > 0;
-                      return true;
-                    }).length})</p>
-                  </div>
+            <div className="bg-white border border-red-200 rounded-2xl shadow-md h-full max-h-[800px] flex flex-col overflow-hidden">
+              <div className="p-4 bg-gradient-to-r from-red-600 to-rose-700 text-white flex items-center justify-between shrink-0 shadow-xs">
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className="w-5 h-5 text-white animate-pulse" />
+                  <h3 className="font-bold text-base tracking-tight">PILNE zgłoszenia</h3>
                 </div>
+                <span className="bg-white/20 text-white text-xs font-extrabold px-2.5 py-0.5 rounded-full border border-white/30">
+                  {urgentRequests.length}
+                </span>
               </div>
-              
-              <div className="flex-1 overflow-y-auto p-2 space-y-2">
+
+              <div className="flex-1 overflow-y-auto p-3 space-y-3.5 bg-gray-50/50">
+                {urgentRequests.length === 0 ? (
+                  <div className="text-center py-12 px-4 text-gray-500">
+                    <CheckCircle className="w-12 h-12 mx-auto text-emerald-500 mb-2 opacity-80" />
+                    <p className="font-bold text-sm text-gray-700">Brak zgłoszeń oznaczonych jako pilne.</p>
+                    <p className="text-xs text-gray-500 mt-1">Wszystkie pilne zgłoszenia zostały obsłużone.</p>
+                  </div>
+                ) : (
+                  urgentRequests.map(req => {
+                    const displayId = returnsAPI.getRequestDisplayId(req, requests);
+                    const drumsList = Array.isArray(req.selected_drums) ? req.selected_drums.filter(d => typeof d !== 'object' || d.type !== 'pallet') : [];
+                    const palletsList = Array.isArray(req.selected_drums) ? req.selected_drums.filter(d => typeof d === 'object' && d.type === 'pallet') : [];
+                    const damagedCount = drumsList.filter(d => typeof d === 'object' && d !== null && d.isDamaged).length;
+                    const palletsCount = palletsList.reduce((sum, p) => sum + (p.quantity || 0), 0);
+
+                    const isSavingReason = savingUrgentId === req.id;
+                    const reasonText = urgentReasons[req.id] !== undefined ? urgentReasons[req.id] : (req.urgent_reason || '');
+
+                    return (
+                      <div key={req.id} className="bg-white rounded-xl p-3.5 border border-red-100 shadow-xs hover:shadow-md transition-all space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-xs font-extrabold text-red-900 bg-red-50 border border-red-200 px-2 py-0.5 rounded-md select-all">
+                            {displayId}
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                            {req.status === 'Pending' ? 'Oczekujące' : req.status === 'Approved' ? 'W transporcie' : req.status}
+                          </span>
+                        </div>
+
+                        <div>
+                          <h4 className="font-bold text-sm text-gray-900 leading-snug break-words" title={req.company_name}>
+                            {req.company_name}
+                          </h4>
+                          <p className="text-xs text-gray-500 mt-0.5 flex items-center font-medium">
+                            <MapPin className="w-3.5 h-3.5 text-gray-400 mr-1 shrink-0" />
+                            <span className="truncate">{req.city ? `${req.street}, ${req.city}` : req.street}</span>
+                          </p>
+                        </div>
+
+                        <div className="bg-gray-50 p-2 rounded-lg border border-gray-100 flex flex-wrap gap-1.5 text-[11px] font-semibold text-gray-700">
+                          <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded">📦 Bębny: {drumsList.length} szt.</span>
+                          {palletsCount > 0 && (
+                            <span className="bg-amber-50 text-amber-800 px-2 py-0.5 rounded">🪵 Palety: {palletsCount} szt.</span>
+                          )}
+                          {damagedCount > 0 && (
+                            <span className="bg-red-50 text-red-700 px-2 py-0.5 rounded font-bold">⚠️ Uszkodzenia ({damagedCount})</span>
+                          )}
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                            Powód pilności zgłoszenia:
+                          </label>
+                          <div className="flex gap-1.5">
+                            <textarea
+                              rows={2}
+                              placeholder="Wpisz dlaczego to zgłoszenie jest pilne..."
+                              value={reasonText}
+                              onChange={(e) => setUrgentReasons(prev => ({ ...prev, [req.id]: e.target.value }))}
+                              className="w-full text-xs p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none bg-gray-50 focus:bg-white resize-none"
+                            />
+                            <button
+                              onClick={() => handleSaveUrgentReason(req.id, reasonText)}
+                              disabled={isSavingReason}
+                              className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all shrink-0 flex items-center justify-center self-end h-8 shadow-xs"
+                              title="Zapisz powód pilności"
+                            >
+                              {isSavingReason ? '...' : <Save className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleFocusUrgentOnMap(req)}
+                          className="w-full py-2 px-3 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 shadow-2xs cursor-pointer"
+                        >
+                          <Search className="w-3.5 h-3.5" />
+                          <span>Przybliż na zgłoszenie</span>
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* SEKCJA PONIŻEJ MAPY: Brak współrzędnych */}
+        <div className="mt-8 bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-200 bg-red-50 flex items-center justify-between">
+            <div className="flex items-center">
+              <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
+              <div>
+                <h3 className="font-bold text-gray-900">Brak współrzędnych</h3>
+                <p className="text-xs text-red-600">Nie znaleziono w Google ({missingAddresses.filter(m => {
+                  if (filter === 'pickups') return m.pickupIds && m.pickupIds.length > 0;
+                  if (filter === 'drums') return m.drumIds && m.drumIds.length > 0;
+                  return true;
+                }).length})</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-4">
+            {missingAddresses.filter(m => {
+              if (filter === 'pickups') return m.pickupIds && m.pickupIds.length > 0;
+              if (filter === 'drums') return m.drumIds && m.drumIds.length > 0;
+              return true;
+            }).length === 0 ? (
+              <div className="p-6 text-center text-gray-500 text-sm bg-gray-50 rounded-xl">
+                ✨ Wszystkie pozycje posiadają zlokalizowane współrzędne geograficzne na mapie!
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {missingAddresses.filter(m => {
                   if (filter === 'pickups') return m.pickupIds && m.pickupIds.length > 0;
                   if (filter === 'drums') return m.drumIds && m.drumIds.length > 0;
                   return true;
-                }).length === 0 ? (
-                  <div className="p-4 text-center text-gray-500 text-sm">
-                    Wszystkie pozycje posiadają współrzędne!
-                  </div>
-                ) : (
-                  missingAddresses.filter(m => {
-                    if (filter === 'pickups') return m.pickupIds && m.pickupIds.length > 0;
-                    if (filter === 'drums') return m.drumIds && m.drumIds.length > 0;
-                    return true;
-                  }).map((m, idx) => (
-                    <div 
-                      key={idx} 
-                      className={`p-3 rounded-lg border transition-all ${assigningLocation?.address === m.address ? 'bg-yellow-50 border-yellow-400 shadow-sm' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}`}
-                    >
-                      <div className="flex justify-between items-start mb-1">
-                        <div className="flex flex-col">
-                          <p className="font-bold text-gray-800 break-words">{m.companyName}</p>
-                          <p className="text-xs text-gray-500">{m.address}</p>
-                        </div>
-                        <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-bold whitespace-nowrap ml-2">
-                          {filter === 'pickups' 
-                            ? `${m.pickupIds?.length || 0} zgłoszeń` 
-                            : filter === 'drums' 
-                              ? `${m.drumIds?.length || 0} bębnów`
-                              : `${m.count} pozycje`
-                          }
-                        </span>
+                }).map((m, idx) => (
+                  <div 
+                    key={idx} 
+                    className={`p-3.5 rounded-xl border transition-all ${assigningLocation?.address === m.address ? 'bg-yellow-50 border-yellow-400 shadow-sm' : 'bg-gray-50 border-gray-200 hover:border-blue-300'}`}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex flex-col min-w-0 pr-2">
+                        <p className="font-bold text-gray-800 truncate">{m.companyName}</p>
+                        <p className="text-xs text-gray-500 truncate">{m.address}</p>
                       </div>
-                      
-                      <button
-                        onClick={() => {
-                          setAssigningLocation({ 
-                            address: m.address, 
-                            companyName: m.companyName, 
-                            drumIds: m.drumIds,
-                            pickupIds: m.pickupIds
-                          });
-                          alert(`Kliknij na mapie w miejscu, gdzie znajduje się adres:\n${m.address} (Klient: ${m.companyName || 'Brak'})`);
-                        }}
-                        className="w-full mt-3 flex items-center justify-center space-x-1 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition text-xs font-medium"
-                      >
-                        <MapPin className="w-3 h-3" />
-                        <span>Przypisz ręcznie</span>
-                      </button>
-
-                      {assigningLocation && assigningLocation.address === m.address && assigningLocation.companyName === m.companyName && (
-                        <div className="mt-2 text-xs text-yellow-600 bg-yellow-50 p-2 rounded flex justify-between items-center">
-                          <span>Wskazujesz na mapie...</span>
-                          <button onClick={(e) => { e.stopPropagation(); setAssigningLocation(null); }} className="text-yellow-800 hover:underline">Anuluj</button>
-                        </div>
-                      )}
+                      <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-bold whitespace-nowrap shrink-0">
+                        {filter === 'pickups' 
+                          ? `${m.pickupIds?.length || 0} zgłoszeń` 
+                          : filter === 'drums' 
+                            ? `${m.drumIds?.length || 0} bębnów`
+                            : `${m.count} pozycje`
+                        }
+                      </span>
                     </div>
-                  ))
-                )}
+                    
+                    <button
+                      onClick={() => {
+                        setAssigningLocation({ 
+                          address: m.address, 
+                          companyName: m.companyName, 
+                          drumIds: m.drumIds,
+                          pickupIds: m.pickupIds
+                        });
+                        alert(`Kliknij na mapie w miejscu, gdzie znajduje się adres:\n${m.address} (Klient: ${m.companyName || 'Brak'})`);
+                      }}
+                      className="w-full mt-2 flex items-center justify-center space-x-1 py-2 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-lg transition text-xs font-semibold shadow-2xs"
+                    >
+                      <MapPin className="w-3.5 h-3.5 text-red-500" />
+                      <span>Przypisz ręcznie na mapie</span>
+                    </button>
+
+                    {assigningLocation && assigningLocation.address === m.address && assigningLocation.companyName === m.companyName && (
+                      <div className="mt-2 text-xs text-yellow-600 bg-yellow-50 p-2 rounded flex justify-between items-center">
+                        <span>Wskazujesz na mapie...</span>
+                        <button onClick={(e) => { e.stopPropagation(); setAssigningLocation(null); }} className="text-yellow-800 hover:underline">Anuluj</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

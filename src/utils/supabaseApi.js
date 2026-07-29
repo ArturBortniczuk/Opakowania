@@ -2167,10 +2167,11 @@ export const returnsAPI = {
         .single();
 
       if (error) {
-        if (error.message?.includes('status_history') || error.message?.includes('status_updated_at') || error.code === 'PGRST204') {
+        if (error.message?.includes('status_history') || error.message?.includes('status_updated_at') || error.message?.includes('urgent_reason') || error.code === 'PGRST204') {
           console.warn('Brak kolumny status_history w bazie DB - ponawianie update bez tych pól');
           delete updatePayload.status_history;
           delete updatePayload.status_updated_at;
+          delete updatePayload.urgent_reason;
           const retry = await supabase
             .from('return_requests')
             .update(updatePayload)
