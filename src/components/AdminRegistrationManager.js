@@ -1,14 +1,45 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { UserCheck, CheckCircle, AlertCircle, X, Check, Mail, Phone, Building2, ShieldAlert, RefreshCw, Search, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { authAPI } from '../utils/supabaseApi';
 
 // Komponent wyszukiwalnego i edytowalnego pola NIP z podpowiedziami z bazy
-const CompanyNipCombobox = ({ userId, currentSelectedNip, companies, onNipChange }) => {
+const CompanyNipCombobox = ({ userId, currentSelectedNip, companies, onNipChange, onAddCompanies }) => {
   const [filterText, setFilterText] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   const selectedCompany = companies.find(c => c.nip === currentSelectedNip);
+
+  // Wyszukiwanie na żywo w Supabase jeśli fraza ma co najmniej 2 znaki
+  useEffect(() => {
+    if (!filterText || filterText.trim().length < 2) return;
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const q = filterText.trim();
+        const cleanNip = q.replace(/[^0-9]/g, '');
+        
+        let query = supabase.from('companies').select('nip, name');
+        if (cleanNip.length >= 3) {
+          query = query.or(`nip.ilike.%${cleanNip}%,name.ilike.%${q}%`);
+        } else {
+          query = query.ilike('name', `%${q}%`);
+        }
+        
+        const { data: searchResults } = await query.limit(50);
+        if (searchResults && searchResults.length > 0) {
+          onAddCompanies(searchResults);
+        }
+      } catch (err) {
+        console.error('Błąd live search firm:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [filterText, onAddCompanies]);
 
   const filteredCompanies = useMemo(() => {
     if (!filterText.trim()) return companies.slice(0, 150);
@@ -46,6 +77,11 @@ const CompanyNipCombobox = ({ userId, currentSelectedNip, companies, onNipChange
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)}></div>
           <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto divide-y divide-gray-100">
+            {isSearching && (
+              <div className="p-2 text-xs text-purple-600 text-center font-medium bg-purple-50">
+                Szukam w bazie Supabase...
+              </div>
+            )}
             {filteredCompanies.length === 0 ? (
               <div className="p-3 text-xs text-gray-500 text-center">
                 Brak pasującej firmy w bazie. Przypisujesz wpisany NIP: <strong className="font-mono text-purple-700">{filterText}</strong>
@@ -91,13 +127,31 @@ const AdminRegistrationManager = () => {
     setLoading(true);
     setError(null);
     try {
-      const [users, { data: companiesData }] = await Promise.all([
+      const [users, { data: initialCompanies }] = await Promise.all([
         authAPI.getPendingRegistrations(),
-        supabase.from('companies').select('nip, name').order('name').limit(10000)
+        supabase.from('companies').select('nip, name').order('name').limit(1000)
       ]);
       
       setPendingUsers(users);
-      setCompanies(companiesData || []);
+
+      // Bezpośrednie dociągnięcie z bazy Supabase firm pasujących do NIP-ów podanych przy rejestracji
+      const userNips = (users || []).map(u => u.nip).filter(Boolean);
+      let matchedDbCompanies = [];
+      if (userNips.length > 0) {
+        const { data: dbMatched } = await supabase
+          .from('companies')
+          .select('nip, name')
+          .in('nip', userNips);
+        if (dbMatched) {
+          matchedDbCompanies = dbMatched;
+        }
+      }
+
+      // Połącz bazy firm i usuń dublety
+      const mergedMap = new Map();
+      (initialCompanies || []).forEach(c => mergedMap.set(c.nip, c));
+      matchedDbCompanies.forEach(c => mergedMap.set(c.nip, c));
+      setCompanies(Array.from(mergedMap.values()));
       
       // Domyślnie wpisz podany NIP klienta
       const initialNips = {};
@@ -167,8 +221,28 @@ const AdminRegistrationManager = () => {
     }
   };
 
-  const handleNipChange = (userId, nip) => {
+  const handleAddCompanies = useCallback((newCompanies) => {
+    setCompanies(prev => {
+      const map = new Map();
+      prev.forEach(c => map.set(c.nip, c));
+      newCompanies.forEach(c => map.set(c.nip, c));
+      return Array.from(map.values());
+    });
+  }, []);
+
+  const handleNipChange = async (userId, nip) => {
     setSelectedNips(prev => ({ ...prev, [userId]: nip }));
+    if (nip && nip.length >= 8) {
+      // Dociągnij bezpośrednio z Supabase jeśli jeszcze nie ma w stanie
+      if (!companies.some(c => c.nip === nip)) {
+        try {
+          const { data: dbMatch } = await supabase.from('companies').select('nip, name').eq('nip', nip).maybeSingle();
+          if (dbMatch) {
+            handleAddCompanies([dbMatch]);
+          }
+        } catch (e) {}
+      }
+    }
   };
 
   if (loading) {
@@ -300,6 +374,7 @@ const AdminRegistrationManager = () => {
                       currentSelectedNip={currentSelectedNip}
                       companies={companies}
                       onNipChange={handleNipChange}
+                      onAddCompanies={handleAddCompanies}
                     />
 
                     {!nipExistsInBase && (
