@@ -57,9 +57,9 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
       setCheckedDrums(allDrumCechas);
 
       const palletsInit = request.selected_drums
-        ?.filter(d => typeof d === 'object' && d.type === 'pallet' && d.transported !== true && (d.quantity - (d.transportedQuantity || 0)) > 0)
+        ?.filter(d => typeof d === 'object' && (d.type === 'pallet' || d.isPallet || (!d.cecha && !d.kod_bebna && (d.size || d.name || d.nazwa))) && d.transported !== true && (d.quantity - (d.transportedQuantity || 0)) > 0)
         .map(p => ({
-           size: p.size,
+           size: p.size || p.cecha || p.name || p.nazwa || p.pallet_type || 'Paleta',
            quantity: (p.quantity || 0) - (p.transportedQuantity || 0),
            maxQuantity: (p.quantity || 0) - (p.transportedQuantity || 0)
         })) || [];

@@ -18,6 +18,15 @@ const center = {
   lng: 21.0122
 };
 
+const formatPalletName = (size) => {
+  if (!size) return 'Paleta';
+  const str = String(size).trim();
+  if (str.toLowerCase().startsWith('paleta')) {
+    return str;
+  }
+  return `Paleta ${str}`;
+};
+
 const getAgeInDays = (dateStr) => {
   if (!dateStr) return 0;
   const issueDate = new Date(dateStr);
@@ -309,15 +318,16 @@ const LogisticsMap = ({ user }) => {
               drumsCount: r.selected_drums ? r.selected_drums.length : 0,
               selected_drums: (r.selected_drums || []).map(drum => {
                 const isObject = typeof drum === 'object' && drum !== null;
-                const isPallet = isObject && (drum.isPallet || drum.type === 'pallet' || (drum.name && !drum.cecha && !drum.kod_bebna));
+                const isPallet = isObject && (drum.isPallet || drum.type === 'pallet' || (!drum.cecha && (drum.size || drum.name || drum.nazwa || drum.pallet_type)));
 
                 if (isPallet) {
-                  const rawName = drum.name || drum.nazwa || drum.pallet_type || 'Paleta';
-                  const cleanName = rawName.startsWith('Paleta') ? rawName : `Paleta ${rawName}`;
+                  const rawName = drum.size || drum.cecha || drum.name || drum.nazwa || drum.pallet_type || 'Paleta';
+                  const cleanName = formatPalletName(rawName);
                   const qty = drum.count || drum.quantity || drum.ilosc || 1;
                   return {
                     isPallet: true,
                     name: cleanName,
+                    size: drum.size || drum.cecha || rawName,
                     quantity: qty,
                     kon_dostawca: drum.kon_dostawca || ''
                   };
@@ -826,7 +836,13 @@ const LogisticsMap = ({ user }) => {
         });
 
         const drumsDescParts = selectedDrumsDetails.map(d => {
-            if (typeof d === 'object') {
+            if (typeof d === 'object' && d !== null) {
+                const isPallet = d.isPallet || d.type === 'pallet' || (!d.cecha && !d.kod_bebna && (d.size || d.name || d.nazwa));
+                if (isPallet) {
+                    const palletName = formatPalletName(d.size || d.cecha || d.name || d.nazwa || d.pallet_type);
+                    const qty = d.quantity || d.count || d.ilosc || 1;
+                    return `${palletName} - ${qty} szt.`;
+                }
                 const cecha = d.cecha || d.kod_bebna || '';
                 const size = d.rozmiar_bebna || d.nazwa || '';
                 const weight = d.waga_bebna || d.WAGA_BEBNA || d.weight || d.waga || '';
@@ -1274,10 +1290,10 @@ const LogisticsMap = ({ user }) => {
                               {pickup.selected_drums && pickup.selected_drums.length > 0 && (
                                 <div className="space-y-1.5 mb-3">
                                   {pickup.selected_drums.map((drum, idx) => {
-                                    const isPallet = drum.isPallet || drum.type === 'pallet' || (!drum.cecha && (drum.name || drum.nazwa || drum.pallet_type));
+                                    const isPallet = drum.isPallet || drum.type === 'pallet' || (!drum.cecha && (drum.size || drum.name || drum.nazwa || drum.pallet_type));
                                     if (isPallet) {
-                                      const rawName = drum.name || drum.nazwa || drum.pallet_type || 'Paleta';
-                                      const cleanName = rawName.startsWith('Paleta') ? rawName : `Paleta ${rawName}`;
+                                      const rawName = drum.size || drum.cecha || drum.name || drum.nazwa || drum.pallet_type || 'Paleta';
+                                      const cleanName = formatPalletName(rawName);
                                       const qty = drum.quantity || drum.count || drum.ilosc || 1;
 
                                       return (

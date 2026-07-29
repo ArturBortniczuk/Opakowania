@@ -135,7 +135,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
         const drumsDescParts = selectedDrumsDetails.map(d => {
             if (typeof d === 'object') {
-                if (d.type === 'pallet') return `${formatPalletName(d.size)} - ${d.transportedQuantity || d.quantity} szt.`;
+                if (d.type === 'pallet' || d.isPallet || (!d.cecha && !d.kod_bebna && (d.size || d.name || d.nazwa))) return `${formatPalletName(d.size || d.cecha || d.name || d.nazwa || d.pallet_type)} - ${d.transportedQuantity || d.quantity} szt.`;
                 const cecha = d.cecha || d.kod_bebna || '';
                 const size = d.rozmiar_bebna || d.nazwa || '';
                 const weight = d.waga_bebna || d.WAGA_BEBNA || d.weight || d.waga || '';
@@ -491,7 +491,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
   const getDrumLabel = (drum) => {
     if (typeof drum === 'object' && drum !== null) {
-      if (drum.type === 'pallet') return `${formatPalletName(drum.size)} (${drum.quantity} szt.)`;
+      if (drum.type === 'pallet' || drum.isPallet || (!drum.cecha && !drum.kod_bebna && (drum.size || drum.name || drum.nazwa))) return `${formatPalletName(drum.size || drum.cecha || drum.name || drum.nazwa || drum.pallet_type)} (${drum.quantity} szt.)`;
       return drum.cecha || drum.kod_bebna || 'Nieznany';
     }
     return drum;
