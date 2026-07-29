@@ -373,65 +373,183 @@ const LogisticsMap = ({ user }) => {
               drumsByWarehouse[magName].push(d);
             });
 
-            const cityCoordsFallback = {
-              'białystok': { lat: 53.1325, lng: 23.1688 },
-              'bialystok': { lat: 53.1325, lng: 23.1688 },
-              'poznan': { lat: 52.4064, lng: 16.9252 },
-              'poznań': { lat: 52.4064, lng: 16.9252 },
-              'warszawa': { lat: 52.2297, lng: 21.0122 },
-              'elk': { lat: 53.8266, lng: 22.3619 },
-              'ełk': { lat: 53.8266, lng: 22.3619 },
-              'katowice': { lat: 50.2649, lng: 19.0238 },
-              'wroclaw': { lat: 51.1100, lng: 17.0333 },
-              'wrocław': { lat: 51.1100, lng: 17.0333 },
-              'gdansk': { lat: 54.3520, lng: 18.6466 },
-              'gdańsk': { lat: 54.3520, lng: 18.6466 },
-              'rzeszow': { lat: 50.0412, lng: 21.9991 },
-              'rzeszów': { lat: 50.0412, lng: 21.9991 },
-              'lublin': { lat: 51.2465, lng: 22.5684 }
+            const warehouseDetailsMap = {
+              'lublin': {
+                companyName: 'Magazyn Lublin',
+                street: 'Energetyków 10',
+                postal_code: '20-468',
+                city: 'Lublin',
+                lat: 51.2335,
+                lng: 22.5684
+              },
+              'białystok': {
+                companyName: 'Magazyn Białystok',
+                street: 'Wysockiego 69B',
+                postal_code: '15-169',
+                city: 'Białystok',
+                lat: 53.1585,
+                lng: 23.1812
+              },
+              'bialystok': {
+                companyName: 'Magazyn Białystok',
+                street: 'Wysockiego 69B',
+                postal_code: '15-169',
+                city: 'Białystok',
+                lat: 53.1585,
+                lng: 23.1812
+              },
+              'zielonka': {
+                companyName: 'Magazyn Zielonka',
+                street: 'Krótka 2',
+                postal_code: '05-220',
+                city: 'Zielonka',
+                lat: 52.3082,
+                lng: 21.1610
+              },
+              'poznan': {
+                companyName: 'Magazyn Poznań',
+                street: 'Magazynowa 1',
+                postal_code: '60-001',
+                city: 'Poznań',
+                lat: 52.4064,
+                lng: 16.9252
+              },
+              'poznań': {
+                companyName: 'Magazyn Poznań',
+                street: 'Magazynowa 1',
+                postal_code: '60-001',
+                city: 'Poznań',
+                lat: 52.4064,
+                lng: 16.9252
+              },
+              'warszawa': {
+                companyName: 'Magazyn Zielonka',
+                street: 'Krótka 2',
+                postal_code: '05-220',
+                city: 'Zielonka',
+                lat: 52.3082,
+                lng: 21.1610
+              },
+              'elk': {
+                companyName: 'Magazyn Ełk',
+                street: 'Przemysłowa 1',
+                postal_code: '19-300',
+                city: 'Ełk',
+                lat: 53.8266,
+                lng: 22.3619
+              },
+              'ełk': {
+                companyName: 'Magazyn Ełk',
+                street: 'Przemysłowa 1',
+                postal_code: '19-300',
+                city: 'Ełk',
+                lat: 53.8266,
+                lng: 22.3619
+              },
+              'katowice': {
+                companyName: 'Magazyn Katowice',
+                street: 'Hutnicza 1',
+                postal_code: '40-001',
+                city: 'Katowice',
+                lat: 50.2649,
+                lng: 19.0238
+              },
+              'wroclaw': {
+                companyName: 'Magazyn Wrocław',
+                street: 'Fabryczna 1',
+                postal_code: '50-001',
+                city: 'Wrocław',
+                lat: 51.1100,
+                lng: 17.0333
+              },
+              'wrocław': {
+                companyName: 'Magazyn Wrocław',
+                street: 'Fabryczna 1',
+                postal_code: '50-001',
+                city: 'Wrocław',
+                lat: 51.1100,
+                lng: 17.0333
+              },
+              'gdansk': {
+                companyName: 'Magazyn Gdańsk',
+                street: 'Portowa 1',
+                postal_code: '80-001',
+                city: 'Gdańsk',
+                lat: 54.3520,
+                lng: 18.6466
+              },
+              'gdańsk': {
+                companyName: 'Magazyn Gdańsk',
+                street: 'Portowa 1',
+                postal_code: '80-001',
+                city: 'Gdańsk',
+                lat: 54.3520,
+                lng: 18.6466
+              },
+              'rzeszow': {
+                companyName: 'Magazyn Rzeszów',
+                street: 'Kolejowa 1',
+                postal_code: '35-001',
+                city: 'Rzeszów',
+                lat: 50.0412,
+                lng: 21.9991
+              },
+              'rzeszów': {
+                companyName: 'Magazyn Rzeszów',
+                street: 'Kolejowa 1',
+                postal_code: '35-001',
+                city: 'Rzeszów',
+                lat: 50.0412,
+                lng: 21.9991
+              }
             };
 
             Object.entries(drumsByWarehouse).forEach(([magName, drums]) => {
               const cleanCity = magName.replace(/^magazyn\s+/i, '').trim();
               const lowerCity = cleanCity.toLowerCase();
               
-              let lat = drums.find(d => d.latitude)?.latitude;
-              let lng = drums.find(d => d.longitude)?.longitude;
+              let whInfo = warehouseDetailsMap[lowerCity];
+              if (!whInfo) {
+                const words = lowerCity.split(/\s+/);
+                for (const w of words) {
+                  if (warehouseDetailsMap[w]) {
+                    whInfo = warehouseDetailsMap[w];
+                    break;
+                  }
+                }
+              }
+
+              const street = whInfo?.street || '';
+              const postal_code = whInfo?.postal_code || '';
+              const city = whInfo?.city || cleanCity || 'Białystok';
+              const companyName = whInfo?.companyName || magName;
+
+              let lat = drums.find(d => d.latitude)?.latitude || whInfo?.lat;
+              let lng = drums.find(d => d.longitude)?.longitude || whInfo?.lng;
 
               if (!lat || !lng) {
                 if (cacheMap[lowerCity]) {
                   lat = cacheMap[lowerCity].latitude;
                   lng = cacheMap[lowerCity].longitude;
-                } else if (cityCoordsFallback[lowerCity]) {
-                  lat = cityCoordsFallback[lowerCity].lat;
-                  lng = cityCoordsFallback[lowerCity].lng;
-                } else {
-                  const words = lowerCity.split(/\s+/);
-                  for (const w of words) {
-                    if (cacheMap[w]) {
-                      lat = cacheMap[w].latitude;
-                      lng = cacheMap[w].longitude;
-                      break;
-                    } else if (cityCoordsFallback[w]) {
-                      lat = cityCoordsFallback[w].lat;
-                      lng = cityCoordsFallback[w].lng;
-                      break;
-                    }
-                  }
                 }
               }
 
-              lat = lat ? parseFloat(lat) : 53.1325;
-              lng = lng ? parseFloat(lng) : 23.1688;
+              lat = lat ? parseFloat(lat) : 53.1585;
+              lng = lng ? parseFloat(lng) : 23.1812;
+
+              const displayAddress = street ? `${street}, ${postal_code} ${city}` : `Miejscowość: ${city}`;
 
               warehouseReadyLocations.push({
                 id: `loc_wh_ready_${magName.replace(/[^a-zA-Z0-9]/g, '_')}`,
                 lat,
                 lng,
-                title: `${magName} - Gotowe do zwrotu (${drums.length} szt.)`,
+                title: `${companyName} - Gotowe do zwrotu (${drums.length} szt.)`,
                 type: 'warehouse_ready',
-                companyName: magName,
-                address: `Miejscowość: ${cleanCity || magName}`,
+                companyName,
+                address: displayAddress,
+                street,
+                postal_code,
+                city,
                 drums,
                 visibleCount: drums.length
               });
@@ -1013,9 +1131,9 @@ const LogisticsMap = ({ user }) => {
                               const syntheticRequest = {
                                 id: `MAG_${selectedLocation.companyName.replace(/[^a-zA-Z0-9]/g, '_')}`,
                                 company_name: selectedLocation.companyName,
-                                street: 'Magazynowa 1',
-                                postal_code: '15-001',
-                                city: selectedLocation.address.replace(/^Miejscowość:\s*/i, '') || 'Białystok',
+                                street: selectedLocation.street || 'Wysockiego 69B',
+                                postal_code: selectedLocation.postal_code || '15-169',
+                                city: selectedLocation.city || 'Białystok',
                                 user_nip: '0000000000',
                                 selected_drums: selectedLocation.drums.map(d => ({
                                   cecha: d.cecha || d.kod_bebna,
