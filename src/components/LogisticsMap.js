@@ -57,6 +57,7 @@ const LogisticsMap = ({ user }) => {
   const [clientSearch, setClientSearch] = useState(''); // Po nazwie klienta
   const [sizeFilter, setSizeFilter] = useState(''); // Po rozmiar_bebna
   const [supplierFilter, setSupplierFilter] = useState(''); // Po kon_dostawca
+  const [pickupTypeFilter, setPickupTypeFilter] = useState('all'); // Po typie odbioru (spedycja, magazyn_bialystok, magazyn_zielonka)
   const [minAge, setMinAge] = useState(''); // Termin zwrotu od (dni)
   const [maxAge, setMaxAge] = useState(''); // Termin zwrotu do (dni)
 
@@ -803,11 +804,20 @@ const LogisticsMap = ({ user }) => {
         if (cQuery && loc.companyName && !loc.companyName.toLowerCase().includes(cQuery)) {
           return false;
         }
+
+        if (pickupTypeFilter && pickupTypeFilter !== 'all') {
+          const matchesType = loc.pickups && loc.pickups.some(p => {
+            const info = returnsAPI.getPickupTypeInfo(p.originalRequest?.pickup_type);
+            return info.value === pickupTypeFilter;
+          });
+          if (!matchesType) return false;
+        }
+
         return true;
       }
       return loc.visibleCount > 0;
     });
-  }, [locations, filter, searchQuery, clientSearch, sizeFilter, supplierFilter, minAge, maxAge]);
+  }, [locations, filter, searchQuery, clientSearch, sizeFilter, supplierFilter, minAge, maxAge, pickupTypeFilter]);
 
   const handleMapClick = useCallback(async (e) => {
     if (!assigningLocation) return;
@@ -1031,7 +1041,21 @@ const LogisticsMap = ({ user }) => {
         </form>
 
         {/* NOWY PANEL FILTROWANIA ZAAWANSOWANEGO */}
-        <div className="bg-gray-50 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="bg-gray-50 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">Metoda Odbioru</label>
+            <select
+              className="w-full py-2 px-3 border border-gray-300 rounded text-sm bg-white focus:ring-blue-500 focus:border-blue-500 font-medium"
+              value={pickupTypeFilter}
+              onChange={(e) => setPickupTypeFilter(e.target.value)}
+            >
+              <option value="all">Wszystkie metody</option>
+              <option value="spedycja">🚚 Spedycja</option>
+              <option value="magazyn_bialystok">🏢 Magazyn Białystok</option>
+              <option value="magazyn_zielonka">🏢 Magazyn Zielonka</option>
+            </select>
+          </div>
           
           <div className="relative">
             <label className="block text-xs font-bold text-gray-700 mb-1">Kod / Cecha bębna</label>
