@@ -645,22 +645,24 @@ const LogisticsMap = ({ user }) => {
 
     if (loc.type === 'pickup') {
       const pickups = loc.pickups || [];
-      const hasInTransit = pickups.some(p => p.status === 'InTransit');
-      const hasPending = pickups.some(p => p.status === 'Pending' || p.status === 'Approved');
-      const hasHighPriority = pickups.some(p => p.priority === 'High');
+      
+      // Wyznaczamy jednolity kolor dla każdego zgłoszenia z osobna
+      const pickupColors = pickups.map(p => {
+        if (p.priority === 'High') return '#EF4444'; // Czerwony dla pilnego zgłoszenia
+        if (p.status === 'InTransit') return '#F97316'; // Pomarańczowy dla zgłoszenia w transporcie
+        return '#8B5CF6'; // Fioletowy dla pozostałych oczekujących
+      });
 
-      const colors = [];
-      if (hasHighPriority) colors.push('#EF4444'); // Czerwony dla pilnego
-      if (hasInTransit) colors.push('#F97316');    // Pomarańczowy dla transporu
-      if (hasPending) colors.push('#8B5CF6');      // Fioletowy dla oczekującego
-
-      const uniqueColors = Array.from(new Set(colors));
+      const uniqueColors = Array.from(new Set(pickupColors));
 
       if (uniqueColors.length >= 2) {
-        // Dwa różne statusy pod jednym adresem -> Pineska PÓŁ NA PÓŁ!
+        // Co najmniej 2 RÓŻNE ZGŁOSZENIA o różnych kolorach w jednym miejscu -> Pineska PÓŁ NA PÓŁ!
         return createSplitMarkerIcon(uniqueColors[0], uniqueColors[1]);
       } else if (uniqueColors.length === 1) {
-        return getMarkerIcon('pickup', 0, hasInTransit ? 'InTransit' : 'Pending', hasHighPriority ? 'High' : 'Normal');
+        const singleColor = uniqueColors[0];
+        const status = singleColor === '#F97316' ? 'InTransit' : 'Pending';
+        const priority = singleColor === '#EF4444' ? 'High' : 'Normal';
+        return getMarkerIcon('pickup', 0, status, priority);
       }
     }
 
