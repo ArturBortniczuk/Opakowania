@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { drumsAPI } from '../utils/supabaseApi';
 import {
   Package,
@@ -31,7 +31,9 @@ const AdminWarehouseDrums = () => {
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'empty', 'full'
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [withLocationOnly, setWithLocationOnly] = useState(false);
-  const [readyOnly, setReadyOnly] = useState(false);
+  const [searchParams] = useSearchParams();
+  const urlReadyOnly = searchParams.get('readyOnly') === 'true';
+  const [readyOnly, setReadyOnly] = useState(urlReadyOnly);
 
   const [readyCechy, setReadyCechy] = useState(new Set());
 
@@ -65,9 +67,16 @@ const AdminWarehouseDrums = () => {
     setError(null);
 
     try {
+      // Dociągnij najnowszą zestaw cech gotowych do zwrotu
+      const latestReadyList = await drumsAPI.getReadyForReturnCechy();
+      const latestReadySet = new Set(latestReadyList);
+      setReadyCechy(latestReadySet);
+
+      const targetPage = options.page !== undefined ? options.page : 1;
+
       const requestOptions = {
-        page: drumsData.pagination.page,
-        limit: 50,
+        page: readyOnly ? 1 : targetPage,
+        limit: readyOnly ? 5000 : 50,
         sortBy,
         sortOrder,
         search: searchTerm,
@@ -82,13 +91,18 @@ const AdminWarehouseDrums = () => {
       const result = await drumsAPI.getWarehouseDrums(requestOptions);
 
       if (readyOnly) {
-        const filteredData = (result.data || []).filter(drum => readyCechy.has(drum.cecha || drum.kod_bebna));
+        const filteredData = (result.data || []).filter(drum => latestReadySet.has(drum.cecha || drum.kod_bebna));
         setDrumsData({
           ...result,
           data: filteredData,
           pagination: {
             ...result.pagination,
-            total: filteredData.length
+            page: 1,
+            limit: filteredData.length || 50,
+            total: filteredData.length,
+            totalPages: 1,
+            hasNext: false,
+            hasPrev: false
           }
         });
       } else {
@@ -100,7 +114,7 @@ const AdminWarehouseDrums = () => {
     } finally {
       setLoading(false);
     }
-  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly, withLocationOnly, readyOnly, readyCechy, selectedSizes, selectedMagazyny]);
+  }, [sortBy, sortOrder, searchTerm, statusFilter, urgentOnly, withLocationOnly, readyOnly, selectedSizes, selectedMagazyny]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
