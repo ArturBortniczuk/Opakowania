@@ -570,6 +570,28 @@ const LogisticsMap = ({ user }) => {
     fetchData();
   }, []);
 
+  // Kustomowy generator ikony pineski pół na pół (dwukolorowej) z gradientem pionowym
+  const createSplitMarkerIcon = (colorLeft, colorRight) => {
+    if (!window.google) return null;
+    const gradientId = `grad_${colorLeft.replace('#','')}_${colorRight.replace('#','')}`;
+    const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="38" height="50" viewBox="0 0 24 32">
+  <defs>
+    <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="50%" stop-color="${colorLeft}" />
+      <stop offset="50%" stop-color="${colorRight}" />
+    </linearGradient>
+  </defs>
+  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="url(#${gradientId})" stroke="#FFFFFF" stroke-width="1.2" />
+</svg>`.trim();
+
+    return {
+      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+      scaledSize: new window.google.maps.Size(38, 50),
+      anchor: new window.google.maps.Point(19, 50)
+    };
+  };
+
   // Kustomowe Ikony SVG (Pin Google z własnym kolorem)
   const getMarkerIcon = (type, maxAgeDays = 0, status = null, priority = null) => {
     if (!window.google) return null; // Zabezpieczenie przed błędem przed wczytaniem skryptu
@@ -607,6 +629,42 @@ const LogisticsMap = ({ user }) => {
       scale: 1.6,
       anchor: new window.google.maps.Point(12, 24)
     };
+  };
+
+  // Wyznaczanie odpowiedniej ikony dla lokalizacji (obsługa pineski pół na pół przy mieszanych statusach)
+  const getMarkerIconForLocation = (loc) => {
+    if (!window.google) return null;
+
+    if (loc.type === 'warehouse_ready') {
+      return getMarkerIcon('warehouse_ready');
+    }
+
+    if (loc.type === 'drums') {
+      return getMarkerIcon('drums', loc.maxAgeDays);
+    }
+
+    if (loc.type === 'pickup') {
+      const pickups = loc.pickups || [];
+      const hasInTransit = pickups.some(p => p.status === 'InTransit');
+      const hasPending = pickups.some(p => p.status === 'Pending' || p.status === 'Approved');
+      const hasHighPriority = pickups.some(p => p.priority === 'High');
+
+      const colors = [];
+      if (hasHighPriority) colors.push('#EF4444'); // Czerwony dla pilnego
+      if (hasInTransit) colors.push('#F97316');    // Pomarańczowy dla transporu
+      if (hasPending) colors.push('#8B5CF6');      // Fioletowy dla oczekującego
+
+      const uniqueColors = Array.from(new Set(colors));
+
+      if (uniqueColors.length >= 2) {
+        // Dwa różne statusy pod jednym adresem -> Pineska PÓŁ NA PÓŁ!
+        return createSplitMarkerIcon(uniqueColors[0], uniqueColors[1]);
+      } else if (uniqueColors.length === 1) {
+        return getMarkerIcon('pickup', 0, hasInTransit ? 'InTransit' : 'Pending', hasHighPriority ? 'High' : 'Normal');
+      }
+    }
+
+    return getMarkerIcon('pickup');
   };
 
   // LOGIKA FILTROWANIA
@@ -998,9 +1056,7 @@ const LogisticsMap = ({ user }) => {
                 options={{ clickableIcons: false, gestureHandling: 'greedy' }}
               >
                 {filteredLocations.map((loc) => {
-                  const isInTransit = loc.type === 'pickup' && loc.pickups.some(p => p.status === 'InTransit');
-                  const isHighPriority = loc.type === 'pickup' && loc.pickups.some(p => p.priority === 'High');
-                  const icon = getMarkerIcon(loc.type, loc.maxAgeDays, isInTransit ? 'InTransit' : 'Pending', isHighPriority ? 'High' : 'Normal');
+                  const icon = getMarkerIconForLocation(loc);
                   if (!icon) return null; // Jeszcze nie załadowano Google Maps API
 
                   return (
