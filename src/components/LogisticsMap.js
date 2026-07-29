@@ -307,17 +307,32 @@ const LogisticsMap = ({ user }) => {
               requestId: r.id,
               drumsCount: r.selected_drums ? r.selected_drums.length : 0,
               selected_drums: (r.selected_drums || []).map(drum => {
-                const cecha = typeof drum === 'object' ? (drum.cecha || drum.kod_bebna) : drum;
-                const isDamaged = typeof drum === 'object' && drum.isDamaged;
-                const description = typeof drum === 'object' ? drum.description : '';
+                const isObject = typeof drum === 'object' && drum !== null;
+                const isPallet = isObject && (drum.isPallet || drum.type === 'pallet' || (drum.name && !drum.cecha && !drum.kod_bebna));
+
+                if (isPallet) {
+                  const rawName = drum.name || drum.nazwa || drum.pallet_type || 'Paleta';
+                  const cleanName = rawName.startsWith('Paleta') ? rawName : `Paleta ${rawName}`;
+                  const qty = drum.count || drum.quantity || drum.ilosc || 1;
+                  return {
+                    isPallet: true,
+                    name: cleanName,
+                    quantity: qty,
+                    kon_dostawca: drum.kon_dostawca || ''
+                  };
+                }
+
+                const cecha = isObject ? (drum.cecha || drum.kod_bebna) : drum;
+                const isDamaged = isObject && drum.isDamaged;
+                const description = isObject ? drum.description : '';
                 const fullDrum = drumsData.find(d => (d.cecha || d.kod_bebna) === cecha) || {};
                 
                 return {
                   cecha,
                   isDamaged,
                   description,
-                  kon_dostawca: typeof drum === 'object' && drum.kon_dostawca ? drum.kon_dostawca : fullDrum.kon_dostawca,
-                  rozmiar_bebna: typeof drum === 'object' && drum.rozmiar_bebna ? drum.rozmiar_bebna : (fullDrum.rozmiar_bebna || fullDrum.nazwa)
+                  kon_dostawca: isObject && drum.kon_dostawca ? drum.kon_dostawca : fullDrum.kon_dostawca,
+                  rozmiar_bebna: isObject && drum.rozmiar_bebna ? drum.rozmiar_bebna : (fullDrum.rozmiar_bebna || fullDrum.nazwa)
                 };
               }),
               status: r.status,
@@ -1258,6 +1273,26 @@ const LogisticsMap = ({ user }) => {
                               {pickup.selected_drums && pickup.selected_drums.length > 0 && (
                                 <div className="space-y-1.5 mb-3">
                                   {pickup.selected_drums.map((drum, idx) => {
+                                    const isPallet = drum.isPallet || drum.type === 'pallet' || (!drum.cecha && (drum.name || drum.nazwa || drum.pallet_type));
+                                    if (isPallet) {
+                                      const rawName = drum.name || drum.nazwa || drum.pallet_type || 'Paleta';
+                                      const cleanName = rawName.startsWith('Paleta') ? rawName : `Paleta ${rawName}`;
+                                      const qty = drum.quantity || drum.count || drum.ilosc || 1;
+
+                                      return (
+                                        <div key={idx} className="flex flex-col p-2 rounded-lg border bg-amber-50/80 border-amber-200 shadow-xs">
+                                          <div className="flex justify-between items-center">
+                                            <span className="font-sans text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                                              📦 {cleanName}
+                                            </span>
+                                            <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-200 text-amber-900">
+                                              {qty} {qty === 1 ? 'sztuka' : (qty > 1 && qty < 5 ? 'sztuki' : 'sztuk')}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+
                                     const cecha = drum.cecha;
                                     const isDamaged = drum.isDamaged;
                                     return (
