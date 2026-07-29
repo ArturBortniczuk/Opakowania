@@ -1,11 +1,14 @@
-// src/components/AdminNavbar.js - Zaktualizowany o zwijanie i przewijanie
+// src/components/AdminNavbar.js - Zaktualizowany o zwijanie, przewijanie oraz Czat na Żywo
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Menu, X, Home, Users, Package, Truck, BarChart3, LogOut, Building2,
-  UserCheck, ChevronRight, Shield, Settings, Crown, Pin, PinOff, Map, MapPin, HelpCircle, Calculator
+  UserCheck, ChevronRight, Shield, Settings, Crown, Pin, PinOff, Map, MapPin, HelpCircle, Calculator,
+  MessageSquare
 } from 'lucide-react';
 import { statsAPI } from '../utils/supabaseApi';
+import { chatAPI } from '../utils/chatApi';
+import AdminChatModal from './AdminChatModal';
 
 const AdminNavbar = ({
   user,
@@ -25,6 +28,34 @@ const AdminNavbar = ({
     overdueReturns: 0
   });
   const [statsLoading, setStatsLoading] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+
+  // Pobieranie sumy nieprzeczytanych wiadomości dla admina
+  const fetchUnreadChatCount = async () => {
+    try {
+      const threads = await chatAPI.getAllThreads();
+      const totalUnread = threads.reduce((acc, t) => acc + (t.unread_admin_count || 0), 0);
+      setUnreadChatCount(totalUnread);
+    } catch (err) {
+      console.error('Błąd pobierania liczby nieprzeczytanych wiadomości:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchUnreadChatCount();
+
+    // Nasłuchiwanie zmian w czasie rzeczywistym
+    const subscription = chatAPI.subscribeToStaffChat(() => {
+      fetchUnreadChatCount();
+    });
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
+  }, []);
 
   // Pobierz szybkie statystyki
   useEffect(() => {
@@ -50,8 +81,6 @@ const AdminNavbar = ({
     const interval = setInterval(fetchQuickStats, 30000);
     return () => clearInterval(interval);
   }, []);
-
-
 
   const menuItems = [
     { path: '/admin', label: 'Strona główna', icon: Home, description: 'Panel główny' },
@@ -163,6 +192,21 @@ const AdminNavbar = ({
             </div>
           </div>
           <div className="flex items-center space-x-4">
+            {/* Przycisk Czatu na żywo w nagłówku dla pracowników */}
+            <button
+              onClick={() => setIsChatOpen(true)}
+              className="relative p-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl transition-all duration-200 flex items-center space-x-2 border border-blue-200/60 shadow-sm group"
+              title="Czat na żywo z klientami"
+            >
+              <MessageSquare className="w-5 h-5 text-blue-600 group-hover:scale-110 transition-transform" />
+              <span className="hidden md:inline font-medium text-xs">Czat na Żywo</span>
+              {unreadChatCount > 0 && (
+                <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-bounce shadow-md">
+                  {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                </span>
+              )}
+            </button>
+
             <div className="flex items-center space-x-3">
               <div className="hidden sm:block text-right">
                 <div className="text-sm font-medium text-gray-900">{user.name}</div>
@@ -183,7 +227,7 @@ const AdminNavbar = ({
         />
       )}
 
-      {/* ZMIANA: Dynamiczna szerokość i obsługa zwijania */}
+      {/* Dynamiczna szerokość i obsługa zwijania */}
       <aside className={`
         fixed top-0 left-0 z-40 h-screen bg-white/95 backdrop-blur-md 
         border-r border-purple-100 shadow-xl transform transition-all duration-300 ease-in-out
@@ -209,11 +253,42 @@ const AdminNavbar = ({
             </div>
           </div>
 
-          {/* ZMIANA: Dodano overflow-y-auto dla przewijania */}
           <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
             <h4 className={`text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 ${isCollapsed ? 'text-center' : 'pl-4'}`}>
               {isCollapsed ? 'MENU' : 'Zarządzanie'}
             </h4>
+
+            {/* Dedykowany przycisk czatu w menu bocznym */}
+            <button
+              onClick={() => {
+                setIsChatOpen(true);
+                setSidebarOpen(false);
+              }}
+              title={isCollapsed ? "Czat na żywo" : ""}
+              className={`
+                relative w-full p-4 rounded-xl transition-all duration-300 group flex items-center mb-2
+                ${isCollapsed ? 'justify-center' : ''}
+                bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-900 border border-blue-200/80 hover:from-blue-100 hover:to-indigo-100
+              `}
+            >
+              <div className="p-2 rounded-lg bg-blue-600 text-white shrink-0 shadow-md">
+                <MessageSquare className="w-5 h-5" />
+              </div>
+              {!isCollapsed && (
+                <div className="flex-1 text-left ml-4 whitespace-nowrap overflow-hidden flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-sm text-blue-950">Czat na Żywo</div>
+                    <div className="text-[11px] text-blue-700">Wiadomości od klientów</div>
+                  </div>
+                  {unreadChatCount > 0 && (
+                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
+                      {unreadChatCount}
+                    </span>
+                  )}
+                </div>
+              )}
+            </button>
+
             {filteredMenuItems.map((item) => (
               <NavItem
                 key={item.path}
@@ -251,6 +326,13 @@ const AdminNavbar = ({
           </div>
         </div>
       </aside>
+
+      {/* Modal czatu dla pracowników */}
+      <AdminChatModal
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        currentUser={user}
+      />
     </>
   );
 };

@@ -24,6 +24,7 @@ import HelpGuide from './components/HelpGuide';
 import LogisticsMap from './components/LogisticsMap';
 import AdminWarehouseDrums from './components/AdminWarehouseDrums';
 import DrumCalculator from './components/DrumCalculator';
+import ChatWidget from './components/ChatWidget';
 import './App.css';
 
 import { supabase } from './lib/supabase';
@@ -527,6 +528,8 @@ const App = () => {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>
+          {/* Czat w czasie rzeczywistym dla klientów */}
+          <ChatWidget currentUser={currentUser} isUserStaff={isUserStaff} />
         </>
       )}
     </div>
