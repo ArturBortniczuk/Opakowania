@@ -218,7 +218,7 @@ const ClientReturnRequests = ({ user }) => {
                   {/* Card Header (Zawsze widoczny) */}
                   <div className="flex justify-between items-start mb-4 pb-4 border-b border-gray-100">
                     <div>
-                      <span className="text-[9px] font-bold bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg uppercase tracking-wider">ZGŁOSZENIE #{req.id}</span>
+                      <span className="text-[9px] font-bold bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg uppercase tracking-wider">ZGŁOSZENIE {returnsAPI.getRequestDisplayId(req, requests)}</span>
                       <div className="flex flex-col mt-2">
                         <p className="text-[10px] text-gray-400 font-semibold tracking-wider uppercase leading-none">NIP: {user.nip}</p>
                         <p className="text-[10px] text-gray-400 font-semibold tracking-wider uppercase mt-1 leading-none">Zgłoszono: {new Date(req.created_at).toLocaleDateString('pl-PL')}</p>

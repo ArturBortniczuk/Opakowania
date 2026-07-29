@@ -305,6 +305,7 @@ const LogisticsMap = ({ user }) => {
             pickupsByLoc[locKey].pickups.push({
               id: `ret_${r.id}`,
               requestId: r.id,
+              requestDisplayId: returnsAPI.getRequestDisplayId(r, retRes),
               drumsCount: r.selected_drums ? r.selected_drums.length : 0,
               selected_drums: (r.selected_drums || []).map(drum => {
                 const isObject = typeof drum === 'object' && drum !== null;
@@ -851,7 +852,7 @@ const LogisticsMap = ({ user }) => {
           loadingContact: ((requestForTransport.notes || '').match(/Telefon kontaktowy:\s*([\d\s\+\-]{8,20})/)?.[1]?.trim()) || requestForTransport.profile_phone || 'Brak telefonu',
           unloadingContact: transportData.unloadingContact || '',
           deliveryDate: transportData.transportDate,
-          notes: `Zgłoszenie z Opakowań #${requestForTransport.id}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}\n${requestForTransport.notes || ''}`,
+          notes: `Zgłoszenie z Opakowań ${returnsAPI.getRequestDisplayId(requestForTransport)}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}\n${requestForTransport.notes || ''}`,
           clientName: transportData.deliveryName || requestForTransport.company_name,
           sourceClientName: requestForTransport.company_name,
           distanceKm: transportData.distanceKm || 0,
@@ -1232,11 +1233,11 @@ const LogisticsMap = ({ user }) => {
                             <div key={pickup.id} className="mb-4 last:mb-0 border-b last:border-0 pb-4 last:pb-0 border-gray-200">
                               <div className="flex justify-between items-center mb-2">
                                 <h4 className="font-bold text-purple-800 text-sm flex items-center">
-                                  Zgłoszenie #{pickup.requestId}
+                                  Zgłoszenie {pickup.requestDisplayId || `#${pickup.requestId}`}
                                   {pickup.priority === 'High' && <AlertTriangle className="w-4 h-4 text-red-500 ml-1.5" title="Priorytet: Wysoki" />}
                                 </h4>
                                 <a 
-                                  href={`/admin/returns?searchTerm=${pickup.requestId}&openModalId=${pickup.requestId}`}
+                                  href={`/admin/returns?searchTerm=${encodeURIComponent(pickup.requestDisplayId || pickup.requestId)}&openModalId=${pickup.requestId}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="px-2 py-1 bg-purple-600 text-white hover:bg-purple-700 rounded text-xs font-medium transition-colors flex items-center"

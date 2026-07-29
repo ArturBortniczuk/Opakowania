@@ -161,7 +161,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
           loadingContact: ((requestForTransport.notes || '').match(/Telefon kontaktowy:\s*([\d\s\+\-]{8,20})/)?.[1]?.trim()) || requestForTransport.profile_phone || 'Brak telefonu',
           unloadingContact: transportData.unloadingContact || '',
           deliveryDate: transportData.transportDate,
-          notes: `Zgłoszenie z Opakowań #${requestForTransport.id}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}\n${requestForTransport.notes || ''}`,
+          notes: `Zgłoszenie z Opakowań ${returnsAPI.getRequestDisplayId(requestForTransport, requests)}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}\n${requestForTransport.notes || ''}`,
           clientName: transportData.deliveryName || requestForTransport.company_name,
           sourceClientName: requestForTransport.company_name,
           distanceKm: transportData.distanceKm || 0,
@@ -363,7 +363,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
         email: selectedRequest.email,
         loading_hours: selectedRequest.loading_hours || '',
         available_equipment: selectedRequest.available_equipment || '',
-        notes: (selectedRequest.notes || '') + '\n\n[Zgłoszenie wydzielone ze zgłoszenia #' + selectedRequest.id + ']',
+        notes: (selectedRequest.notes || '') + '\n\n[Zgłoszenie wydzielone ze zgłoszenia ' + returnsAPI.getRequestDisplayId(selectedRequest, requests) + ']',
         selected_drums: enrichedDrumsToMove,
         created_at: selectedRequest.created_at,
         status: selectedRequest.status || 'Pending',
@@ -461,11 +461,14 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   const filteredAndSortedRequests = useMemo(() => {
     return requests
       .filter(req => {
+        const displayId = returnsAPI.getRequestDisplayId(req, requests);
         const matchesSearch = 
           req.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           req.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           req.user_nip?.includes(searchTerm) ||
-          req.id?.toString().includes(searchTerm);
+          req.id?.toString().includes(searchTerm) ||
+          displayId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          req.request_number?.toLowerCase().includes(searchTerm.toLowerCase());
         
         const matchesStatus = filterStatus === 'all' || req.status === filterStatus;
         const matchesPriority = filterPriority === 'all' || req.priority === filterPriority;
@@ -542,7 +545,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
         <div className="flex items-start justify-between gap-4 mb-6">
           <div className="min-w-0 pr-6">
-            <h3 className="text-lg font-bold text-gray-900 leading-tight">Zgłoszenie #{request.id}</h3>
+            <h3 className="text-lg font-bold text-gray-900 leading-tight">Zgłoszenie {returnsAPI.getRequestDisplayId(request, requests)}</h3>
             <p className="text-sm font-medium text-blue-600 truncate mt-0.5">{request.company_name}</p>
             <p className="text-xs font-semibold text-gray-600 mt-1">
               Bębny: {drumsList.length} szt. {palletsCount > 0 && `| Palety: ${palletsCount} szt.`}
@@ -721,7 +724,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Zgłoszenie zwrotu #{selectedRequest.id}</h2>
+                <h2 className="text-2xl font-bold text-gray-900">Zgłoszenie zwrotu {returnsAPI.getRequestDisplayId(selectedRequest, requests)}</h2>
                 <div className="flex items-center space-x-3 mt-2">
                   {getStatusBadge(selectedRequest.status)}
                   {getPriorityBadge(selectedRequest)}
@@ -1345,8 +1348,8 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     const initialPriority = hasHighPriority ? 'High' : 'Normal';
 
     const combinedNotes = selectedRequests
-      .map(r => `[Zgłoszenie #${r.id}]: ${r.notes ? r.notes.trim() : 'Brak dodatkowych uwag'}`)
-      .join('\n\n') + `\n\n[Połączono ze zgłoszeń: #${selectedRequests.map(r => r.id).join(', #')}]`;
+      .map(r => `[Zgłoszenie ${returnsAPI.getRequestDisplayId(r, requests)}]: ${r.notes ? r.notes.trim() : 'Brak dodatkowych uwag'}`)
+      .join('\n\n') + `\n\n[Połączono ze zgłoszeń: ${selectedRequests.map(r => returnsAPI.getRequestDisplayId(r, requests)).join(', ')}]`;
 
     const [formData, setFormData] = useState({
       user_nip: initialClient.user_nip,
@@ -1453,7 +1456,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
         setMergeMode(false);
         handleRefresh();
 
-        alert(`Pomyślnie połączono zgłoszenia #${selectedMergeIds.join(', #')} w nowe zgłoszenie #${newReturn.id}!`);
+        alert(`Pomyślnie połączono wybrane zgłoszenia w nowe zgłoszenie ${returnsAPI.getRequestDisplayId(newReturn, requests)}!`);
       } catch (err) {
         console.error('Błąd podczas łączenia zgłoszeń:', err);
         alert('Wystąpił błąd podczas łączenia zgłoszeń: ' + err.message);

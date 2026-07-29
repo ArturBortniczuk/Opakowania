@@ -236,11 +236,13 @@ const Dashboard = ({ user, profile }) => {
       const updatedDate = new Date(req.updated_at || req.created_at);
       const drumsCount = Array.isArray(req.selected_drums) ? req.selected_drums.length : 0;
 
+      const reqNum = returnsAPI.getRequestDisplayId(req, returns);
+
       // 1. Krok: Utworzenie zgłoszenia (zawsze widoczne)
       activities.push({
         id: `created-${req.id}`,
         type: 'return_created',
-        message: `Zgłoszono zwrot ${drumsCount} bębna/ów (zgłoszenie #${req.id})`,
+        message: `Zgłoszono zwrot ${drumsCount} bębna/ów (zgłoszenie ${reqNum})`,
         time: formatRelativeDate(req.created_at),
         rawDate: createdDate,
         icon: Truck,
@@ -253,7 +255,7 @@ const Dashboard = ({ user, profile }) => {
         activities.push({
           id: `approved-${req.id}`,
           type: 'return_approved',
-          message: `Zatwierdzono transport dla zgłoszenia #${req.id}`,
+          message: `Zatwierdzono transport dla zgłoszenia ${reqNum}`,
           time: formatRelativeDate(approvalDate),
           rawDate: approvalDate,
           icon: Clock,
@@ -267,7 +269,7 @@ const Dashboard = ({ user, profile }) => {
         activities.push({
           id: `intransit-${req.id}`,
           type: 'return_intransit',
-          message: `Zgłoszenie #${req.id} jest w transporcie`,
+          message: `Zgłoszenie ${reqNum} jest w transporcie`,
           time: formatRelativeDate(transitDate),
           rawDate: transitDate,
           icon: Truck,
@@ -280,7 +282,7 @@ const Dashboard = ({ user, profile }) => {
         activities.push({
           id: `completed-${req.id}`,
           type: 'return_completed',
-          message: `Odebrano bębny dla zgłoszenia #${req.id}`,
+          message: `Odebrano bębny dla zgłoszenia ${reqNum}`,
           time: formatRelativeDate(updatedDate),
           rawDate: updatedDate,
           icon: CheckCircle,
@@ -305,7 +307,7 @@ const Dashboard = ({ user, profile }) => {
         activities.push({
           id: `rejected-${req.id}`,
           type: 'return_rejected',
-          message: `Odrzucono zgłoszenie zwrotu #${req.id}`,
+          message: `Odrzucono zgłoszenie zwrotu ${reqNum}`,
           time: formatRelativeDate(updatedDate),
           rawDate: updatedDate,
           icon: XCircle,

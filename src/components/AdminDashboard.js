@@ -285,12 +285,13 @@ const AdminDashboard = ({ user, onNavigate }) => {
     // Sprawdź pilne zgłoszenia
     returns.forEach(request => {
       if (request.priority === 'High' && request.status === 'Pending') {
+        const reqNum = returnsAPI.getRequestDisplayId(request, returns);
         urgent.push({
           type: 'urgent_request',
-          title: `Pilne zgłoszenie #${request.id}`,
+          title: `Pilne zgłoszenie ${reqNum}`,
           subtitle: request.company_name,
           priority: 'high',
-          action: () => onNavigate('admin-returns', { searchTerm: request.id.toString(), openModal: true }),
+          action: () => onNavigate('admin-returns', { searchTerm: reqNum, openModal: true }),
           clientAction: request.user_nip ? () => onNavigate('admin-clients', { clientNip: request.user_nip, openModal: true }) : null
         });
       }

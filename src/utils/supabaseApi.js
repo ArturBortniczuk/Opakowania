@@ -1907,8 +1907,58 @@ export const companiesAPI = {
 
 // ==================================
 //  API do Zwrotów
+/**
+ * Zwraca sformatowany unikalny miesięczny numer zgłoszenia w formacie ZO/XXXX/MM/RR.
+ * @param {object} req - Obiekt zgłoszenia zwrotu.
+ * @param {Array} [allRequests] - Opcjonalna tablica wszystkich zgłoszeń do wyliczenia kolejności jeśli brak pola w DB.
+ * @returns {string} Sformatowany numer np. "ZO/0001/07/26".
+ */
+export function getRequestDisplayId(req, allRequests = null) {
+  if (!req) return '';
+  
+  if (req.request_number && typeof req.request_number === 'string' && req.request_number.startsWith('ZO/')) {
+    return req.request_number;
+  }
+
+  const createdAt = req.created_at ? new Date(req.created_at) : new Date();
+  if (isNaN(createdAt.getTime())) {
+    return req.id ? `#${req.id}` : '';
+  }
+
+  const yr = String(createdAt.getFullYear()).slice(-2);
+  const mo = String(createdAt.getMonth() + 1).padStart(2, '0');
+
+  let seqNum = null;
+
+  if (Array.isArray(allRequests) && allRequests.length > 0) {
+    const sameMonthReqs = allRequests
+      .filter(r => {
+        if (!r || !r.created_at) return false;
+        const d = new Date(r.created_at);
+        return !isNaN(d.getTime()) && 
+               d.getFullYear() === createdAt.getFullYear() && 
+               d.getMonth() === createdAt.getMonth();
+      })
+      .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0) || (a.id - b.id));
+
+    const index = sameMonthReqs.findIndex(r => r.id === req.id);
+    if (index !== -1) {
+      seqNum = index + 1;
+    }
+  }
+
+  if (!seqNum) {
+    seqNum = req.id || 1;
+  }
+
+  const seqStr = String(seqNum).padStart(4, '0');
+  return `ZO/${seqStr}/${mo}/${yr}`;
+}
+
 // ==================================
 export const returnsAPI = {
+  getRequestDisplayId,
+
   /**
    * Pobiera listę zgłoszeń zwrotu.
    * @param {string|null} nip - NIP klienta do filtrowania.
@@ -1993,10 +2043,11 @@ export const returnsAPI = {
         .single();
 
       if (error) {
-        if (error.message?.includes('status_history') || error.message?.includes('status_updated_at') || error.code === 'PGRST204') {
-          console.warn('Kolumna status_history nie istnieje w bazie DB - powtarzanie zapisu bez kolumn historii');
+        if (error.message?.includes('status_history') || error.message?.includes('status_updated_at') || error.message?.includes('request_number') || error.code === 'PGRST204') {
+          console.warn('Niektóre opcjonalne kolumny nie istnieją w bazie DB - powtarzanie zapisu bez opcjonalnych pól');
           delete payload.status_history;
           delete payload.status_updated_at;
+          delete payload.request_number;
           const retry = await supabase
             .from('return_requests')
             .insert([payload])
