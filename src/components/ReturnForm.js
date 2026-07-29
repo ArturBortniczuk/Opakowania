@@ -642,24 +642,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
                 </div>
               </div>
 
-              {/* Drugi wiersz: Metoda odbioru */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Truck className="inline w-4 h-4 mr-2 text-blue-600" />
-                  Preferowana metoda odbioru *
-                </label>
-                <select
-                  value={formData.pickupType || 'spedycja'}
-                  onChange={(e) => setFormData(prev => ({ ...prev, pickupType: e.target.value }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm font-medium"
-                >
-                  <option value="spedycja">Odbiór przez spedycję (zewnętrzna firma transportowa)</option>
-                  <option value="magazyn_bialystok">Odbiór przez magazyn Białystok</option>
-                  <option value="magazyn_zielonka">Odbiór przez magazyn Zielonka</option>
-                </select>
-              </div>
-
-              {/* Trzeci wiersz: Email i Telefon */}
+              {/* Drugi wiersz: Email i Telefon */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1115,12 +1098,7 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
                   <p className="text-sm text-gray-500">Telefon</p>
                   <p className="font-medium text-gray-900">{formData.phoneNumber}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500">Metoda odbioru</p>
-                  <p className="font-medium text-gray-900">
-                    {formData.pickupType === 'magazyn_bialystok' ? 'Magazyn Białystok' : formData.pickupType === 'magazyn_zielonka' ? 'Magazyn Zielonka' : 'Spedycja'}
-                  </p>
-                </div>
+
                 <div>
                   <p className="text-sm text-gray-500">Adres</p>
                   <p className="font-medium text-gray-900">
