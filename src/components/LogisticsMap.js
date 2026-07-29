@@ -1319,6 +1319,20 @@ const LogisticsMap = ({ user }) => {
                                 </a>
                               </div>
                               
+                              {(pickup.priority === 'High' || pickup.originalRequest?.urgent_reason || urgentReasons[pickup.requestId]) && (
+                                <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg text-xs">
+                                  <div className="flex items-center gap-1 text-red-700 font-bold mb-0.5">
+                                    <AlertTriangle className="w-3.5 h-3.5" />
+                                    <span>Powód pilności zgłoszenia:</span>
+                                  </div>
+                                  <p className="text-red-900 font-medium italic break-words pl-4">
+                                    {urgentReasons[pickup.requestId] !== undefined 
+                                      ? (urgentReasons[pickup.requestId] || 'Brak wpisanego powodu')
+                                      : (pickup.originalRequest?.urgent_reason || 'Brak wpisanego powodu (Priorytet wysoki)')}
+                                  </p>
+                                </div>
+                              )}
+
                               <div className="bg-purple-50 p-2 rounded mb-3 border border-purple-100">
                                 <p className="text-sm text-gray-800 mb-1">Status: <strong className={pickup.status === 'InTransit' ? 'text-orange-600' : ''}>
                                   {pickup.status === 'Pending' ? 'Oczekujące' : 
