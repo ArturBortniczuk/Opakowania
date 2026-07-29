@@ -550,8 +550,8 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
         {/* Górny pasek: Numer zgłoszenia, Badge metody odbioru, Ikony akcji (Status i Priorytet) */}
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 flex-wrap min-w-0">
-            <span className="font-mono text-xs sm:text-sm font-extrabold text-gray-900 bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-lg tracking-tight shrink-0">
-              ZO: {returnsAPI.getRequestDisplayId(request, requests).replace('ZO/', '')}
+            <span className="font-mono text-xs sm:text-sm font-extrabold text-gray-900 bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-lg tracking-tight shrink-0 select-all">
+              {returnsAPI.getRequestDisplayId(request, requests)}
             </span>
             {(() => {
               const pInfo = returnsAPI.getPickupTypeInfo(request.pickup_type);
