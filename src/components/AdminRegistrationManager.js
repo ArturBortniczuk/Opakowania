@@ -1,7 +1,77 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { UserCheck, CheckCircle, AlertCircle, X, Check, Mail, Phone, Building2, ShieldAlert, RefreshCw, Search, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { authAPI } from '../utils/supabaseApi';
+
+// Komponent wyszukiwalnego i edytowalnego pola NIP z podpowiedziami z bazy
+const CompanyNipCombobox = ({ userId, currentSelectedNip, companies, onNipChange }) => {
+  const [filterText, setFilterText] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+
+  const selectedCompany = companies.find(c => c.nip === currentSelectedNip);
+
+  const filteredCompanies = useMemo(() => {
+    if (!filterText.trim()) return companies.slice(0, 150);
+    const q = filterText.trim().toLowerCase();
+    return companies.filter(c => 
+      (c.name && c.name.toLowerCase().includes(q)) || 
+      (c.nip && c.nip.includes(q))
+    ).slice(0, 150);
+  }, [companies, filterText]);
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Wpisz lub wyszukaj NIP / Nazwę..."
+          value={isOpen ? filterText : (selectedCompany ? `${selectedCompany.name} (NIP: ${selectedCompany.nip})` : (currentSelectedNip || ''))}
+          onFocus={() => {
+            setFilterText(currentSelectedNip || '');
+            setIsOpen(true);
+          }}
+          onChange={(e) => {
+            const val = e.target.value;
+            setFilterText(val);
+            // Pozwól na wpisywanie własnego NIP-u z klawiatury
+            onNipChange(userId, val.replace(/[^0-9]/g, ''));
+            setIsOpen(true);
+          }}
+          className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-sm font-semibold text-gray-800"
+        />
+        <Search className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none" />
+      </div>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)}></div>
+          <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto divide-y divide-gray-100">
+            {filteredCompanies.length === 0 ? (
+              <div className="p-3 text-xs text-gray-500 text-center">
+                Brak pasującej firmy w bazie. Przypisujesz wpisany NIP: <strong className="font-mono text-purple-700">{filterText}</strong>
+              </div>
+            ) : (
+              filteredCompanies.map(c => (
+                <button
+                  key={c.nip}
+                  type="button"
+                  onClick={() => {
+                    onNipChange(userId, c.nip);
+                    setIsOpen(false);
+                  }}
+                  className="w-full text-left p-2.5 hover:bg-purple-50 transition-colors text-xs font-semibold text-gray-800 flex justify-between items-center"
+                >
+                  <span className="truncate pr-2">{c.name}</span>
+                  <span className="font-mono text-purple-700 shrink-0 font-bold">NIP: {c.nip}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 const AdminRegistrationManager = () => {
   const [pendingUsers, setPendingUsers] = useState([]);
@@ -23,20 +93,17 @@ const AdminRegistrationManager = () => {
     try {
       const [users, { data: companiesData }] = await Promise.all([
         authAPI.getPendingRegistrations(),
-        supabase.from('companies').select('nip, name').order('name')
+        supabase.from('companies').select('nip, name').order('name').limit(10000)
       ]);
       
       setPendingUsers(users);
       setCompanies(companiesData || []);
       
-      // Domyślnie dopasuj NIP-y, jeśli podany przez klienta NIP istnieje już w bazie companies
+      // Domyślnie wpisz podany NIP klienta
       const initialNips = {};
       users.forEach(user => {
         if (user.nip) {
-          const match = (companiesData || []).find(c => c.nip === user.nip);
-          if (match) {
-            initialNips[user.id] = user.nip;
-          }
+          initialNips[user.id] = user.nip;
         }
       });
       setSelectedNips(initialNips);
@@ -60,8 +127,9 @@ const AdminRegistrationManager = () => {
       return;
     }
 
+    const targetUser = pendingUsers.find(u => u.id === userId);
     const company = companies.find(c => c.nip === assignedNip);
-    const companyName = company ? company.name : 'Brak nazwy';
+    const companyName = company ? company.name : (targetUser?.company_name || 'Brak nazwy');
 
     setApprovingId(userId);
     setError(null);
@@ -227,23 +295,17 @@ const AdminRegistrationManager = () => {
                       )}
                     </div>
 
-                    <select
-                      value={currentSelectedNip}
-                      onChange={(e) => handleNipChange(user.id, e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-sm font-semibold text-gray-800"
-                    >
-                      <option value="">-- Wybierz firmę z bazy --</option>
-                      {companies.map(c => (
-                        <option key={c.nip} value={c.nip}>
-                          {c.name} (NIP: {c.nip})
-                        </option>
-                      ))}
-                    </select>
+                    <CompanyNipCombobox
+                      userId={user.id}
+                      currentSelectedNip={currentSelectedNip}
+                      companies={companies}
+                      onNipChange={handleNipChange}
+                    />
 
                     {!nipExistsInBase && (
-                      <p className="text-[10px] text-red-500 leading-normal font-medium mt-1">
-                        Podany NIP ({user.nip}) nie istnieje w nowej zoptymalizowanej kartotece 1000 klientów. 
-                        Wybierz pasujący NIP z listy powyżej lub dodaj go najpierw w zakładce "Zarządzaj klientami".
+                      <p className="text-[10px] text-amber-700 leading-normal font-medium mt-1 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                        Podany NIP ({currentSelectedNip || user.nip}) nie znajduje się na liście pobranych firm. 
+                        Możesz go zostawić/wpisać ręcznie lub wyszukać i wybrać inną firmę z listy.
                       </p>
                     )}
                   </div>
