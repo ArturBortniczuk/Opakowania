@@ -544,8 +544,8 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
         )}
 
         <div className="flex items-start justify-between gap-4 mb-6">
-          <div className="min-w-0 pr-6">
-            <h3 className="text-lg font-bold text-gray-900 leading-tight">Zgłoszenie {returnsAPI.getRequestDisplayId(request, requests)}</h3>
+          <div className="min-w-0 pr-2">
+            <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-tight whitespace-nowrap">Zgłoszenie {returnsAPI.getRequestDisplayId(request, requests)}</h3>
             <p className="text-sm font-medium text-blue-600 truncate mt-0.5">{request.company_name}</p>
             <p className="text-xs font-semibold text-gray-600 mt-1">
               Bębny: {drumsList.length} szt. {palletsCount > 0 && `| Palety: ${palletsCount} szt.`}
