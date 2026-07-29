@@ -160,11 +160,8 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
               <MessageSquare className="w-6 h-6 text-blue-400" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white flex items-center space-x-2">
-                <span>Centrum Komunikacji z Klientami</span>
-                <span className="bg-blue-500/20 text-blue-300 text-xs px-2.5 py-0.5 rounded-full border border-blue-400/30 font-medium">
-                  Realtime
-                </span>
+              <h2 className="text-lg font-bold text-white">
+                Centrum Komunikacji z Klientami
               </h2>
               <p className="text-xs text-gray-400 mt-0.5">Obsługa zapytań i konwersacji w czasie rzeczywistym</p>
             </div>
@@ -327,12 +324,7 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2 flex-shrink-0">
-                    <span className="px-3 py-1 bg-emerald-50 text-emerald-700 font-semibold text-xs rounded-full border border-emerald-200 flex items-center space-x-1.5 shadow-2xs">
-                      <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                      <span>Aktywny wątek</span>
-                    </span>
-                  </div>
+
                 </div>
 
                 {/* Lista wiadomości */}
