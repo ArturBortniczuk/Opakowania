@@ -103,7 +103,6 @@ export const chatAPI = {
       const isClient = senderRole === 'client';
       const now = new Date().toISOString();
 
-      // Pobieramy aktualne liczniki z wątku, aby bezpiecznie zwiększyć
       const { data: threadData } = await supabase
         .from('chat_threads')
         .select('unread_admin_count, unread_client_count')
@@ -141,7 +140,6 @@ export const chatAPI = {
     try {
       const targetSenderRole = readerRole === 'staff' ? 'client' : 'staff';
 
-      // Oznaczamy wiadomości od drugiej strony jako przeczytane
       await supabase
         .from('chat_messages')
         .update({ is_read: true })
@@ -149,7 +147,6 @@ export const chatAPI = {
         .eq('sender_role', targetSenderRole)
         .eq('is_read', false);
 
-      // Zerujemy odpowiedni licznik nieprzeczytanych wiadomości w wątku
       const updatePayload = readerRole === 'staff' 
         ? { unread_admin_count: 0 }
         : { unread_client_count: 0 };
@@ -183,12 +180,13 @@ export const chatAPI = {
     }
   },
 
-  // Subskrypcja wiadomości w czasie rzeczywistym dla wybranego wątku
+  // Subskrypcja wiadomości w czasie rzeczywistym dla wybranego wątku (unikalna nazwa kanału zapobiega błędom)
   subscribeToThreadMessages(threadId, onNewMessage) {
     if (!threadId) return null;
 
+    const channelName = `chat_thread_${threadId}_${Math.random().toString(36).substring(2, 9)}`;
     const channel = supabase
-      .channel(`chat_thread_${threadId}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -208,10 +206,11 @@ export const chatAPI = {
     return channel;
   },
 
-  // Subskrypcja zbiorcza dla admina (nowe wiadomości we wszystkich wątkach oraz zmiana wątków)
+  // Subskrypcja zbiorcza dla admina (unikalna nazwa kanału zapobiega błędom)
   subscribeToStaffChat(onMessageOrThreadUpdate) {
+    const channelName = `staff_global_chat_${Math.random().toString(36).substring(2, 9)}`;
     const channel = supabase
-      .channel('staff_global_chat')
+      .channel(channelName)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'chat_messages' },
