@@ -1955,9 +1955,47 @@ export function getRequestDisplayId(req, allRequests = null) {
   return `ZO/${seqStr}/${mo}/${yr}`;
 }
 
+/**
+ * Zwraca informacje i style dla danej metody odbioru zgłoszenia.
+ * @param {string} type - Typ odbioru ('spedycja', 'magazyn_bialystok', 'magazyn_zielonka')
+ * @returns {object} { value, label, shortLabel, badgeClass, dotClass }
+ */
+export function getPickupTypeInfo(type) {
+  const normalized = String(type || 'spedycja').toLowerCase().trim();
+
+  if (normalized.includes('bialystok') || normalized.includes('białystok')) {
+    return {
+      value: 'magazyn_bialystok',
+      label: 'Magazyn Białystok',
+      shortLabel: 'Białystok',
+      badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      dotClass: 'bg-emerald-500'
+    };
+  }
+
+  if (normalized.includes('zielonka')) {
+    return {
+      value: 'magazyn_zielonka',
+      label: 'Magazyn Zielonka',
+      shortLabel: 'Zielonka',
+      badgeClass: 'bg-purple-50 text-purple-700 border-purple-200',
+      dotClass: 'bg-purple-500'
+    };
+  }
+
+  return {
+    value: 'spedycja',
+    label: 'Spedycja',
+    shortLabel: 'Spedycja',
+    badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
+    dotClass: 'bg-blue-500'
+  };
+}
+
 // ==================================
 export const returnsAPI = {
   getRequestDisplayId,
+  getPickupTypeInfo,
 
   /**
    * Pobiera listę zgłoszeń zwrotu.
@@ -2031,6 +2069,7 @@ export const returnsAPI = {
         ...returnData,
         status: initialStatus,
         priority: returnData.priority || 'Normal',
+        pickup_type: returnData.pickup_type || 'spedycja',
         selected_drums: enrichedDrums,
         status_history: initialHistory,
         status_updated_at: nowIso
@@ -2043,11 +2082,12 @@ export const returnsAPI = {
         .single();
 
       if (error) {
-        if (error.message?.includes('status_history') || error.message?.includes('status_updated_at') || error.message?.includes('request_number') || error.code === 'PGRST204') {
+        if (error.message?.includes('status_history') || error.message?.includes('status_updated_at') || error.message?.includes('request_number') || error.message?.includes('pickup_type') || error.code === 'PGRST204') {
           console.warn('Niektóre opcjonalne kolumny nie istnieją w bazie DB - powtarzanie zapisu bez opcjonalnych pól');
           delete payload.status_history;
           delete payload.status_updated_at;
           delete payload.request_number;
+          delete payload.pickup_type;
           const retry = await supabase
             .from('return_requests')
             .insert([payload])

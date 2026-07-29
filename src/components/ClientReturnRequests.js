@@ -224,8 +224,16 @@ const ClientReturnRequests = ({ user }) => {
                         <p className="text-[10px] text-gray-400 font-semibold tracking-wider uppercase mt-1 leading-none">Zgłoszono: {new Date(req.created_at).toLocaleDateString('pl-PL')}</p>
                       </div>
                     </div>
-                    <div className="shrink-0">
+                    <div className="shrink-0 flex items-center gap-2">
                       {getStatusBadge(req.status)}
+                      {(() => {
+                        const pInfo = returnsAPI.getPickupTypeInfo(req.pickup_type);
+                        return (
+                          <span className={`text-[9px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider border ${pInfo.badgeClass}`}>
+                            {pInfo.shortLabel}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
 

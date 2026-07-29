@@ -50,6 +50,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   const [searchTerm, setSearchTerm] = useState(searchParams.get('searchTerm') || '');
   const [filterStatus, setFilterStatus] = useState(initialFilter.status || 'all');
   const [filterPriority, setFilterPriority] = useState(initialFilter.priority || 'all');
+  const [filterPickupType, setFilterPickupType] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -472,8 +473,11 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
         
         const matchesStatus = filterStatus === 'all' || req.status === filterStatus;
         const matchesPriority = filterPriority === 'all' || req.priority === filterPriority;
+        const matchesPickupType = filterPickupType === 'all' || 
+          (req.pickup_type || 'spedycja').toLowerCase().includes(filterPickupType.toLowerCase()) ||
+          returnsAPI.getPickupTypeInfo(req.pickup_type).value === filterPickupType;
 
-        return matchesSearch && matchesStatus && matchesPriority;
+        return matchesSearch && matchesStatus && matchesPriority && matchesPickupType;
       })
       .sort((a, b) => {
         let valA = a[sortBy];
@@ -487,7 +491,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
         if (sortOrder === 'asc') return valA > valB ? 1 : -1;
         return valA < valB ? 1 : -1;
       });
-  }, [requests, searchTerm, filterStatus, filterPriority, sortBy, sortOrder]);
+  }, [requests, searchTerm, filterStatus, filterPriority, filterPickupType, sortBy, sortOrder]);
 
   const getDrumLabel = (drum) => {
     if (typeof drum === 'object' && drum !== null) {
@@ -559,6 +563,14 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
           <div className="flex items-center gap-2 shrink-0">
             {getStatusBadge(request.status)}
             {getPriorityBadge(request)}
+            {(() => {
+              const pInfo = returnsAPI.getPickupTypeInfo(request.pickup_type);
+              return (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${pInfo.badgeClass}`}>
+                  {pInfo.shortLabel}
+                </span>
+              );
+            })()}
           </div>
         </div>
 
@@ -728,6 +740,30 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                 <div className="flex items-center space-x-3 mt-2">
                   {getStatusBadge(selectedRequest.status)}
                   {getPriorityBadge(selectedRequest)}
+                  {canChangeStatus ? (
+                    <select
+                      value={returnsAPI.getPickupTypeInfo(selectedRequest.pickup_type).value}
+                      onChange={async (e) => {
+                        const newType = e.target.value;
+                        try {
+                          await returnsAPI.updateReturnStatus(selectedRequest.id, { pickup_type: newType });
+                          setSelectedRequest(prev => ({ ...prev, pickup_type: newType }));
+                          setRequests(prev => prev.map(r => r.id === selectedRequest.id ? { ...r, pickup_type: newType } : r));
+                        } catch (err) {
+                          alert('Błąd zmiany metody odbioru: ' + err.message);
+                        }
+                      }}
+                      className="text-xs font-bold px-2.5 py-1 rounded-md border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="spedycja">Spedycja</option>
+                      <option value="magazyn_bialystok">Magazyn Białystok</option>
+                      <option value="magazyn_zielonka">Magazyn Zielonka</option>
+                    </select>
+                  ) : (
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-md border ${returnsAPI.getPickupTypeInfo(selectedRequest.pickup_type).badgeClass}`}>
+                      {returnsAPI.getPickupTypeInfo(selectedRequest.pickup_type).label}
+                    </span>
+                  )}
                 </div>
               </div>
               <button
@@ -1913,6 +1949,17 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                 <option value="High">Wysoki</option>
                 <option value="Normal">Normalny</option>
                 <option value="Low">Niski</option>
+              </select>
+
+              <select
+                value={filterPickupType}
+                onChange={(e) => setFilterPickupType(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+              >
+                <option value="all">Wszystkie metody odbioru</option>
+                <option value="spedycja">Spedycja</option>
+                <option value="magazyn_bialystok">Magazyn Białystok</option>
+                <option value="magazyn_zielonka">Magazyn Zielonka</option>
               </select>
 
               <div className="flex space-x-2">

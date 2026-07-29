@@ -1248,9 +1248,17 @@ const LogisticsMap = ({ user }) => {
                           {selectedLocation.pickups.map(pickup => (
                             <div key={pickup.id} className="mb-4 last:mb-0 border-b last:border-0 pb-4 last:pb-0 border-gray-200">
                               <div className="flex justify-between items-center mb-2">
-                                <h4 className="font-bold text-purple-800 text-sm flex items-center">
-                                  Zgłoszenie {pickup.requestDisplayId || `#${pickup.requestId}`}
-                                  {pickup.priority === 'High' && <AlertTriangle className="w-4 h-4 text-red-500 ml-1.5" title="Priorytet: Wysoki" />}
+                                <h4 className="font-bold text-purple-800 text-sm flex items-center gap-1.5 flex-wrap">
+                                  <span>Zgłoszenie {pickup.requestDisplayId || `#${pickup.requestId}`}</span>
+                                  {pickup.priority === 'High' && <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" title="Priorytet: Wysoki" />}
+                                  {(() => {
+                                    const pInfo = returnsAPI.getPickupTypeInfo(pickup.originalRequest?.pickup_type);
+                                    return (
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${pInfo.badgeClass}`}>
+                                        {pInfo.shortLabel}
+                                      </span>
+                                    );
+                                  })()}
                                 </h4>
                                 <a 
                                   href={`/admin/returns?searchTerm=${encodeURIComponent(pickup.requestDisplayId || pickup.requestId)}&openModalId=${pickup.requestId}`}
