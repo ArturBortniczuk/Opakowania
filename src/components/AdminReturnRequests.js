@@ -547,31 +547,55 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
           </div>
         )}
 
-        <div className="flex items-start justify-between gap-4 mb-6">
-          <div className="min-w-0 pr-2">
-            <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-tight whitespace-nowrap">Zgłoszenie {returnsAPI.getRequestDisplayId(request, requests)}</h3>
-            <p className="text-sm font-medium text-blue-600 truncate mt-0.5">{request.company_name}</p>
-            <p className="text-xs font-semibold text-gray-600 mt-1">
-              Bębny: {drumsList.length} szt. {palletsCount > 0 && `| Palety: ${palletsCount} szt.`}
-            </p>
-            <div className="flex flex-col mt-1">
-              <p className="text-[10px] text-gray-400 font-bold tracking-wider uppercase leading-none">NIP: {request.user_nip}</p>
-              <p className="text-[10px] text-gray-400 font-bold tracking-wider uppercase mt-1 leading-none">Zgłoszono: {new Date(request.created_at).toLocaleDateString('pl-PL')}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {getStatusBadge(request.status)}
-            {getPriorityBadge(request)}
+        {/* Górny pasek: Numer zgłoszenia, Badge metody odbioru, Ikony akcji (Status i Priorytet) */}
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <span className="font-mono text-xs sm:text-sm font-extrabold text-gray-900 bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-lg tracking-tight shrink-0">
+              ZO: {returnsAPI.getRequestDisplayId(request, requests).replace('ZO/', '')}
+            </span>
             {(() => {
               const pInfo = returnsAPI.getPickupTypeInfo(request.pickup_type);
               return (
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${pInfo.badgeClass}`}>
+                <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border shrink-0 ${pInfo.badgeClass}`}>
                   {pInfo.shortLabel}
                 </span>
               );
             })()}
           </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {getStatusBadge(request.status)}
+            {getPriorityBadge(request)}
+          </div>
+        </div>
+
+        {/* Nazwa firmy & Dane identyfikacyjne */}
+        <div className="mb-3">
+          <h3 className="text-base font-bold text-blue-900 leading-snug break-words" title={request.company_name}>
+            {request.company_name}
+          </h3>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500 font-medium mt-1">
+            <span>NIP: <strong className="text-gray-700 font-semibold">{request.user_nip}</strong></span>
+            <span>•</span>
+            <span>Zgłoszono: <strong className="text-gray-700 font-semibold">{new Date(request.created_at).toLocaleDateString('pl-PL')}</strong></span>
+          </div>
+        </div>
+
+        {/* Podsumowanie ilościowe opakowań */}
+        <div className="flex items-center gap-2 mb-4 flex-wrap text-xs">
+          <span className="bg-blue-50/80 text-blue-800 border border-blue-100 px-2.5 py-1 rounded-md font-semibold">
+            📦 Bębny: {drumsList.length} szt.
+          </span>
+          {palletsCount > 0 && (
+            <span className="bg-amber-50/80 text-amber-800 border border-amber-100 px-2.5 py-1 rounded-md font-semibold">
+              🪵 Palety: {palletsCount} szt.
+            </span>
+          )}
+          {damagedCount > 0 && (
+            <span className="bg-red-50 text-red-700 border border-red-200 px-2 py-1 rounded-md font-bold">
+              ⚠️ Uszkodzone: {damagedCount} szt.
+            </span>
+          )}
         </div>
 
         <div className="mb-6">
