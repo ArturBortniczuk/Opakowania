@@ -162,7 +162,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
           unloadingContact: transportData.unloadingContact || '',
           deliveryDate: transportData.transportDate,
           notes: `Zgłoszenie z Opakowań ${returnsAPI.getRequestDisplayId(requestForTransport, requests)}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}\n${requestForTransport.notes || ''}`,
-          clientName: transportData.deliveryName || requestForTransport.company_name,
+          clientName: transportData.deliveryName || (typeof transportData.deliveryAddress === 'object' ? transportData.deliveryAddress.name : null) || requestForTransport.company_name,
           sourceClientName: requestForTransport.company_name,
           distanceKm: transportData.distanceKm || 0,
           goodsDescription: {

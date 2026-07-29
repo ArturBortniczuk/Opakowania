@@ -14,21 +14,21 @@ const formatPalletName = (size) => {
 };
 
 const KABLOWNIE_DATA = {
-  'STYROBUD': { address: 'ul. Górna 194, 36-050 Trzeboś', contact: '+48 663 896 832' },
-  'Skierniewice Bruk-bet': { address: 'ul. Czerwona 18A, 96-100 Skierniewice', contact: '884 106 616' },
-  'NKT': { address: 'ul. Gajowa 3, 43-254 Warszowice', contact: '+48 538 637 957' },
-  'PRYSMIAN': { address: 'ul. Sąsiedzka 1G, 05-806 Sokołów', contact: '+48 725 505 315' },
-  'DRUTPLAST': { address: 'ul. Parkowa 23, 78-650 Mirosławiec', contact: '662 448 575' },
-  'Forum-Rondo': { address: 'Morszków 56C, 08-304', contact: '+48 25 787 18 10' },
-  'Eltrim Kable': { address: 'Ruszkowo 18, 13-200 Działdowo', contact: '+48 23 697 03 00' },
-  'Zakłady Kablowe BITNER': { address: 'Krakowska 2, 32-353 Trzyciąż', contact: '+48 12 389 40 24' },
-  'Elektrokabel': { address: 'Chopina 151, 62-700 Turek', contact: '604 898 625' },
-  'Tele-Fonika Kable Bydgoszcz': { address: 'Fordońska 152, 85-752 Bydgoszcz', contact: '+48 52 364 32 10' },
-  'NPA Skawina': { address: 'Józefa Piłsudskiego 23, 32-050 Skawina', contact: '+48 12 276 08 02' },
-  'Fabryka Kabli ELPAR': { address: 'ul. Polna 40, 21-200 Parczew', contact: 'karolina.flisiak@elpar.pl' },
-  'ZPB KACZMAREK': { address: 'Folwark 1, 63-900 Rawicz', contact: '+48 65 546 12 55' },
-  'Betard sp. z o.o.': { address: 'Polna 30, 55-095 Długołęka', contact: '+48 71 315 20 09' },
-  'Technokabel': { address: 'Wiatraczna 28, 06-550 Szreńsk', contact: '+48 23 655 17 00' }
+  'STYROBUD': { address: 'ul. Górna 194, 36-050 Trzeboś', contact: '+48 663 896 832', city: 'Trzeboś', postalCode: '36-050', street: 'ul. Górna 194' },
+  'Skierniewice Bruk-bet': { address: 'ul. Czerwona 18A, 96-100 Skierniewice', contact: '884 106 616', city: 'Skierniewice', postalCode: '96-100', street: 'ul. Czerwona 18A' },
+  'NKT': { address: 'ul. Gajowa 3, 43-254 Warszowice', contact: '+48 538 637 957', city: 'Warszowice', postalCode: '43-254', street: 'ul. Gajowa 3' },
+  'PRYSMIAN': { address: 'ul. Sąsiedzka 1G, 05-806 Sokołów', contact: '+48 725 505 315', city: 'Sokołów', postalCode: '05-806', street: 'ul. Sąsiedzka 1G' },
+  'DRUTPLAST': { address: 'ul. Parkowa 23, 78-650 Mirosławiec', contact: '662 448 575', city: 'Mirosławiec', postalCode: '78-650', street: 'ul. Parkowa 23' },
+  'Forum-Rondo': { address: 'Morszków 56C, 08-304 Morszków', contact: '+48 25 787 18 10', city: 'Morszków', postalCode: '08-304', street: 'Morszków 56C' },
+  'Eltrim Kable': { address: 'Ruszkowo 18, 13-200 Działdowo', contact: '+48 23 697 03 00', city: 'Działdowo', postalCode: '13-200', street: 'Ruszkowo 18' },
+  'Zakłady Kablowe BITNER': { address: 'Krakowska 2, 32-353 Trzyciąż', contact: '+48 12 389 40 24', city: 'Trzyciąż', postalCode: '32-353', street: 'Krakowska 2' },
+  'Elektrokabel': { address: 'Chopina 151, 62-700 Turek', contact: '604 898 625', city: 'Turek', postalCode: '62-700', street: 'Chopina 151' },
+  'Tele-Fonika Kable Bydgoszcz': { address: 'Fordońska 152, 85-752 Bydgoszcz', contact: '+48 52 364 32 10', city: 'Bydgoszcz', postalCode: '85-752', street: 'Fordońska 152' },
+  'NPA Skawina': { address: 'Józefa Piłsudskiego 23, 32-050 Skawina', contact: '+48 12 276 08 02', city: 'Skawina', postalCode: '32-050', street: 'Józefa Piłsudskiego 23' },
+  'Fabryka Kabli ELPAR': { address: 'ul. Polna 40, 21-200 Parczew', contact: 'karolina.flisiak@elpar.pl', city: 'Parczew', postalCode: '21-200', street: 'ul. Polna 40' },
+  'ZPB KACZMAREK': { address: 'Folwark 1, 63-900 Rawicz', contact: '+48 65 546 12 55', city: 'Rawicz', postalCode: '63-900', street: 'Folwark 1' },
+  'Betard sp. z o.o.': { address: 'Polna 30, 55-095 Długołęka', contact: '+48 71 315 20 09', city: 'Długołęka', postalCode: '55-095', street: 'Polna 30' },
+  'Technokabel': { address: 'Wiatraczna 28, 06-550 Szreńsk', contact: '+48 23 655 17 00', city: 'Szreńsk', postalCode: '06-550', street: 'Wiatraczna 28' }
 };
 
 const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
@@ -255,20 +255,51 @@ const TransportOrderModal = ({ isOpen, onClose, onConfirm, request, user }) => {
 
   const handleConfirm = () => {
     let finalDeliveryAddress = {};
+    let finalDeliveryName = '';
+
     if (destination === 'Magazyn Białystok') {
-      finalDeliveryAddress = { city: 'Białystok', postalCode: '15-169', street: 'Wysockiego 69B' };
+      finalDeliveryName = 'Magazyn Białystok';
+      finalDeliveryAddress = { 
+        name: 'Magazyn Białystok',
+        city: 'Białystok', 
+        postalCode: '15-169', 
+        street: 'Wysockiego 69B',
+        address: 'ul. Wysockiego 69B, 15-169 Białystok'
+      };
     } else if (destination === 'Magazyn Zielonka') {
-      finalDeliveryAddress = { city: 'Zielonka', postalCode: '05-220', street: 'Krótka 2' };
+      finalDeliveryName = 'Magazyn Zielonka';
+      finalDeliveryAddress = { 
+        name: 'Magazyn Zielonka',
+        city: 'Zielonka', 
+        postalCode: '05-220', 
+        street: 'Krótka 2',
+        address: 'ul. Krótka 2, 05-220 Zielonka'
+      };
     } else if (KABLOWNIE_DATA[destination]) {
-      finalDeliveryAddress = { name: destination, address: KABLOWNIE_DATA[destination].address };
+      const kData = KABLOWNIE_DATA[destination];
+      finalDeliveryName = destination;
+      finalDeliveryAddress = { 
+        name: destination, 
+        city: kData.city || '',
+        postalCode: kData.postalCode || '',
+        street: kData.street || '',
+        address: kData.address 
+      };
     } else {
-      finalDeliveryAddress = customDestination;
+      finalDeliveryName = deliveryName || customDestination.name || customDestination.city || 'Adres docelowy';
+      finalDeliveryAddress = {
+        name: finalDeliveryName,
+        city: customDestination.city || '',
+        postalCode: customDestination.postalCode || '',
+        street: customDestination.street || '',
+        address: `${customDestination.street || ''}, ${customDestination.postalCode || ''} ${customDestination.city || ''}`.trim()
+      };
     }
 
     onConfirm({
       destination: destination === 'Inne' ? 'Inne' : destination,
       deliveryAddress: finalDeliveryAddress,
-      deliveryName: destination === 'Magazyn Białystok' ? 'Magazyn Białystok' : (destination === 'Magazyn Zielonka' ? 'Magazyn Zielonka' : deliveryName),
+      deliveryName: finalDeliveryName,
       totalWeight,
       transportDate,
       mpk,
