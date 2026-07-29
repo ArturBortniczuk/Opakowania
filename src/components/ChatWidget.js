@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, X, Send, Minus, Headphones, CheckCheck, Loader2 } from 'lucide-react';
+import { MessageSquare, X, Send, Headphones, CheckCheck, Loader2 } from 'lucide-react';
 import { chatAPI } from '../utils/chatApi';
 
 const ChatWidget = ({ currentUser, isUserStaff }) => {
@@ -168,22 +168,13 @@ const ChatWidget = ({ currentUser, isUserStaff }) => {
               </div>
             </div>
 
-            <div className="flex items-center space-x-1">
-              <button
-                onClick={toggleChat}
-                className="p-1 hover:bg-white/10 rounded-lg transition-colors text-white/90 hover:text-white"
-                title="Zminimalizuj czat"
-              >
-                <Minus className="w-5 h-5" />
-              </button>
-              <button
-                onClick={toggleChat}
-                className="p-1 hover:bg-white/10 rounded-lg transition-colors text-white/90 hover:text-white"
-                title="Zamknij czat"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+            <button
+              onClick={toggleChat}
+              className="p-1 hover:bg-white/10 rounded-lg transition-colors text-white/90 hover:text-white"
+              title="Zamknij czat"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Obszar wiadomości — Od razu po otwarciu bezpośredni komunikator */}

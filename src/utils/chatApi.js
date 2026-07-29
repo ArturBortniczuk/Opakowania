@@ -160,12 +160,13 @@ export const chatAPI = {
     }
   },
 
-  // Pobieranie wszystkich wątków (dla panelu admina)
+  // Pobieranie wszystkich wątków (dla panelu admina - tylko te, w których wysłano chociaż jedną wiadomość)
   async getAllThreads() {
     try {
       const { data, error } = await supabase
         .from('chat_threads')
         .select('*')
+        .not('last_message', 'is', null)
         .order('updated_at', { ascending: false });
 
       if (error) {
