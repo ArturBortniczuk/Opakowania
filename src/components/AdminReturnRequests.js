@@ -1938,75 +1938,91 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
             </div>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-5 shadow-lg border border-blue-100 mb-6 space-y-4">
+            {/* Wiersz 1: Wyszukiwarka + Checkbox Pilne */}
+            <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+              <div className="relative flex-grow">
+                <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Szukaj zgłoszeń..."
+                  placeholder="Szukaj po nazwie firmy, NIP, mieście lub numerze ZO..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm"
                 />
               </div>
 
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
-              >
-                <option value="all">Wszystkie statusy</option>
-                <option value="Pending">Oczekujące</option>
-                <option value="Approved">Przekazane do transportu</option>
-                <option value="InTransit">W trakcie transportu</option>
-                <option value="Completed">Zakończone</option>
-                <option value="Rejected">Odrzucone</option>
-              </select>
+              <label className="flex items-center space-x-2.5 px-4 py-2.5 bg-red-50/70 hover:bg-red-50 border border-red-200/80 rounded-xl cursor-pointer transition-all shrink-0 select-none">
+                <input
+                  type="checkbox"
+                  checked={filterPriority === 'High'}
+                  onChange={(e) => setFilterPriority(e.target.checked ? 'High' : 'all')}
+                  className="w-4 h-4 text-red-600 focus:ring-red-500 border-gray-300 rounded cursor-pointer"
+                />
+                <span className="text-xs font-bold text-red-700 uppercase tracking-wider flex items-center gap-1.5">
+                  🔥 Tylko pilne
+                </span>
+              </label>
+            </div>
 
-              <select
-                value={filterPriority}
-                onChange={(e) => setFilterPriority(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
-              >
-                <option value="all">Wszystkie priorytety</option>
-                <option value="High">Wysoki</option>
-                <option value="Normal">Normalny</option>
-                <option value="Low">Niski</option>
-              </select>
-
-              <select
-                value={filterPickupType}
-                onChange={(e) => setFilterPickupType(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
-              >
-                <option value="all">Wszystkie metody odbioru</option>
-                <option value="spedycja">Spedycja</option>
-                <option value="magazyn_bialystok">Magazyn Białystok</option>
-                <option value="magazyn_zielonka">Magazyn Zielonka</option>
-              </select>
-
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => handleSort('created_at')}
-                  className={`flex-1 px-3 py-3 rounded-xl border transition-all duration-200 flex items-center justify-center space-x-1 text-sm ${sortBy === 'created_at'
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
-                    }`}
+            {/* Wiersz 2: Filtry rozwijane (Status, Metoda odbioru) + Sortowanie */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-gray-100">
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0 w-16">Status:</span>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm font-medium"
                 >
-                  <span>Data</span>
-                  <ArrowUpDown className="w-3 h-3" />
-                </button>
-                <button
-                  onClick={() => handleSort('collection_date')}
-                  className={`flex-1 px-3 py-3 rounded-xl border transition-all duration-200 flex items-center justify-center space-x-1 text-sm ${sortBy === 'collection_date'
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
-                    }`}
+                  <option value="all">Wszystkie statusy</option>
+                  <option value="Pending">Oczekujące</option>
+                  <option value="Approved">Przekazane do transportu</option>
+                  <option value="InTransit">W trakcie transportu</option>
+                  <option value="Completed">Zakończone</option>
+                  <option value="Rejected">Odrzucone</option>
+                </select>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0 w-16">Odbiór:</span>
+                <select
+                  value={filterPickupType}
+                  onChange={(e) => setFilterPickupType(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm font-medium"
                 >
-                  <span>Odbiór</span>
-                  <ArrowUpDown className="w-3 h-3" />
-                </button>
+                  <option value="all">Wszystkie metody odbioru</option>
+                  <option value="spedycja">Spedycja</option>
+                  <option value="magazyn_bialystok">Magazyn Białystok</option>
+                  <option value="magazyn_zielonka">Magazyn Zielonka</option>
+                </select>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0 w-16">Sortuj:</span>
+                <div className="flex space-x-2 flex-grow">
+                  <button
+                    onClick={() => handleSort('created_at')}
+                    className={`flex-1 px-3 py-2 rounded-xl border transition-all duration-200 flex items-center justify-center space-x-1 text-xs font-bold ${
+                      sortBy === 'created_at'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50'
+                    }`}
+                  >
+                    <span>Data zgł.</span>
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => handleSort('collection_date')}
+                    className={`flex-1 px-3 py-2 rounded-xl border transition-all duration-200 flex items-center justify-center space-x-1 text-xs font-bold ${
+                      sortBy === 'collection_date'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50'
+                    }`}
+                  >
+                    <span>Termin odbioru</span>
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
