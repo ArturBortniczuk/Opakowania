@@ -16,7 +16,7 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
   const messagesEndRef = useRef(null);
   const subscriptionRef = useRef(null);
 
-  // Pobieranie wszystkich wątków dla admina
+  // Pobieranie wszystkich wątków dla admina (tylko z niepustą ostatnią wiadomością)
   const fetchThreads = async () => {
     setLoadingThreads(true);
     try {
@@ -45,9 +45,8 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
     if (!isOpen) return;
 
     const subscription = chatAPI.subscribeToStaffChat((payload) => {
-      fetchThreads(); // Odśwież listę wątków
+      fetchThreads();
 
-      // Jeśli nowa wiadomość dotyczy aktualnie otwartego wątku
       if (payload.table === 'chat_messages' && payload.new) {
         const newMsg = payload.new;
         if (selectedThread && newMsg.thread_id === selectedThread.id) {
@@ -55,7 +54,6 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
             if (prev.some((m) => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
           });
-          // Oznacz od razu jako przeczytane
           chatAPI.markMessagesAsRead(selectedThread.id, 'staff');
         }
       }
@@ -65,7 +63,9 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
 
     return () => {
       if (subscriptionRef.current) {
-        subscriptionRef.current.unsubscribe();
+        try {
+          subscriptionRef.current.unsubscribe();
+        } catch (_) {}
       }
     };
   }, [isOpen, selectedThread]);
@@ -125,7 +125,7 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
           if (prev.some((m) => m.id === sentMsg.id)) return prev;
           return [...prev, sentMsg];
         });
-        fetchThreads(); // Odśwież podgląd ostatniej wiadomości
+        fetchThreads();
       }
     } catch (err) {
       console.error('Błąd wysyłania wiadomości przez admina:', err);
@@ -154,19 +154,19 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white w-full max-w-5xl h-[85vh] rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden">
         {/* Nagłówek okna czatu admina */}
-        <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800">
+        <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-600/30 border border-blue-400/30 rounded-xl">
+            <div className="p-2.5 bg-blue-600/30 border border-blue-400/30 rounded-xl">
               <MessageSquare className="w-6 h-6 text-blue-400" />
             </div>
             <div>
               <h2 className="text-lg font-bold text-white flex items-center space-x-2">
                 <span>Centrum Komunikacji z Klientami</span>
-                <span className="bg-blue-500/20 text-blue-300 text-xs px-2.5 py-0.5 rounded-full border border-blue-400/30">
+                <span className="bg-blue-500/20 text-blue-300 text-xs px-2.5 py-0.5 rounded-full border border-blue-400/30 font-medium">
                   Realtime
                 </span>
               </h2>
-              <p className="text-xs text-gray-400">Obsługa zapytań i konwersacji w czasie rzeczywistym</p>
+              <p className="text-xs text-gray-400 mt-0.5">Obsługa zapytań i konwersacji w czasie rzeczywistym</p>
             </div>
           </div>
 
@@ -191,26 +191,26 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
         {/* Ciało okna: Podział na listę wątków (lewa strona) i okno rozmowy (prawa strona) */}
         <div className="flex-1 flex overflow-hidden">
           {/* Lewy panel: Lista rozmów */}
-          <div className="w-80 sm:w-96 border-r border-gray-200 bg-slate-50 flex flex-col">
+          <div className="w-80 sm:w-96 border-r border-gray-200 bg-slate-50 flex flex-col shrink-0">
             {/* Wyszukiwarka i filtry */}
-            <div className="p-3 border-b border-gray-200 bg-white space-y-2">
+            <div className="p-3 border-b border-gray-200 bg-white space-y-2 shrink-0">
               <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Szukaj firmy, klienta lub NIP..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                  className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
                 />
               </div>
 
-              <div className="flex space-x-1">
+              <div className="flex space-x-1.5">
                 <button
                   onClick={() => setActiveFilter('all')}
                   className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                     activeFilter === 'all'
-                      ? 'bg-blue-100 text-blue-700 font-semibold'
+                      ? 'bg-blue-100 text-blue-800 font-bold shadow-sm'
                       : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >
@@ -220,7 +220,7 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
                   onClick={() => setActiveFilter('unread')}
                   className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center space-x-1 ${
                     activeFilter === 'unread'
-                      ? 'bg-blue-100 text-blue-700 font-semibold'
+                      ? 'bg-blue-100 text-blue-800 font-bold shadow-sm'
                       : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >
@@ -256,39 +256,39 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
                         setSelectedThread(t);
                         chatAPI.markMessagesAsRead(t.id, 'staff');
                       }}
-                      className={`w-full text-left p-4 transition-all duration-150 flex items-start space-x-3 relative ${
+                      className={`w-full text-left p-3.5 transition-all duration-150 flex items-start space-x-3 relative ${
                         isSelected
-                          ? 'bg-blue-50/80 border-l-4 border-blue-600 shadow-sm'
+                          ? 'bg-blue-50/90 border-l-4 border-blue-600 shadow-sm'
                           : 'hover:bg-white bg-slate-50/50'
                       }`}
                     >
-                      <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-inner">
+                      <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-inner mt-0.5">
                         {t.company_name ? t.company_name.charAt(0).toUpperCase() : 'K'}
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <h4 className="font-semibold text-xs text-gray-900 truncate">
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="font-bold text-xs text-gray-900 truncate pr-1">
                             {t.company_name || t.client_name || 'Klient'}
                           </h4>
-                          <span className="text-[10px] text-gray-400 flex-shrink-0 ml-1">{lastTime}</span>
+                          <span className="text-[10px] text-gray-400 flex-shrink-0 font-medium">{lastTime}</span>
                         </div>
 
-                        <p className="text-[11px] text-gray-500 truncate flex items-center space-x-1">
+                        <p className="text-[11px] text-gray-500 truncate flex items-center space-x-1 mb-1">
                           <User className="w-3 h-3 text-gray-400 flex-shrink-0" />
                           <span className="truncate">{t.client_name}</span>
-                          {t.nip && <span className="text-gray-400">({t.nip})</span>}
+                          {t.nip && <span className="text-gray-400 font-mono">({t.nip})</span>}
                         </p>
 
                         {t.last_message && (
-                          <p className="text-xs text-gray-600 truncate mt-1 italic font-sans">
+                          <p className="text-xs text-gray-600 truncate italic font-sans bg-white/60 p-1 rounded border border-gray-100">
                             "{t.last_message}"
                           </p>
                         )}
                       </div>
 
                       {hasUnread && (
-                        <span className="ml-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 animate-pulse">
+                        <span className="ml-1 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 animate-pulse self-center">
                           {t.unread_admin_count}
                         </span>
                       )}
@@ -300,33 +300,35 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
           </div>
 
           {/* Prawy panel: Okno konwersacji */}
-          <div className="flex-1 flex flex-col bg-white">
+          <div className="flex-1 flex flex-col bg-white min-w-0">
             {selectedThread ? (
               <>
-                {/* Nagłówek wątku */}
-                <div className="p-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-md">
+                {/* Estetyczny Nagłówek wątku */}
+                <div className="p-4 bg-gray-50/90 border-b border-gray-200 flex items-center justify-between flex-wrap gap-2 shrink-0">
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold text-sm shadow-md flex-shrink-0">
                       <Building2 className="w-5 h-5" />
                     </div>
-                    <div>
-                      <h3 className="font-bold text-sm text-gray-900 flex items-center space-x-2">
-                        <span>{selectedThread.company_name || 'Klient'}</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                        <h3 className="font-bold text-sm text-gray-900 truncate max-w-md">
+                          {selectedThread.company_name || 'Klient'}
+                        </h3>
                         {selectedThread.nip && (
-                          <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-md font-mono">
+                          <span className="text-[11px] font-semibold text-gray-700 bg-gray-200/80 px-2 py-0.5 rounded-md font-mono flex-shrink-0">
                             NIP: {selectedThread.nip}
                           </span>
                         )}
-                      </h3>
-                      <p className="text-xs text-gray-500">
-                        Rozmówca: <strong>{selectedThread.client_name}</strong>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Rozmówca: <strong className="text-gray-800">{selectedThread.client_name}</strong>
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2 text-xs">
-                    <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-medium rounded-full border border-emerald-200 flex items-center space-x-1">
-                      <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
+                  <div className="flex items-center space-x-2 text-xs flex-shrink-0">
+                    <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-bold text-xs rounded-full border border-emerald-200 flex items-center space-x-1.5 shadow-sm">
+                      <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
                       <span>Aktywny wątek</span>
                     </span>
                   </div>
@@ -354,24 +356,24 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
                           className={`flex flex-col ${isStaffMsg ? 'items-end' : 'items-start'}`}
                         >
                           <span className="text-[11px] font-semibold text-gray-500 mb-0.5 px-1">
-                            {isStaffMsg ? (msg.sender_name || 'Obsługa Klienta') : selectedThread.client_name}
+                            {isStaffMsg ? (msg.sender_name || 'Administrator') : selectedThread.client_name}
                           </span>
 
                           <div
                             className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm shadow-sm ${
                               isStaffMsg
-                                ? 'bg-indigo-600 text-white rounded-br-none'
-                                : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none'
+                                ? 'bg-blue-600 text-white rounded-br-none font-normal'
+                                : 'bg-white text-gray-900 border border-gray-200 rounded-bl-none'
                             }`}
                           >
                             <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
                             <div
                               className={`flex items-center justify-end space-x-1 text-[10px] mt-1 ${
-                                isStaffMsg ? 'text-indigo-200' : 'text-gray-400'
+                                isStaffMsg ? 'text-blue-100' : 'text-gray-400'
                               }`}
                             >
                               <span>{timeStr}</span>
-                              {isStaffMsg && <CheckCheck className="w-3.5 h-3.5 text-indigo-200" />}
+                              {isStaffMsg && <CheckCheck className="w-3.5 h-3.5 text-blue-100" />}
                             </div>
                           </div>
                         </div>
@@ -382,19 +384,19 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
                 </div>
 
                 {/* Formularz odpowiedzi */}
-                <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-gray-200 flex items-center space-x-3">
+                <form onSubmit={handleSendMessage} className="p-4 bg-white border-t border-gray-200 flex items-center space-x-3 shrink-0">
                   <input
                     type="text"
                     value={newMessageText}
                     onChange={(e) => setNewMessageText(e.target.value)}
                     placeholder="Wpisz odpowiedź do klienta..."
-                    className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+                    className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
                     disabled={sending}
                   />
                   <button
                     type="submit"
                     disabled={!newMessageText.trim() || sending}
-                    className="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl font-medium shadow-md transition-all duration-200 flex items-center space-x-2"
+                    className="px-5 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl font-bold text-sm shadow-md transition-all duration-200 flex items-center space-x-2"
                   >
                     {sending ? (
                       <Loader2 className="w-5 h-5 animate-spin" />

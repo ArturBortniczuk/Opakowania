@@ -1,4 +1,4 @@
-// src/components/AdminNavbar.js - Zaktualizowany o zwijanie, przewijanie oraz Czat na Żywo
+// src/components/AdminNavbar.js - Zaktualizowany o zwijanie, przewijanie oraz Czat (Tylko dla Admina i Magazynu)
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -31,8 +31,13 @@ const AdminNavbar = ({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
-  // Pobieranie sumy nieprzeczytanych wiadomości dla admina
+  // Sprawdzanie uprawnień do czatu: TYLKO Admin, Koordynator (Supervisor) oraz Magazyn!
+  const userRoleLower = user?.role?.toLowerCase() || '';
+  const canAccessChat = ['admin', 'supervisor', 'magazyn'].includes(userRoleLower);
+
+  // Pobieranie sumy nieprzeczytanych wiadomości dla uprawnionych ról
   const fetchUnreadChatCount = async () => {
+    if (!canAccessChat) return;
     try {
       const threads = await chatAPI.getAllThreads();
       const totalUnread = threads.reduce((acc, t) => acc + (t.unread_admin_count || 0), 0);
@@ -43,9 +48,11 @@ const AdminNavbar = ({
   };
 
   useEffect(() => {
+    if (!canAccessChat) return;
+
     fetchUnreadChatCount();
 
-    // Nasłuchiwanie zmian w czasie rzeczywistym
+    // Nasłuchiwanie zmian w czasie rzeczywistym dla uprawnionych pracowników
     const subscription = chatAPI.subscribeToStaffChat(() => {
       fetchUnreadChatCount();
     });
@@ -55,7 +62,7 @@ const AdminNavbar = ({
         subscription.unsubscribe();
       }
     };
-  }, []);
+  }, [canAccessChat]);
 
   // Pobierz szybkie statystyki
   useEffect(() => {
@@ -192,20 +199,22 @@ const AdminNavbar = ({
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            {/* Przycisk Czatu na żywo w nagłówku dla pracowników */}
-            <button
-              onClick={() => setIsChatOpen(true)}
-              className="relative p-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl transition-all duration-200 flex items-center space-x-2 border border-blue-200/60 shadow-sm group"
-              title="Czat na żywo z klientami"
-            >
-              <MessageSquare className="w-5 h-5 text-blue-600 group-hover:scale-110 transition-transform" />
-              <span className="hidden md:inline font-medium text-xs">Czat na Żywo</span>
-              {unreadChatCount > 0 && (
-                <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-bounce shadow-md">
-                  {unreadChatCount > 9 ? '9+' : unreadChatCount}
-                </span>
-              )}
-            </button>
+            {/* Przycisk Czatu w nagłówku WYŁĄCZNIE dla Admina i Magazynu */}
+            {canAccessChat && (
+              <button
+                onClick={() => setIsChatOpen(true)}
+                className="relative p-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl transition-all duration-200 flex items-center space-x-2 border border-blue-200/60 shadow-sm group"
+                title="Czat na żywo z klientami"
+              >
+                <MessageSquare className="w-5 h-5 text-blue-600 group-hover:scale-110 transition-transform" />
+                <span className="hidden md:inline font-medium text-xs">Czat na Żywo</span>
+                {unreadChatCount > 0 && (
+                  <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-bounce shadow-md">
+                    {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                  </span>
+                )}
+              </button>
+            )}
 
             <div className="flex items-center space-x-3">
               <div className="hidden sm:block text-right">
@@ -258,36 +267,38 @@ const AdminNavbar = ({
               {isCollapsed ? 'MENU' : 'Zarządzanie'}
             </h4>
 
-            {/* Dedykowany przycisk czatu w menu bocznym */}
-            <button
-              onClick={() => {
-                setIsChatOpen(true);
-                setSidebarOpen(false);
-              }}
-              title={isCollapsed ? "Czat na żywo" : ""}
-              className={`
-                relative w-full p-4 rounded-xl transition-all duration-300 group flex items-center mb-2
-                ${isCollapsed ? 'justify-center' : ''}
-                bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-900 border border-blue-200/80 hover:from-blue-100 hover:to-indigo-100
-              `}
-            >
-              <div className="p-2 rounded-lg bg-blue-600 text-white shrink-0 shadow-md">
-                <MessageSquare className="w-5 h-5" />
-              </div>
-              {!isCollapsed && (
-                <div className="flex-1 text-left ml-4 whitespace-nowrap overflow-hidden flex items-center justify-between">
-                  <div>
-                    <div className="font-bold text-sm text-blue-950">Czat na Żywo</div>
-                    <div className="text-[11px] text-blue-700">Wiadomości od klientów</div>
-                  </div>
-                  {unreadChatCount > 0 && (
-                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
-                      {unreadChatCount}
-                    </span>
-                  )}
+            {/* Dedykowany przycisk czatu w menu bocznym WYŁĄCZNIE dla Admina i Magazynu */}
+            {canAccessChat && (
+              <button
+                onClick={() => {
+                  setIsChatOpen(true);
+                  setSidebarOpen(false);
+                }}
+                title={isCollapsed ? "Czat na żywo" : ""}
+                className={`
+                  relative w-full p-4 rounded-xl transition-all duration-300 group flex items-center mb-2
+                  ${isCollapsed ? 'justify-center' : ''}
+                  bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-900 border border-blue-200/80 hover:from-blue-100 hover:to-indigo-100
+                `}
+              >
+                <div className="p-2 rounded-lg bg-blue-600 text-white shrink-0 shadow-md">
+                  <MessageSquare className="w-5 h-5" />
                 </div>
-              )}
-            </button>
+                {!isCollapsed && (
+                  <div className="flex-1 text-left ml-4 whitespace-nowrap overflow-hidden flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-sm text-blue-950">Czat na Żywo</div>
+                      <div className="text-[11px] text-blue-700">Wiadomości od klientów</div>
+                    </div>
+                    {unreadChatCount > 0 && (
+                      <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
+                        {unreadChatCount}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </button>
+            )}
 
             {filteredMenuItems.map((item) => (
               <NavItem
@@ -327,12 +338,14 @@ const AdminNavbar = ({
         </div>
       </aside>
 
-      {/* Modal czatu dla pracowników */}
-      <AdminChatModal
-        isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
-        currentUser={user}
-      />
+      {/* Modal czatu dla pracowników (tylko uprawnione role) */}
+      {canAccessChat && (
+        <AdminChatModal
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          currentUser={user}
+        />
+      )}
     </>
   );
 };
