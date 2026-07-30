@@ -976,18 +976,22 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                   const returnDeadline = drum.data_zwrotu_do_dostawcy ? new Date(drum.data_zwrotu_do_dostawcy) : null;
                   const nameUpper = (drum.nazwa || '').toUpperCase();
                   
-                  const daysInPossession = Math.ceil((new Date() - issueDate) / (1000 * 60 * 60 * 24));
+                  // Datą referencyjną zamrażającą dni w posiadaniu jest data zgłoszenia (reported_at pozycji lub created_at zgłoszenia)
+                  const itemReportedAt = (typeof drum === 'object' && drum !== null && drum.reported_at) ? drum.reported_at : selectedRequest.created_at;
+                  const refDateForPossession = itemReportedAt ? new Date(itemReportedAt) : new Date();
+                  
+                  const daysInPossession = Math.ceil((refDateForPossession - issueDate) / (1000 * 60 * 60 * 24));
                   
                   // Nowa logika "Nasze":
                   const isOurDrum = 
                     !returnDeadline || 
                     nameUpper.startsWith('BĘBEN ELTRON') || 
                     daysInPossession > 360 ||
-                    (returnDeadline && new Date() > returnDeadline);
+                    (returnDeadline && refDateForPossession > returnDeadline);
                   
                   let daysLeftToReturn = 'Brak danych';
                   if (returnDeadline) {
-                    daysLeftToReturn = Math.ceil((returnDeadline - new Date()) / (1000 * 60 * 60 * 24));
+                    daysLeftToReturn = Math.ceil((returnDeadline - refDateForPossession) / (1000 * 60 * 60 * 24));
                   }
                   
                   // --- Nowa logika wyliczeń ---
@@ -1005,7 +1009,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                   const drumNameUpper = (drum.nazwa || '').toUpperCase();
                   
                   let supplierReturnPercentage = 100;
-                  if (returnDeadline && new Date() > returnDeadline) {
+                  if (returnDeadline && refDateForPossession > returnDeadline) {
                     supplierReturnPercentage = 0;
                   }
                   
@@ -1015,8 +1019,8 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                   );
                   
                   if (matchingRule) {
-                    if (returnDeadline && new Date() > returnDeadline) {
-                       const daysOverdue = Math.ceil((new Date() - returnDeadline) / (1000 * 60 * 60 * 24));
+                    if (returnDeadline && refDateForPossession > returnDeadline) {
+                       const daysOverdue = Math.ceil((refDateForPossession - returnDeadline) / (1000 * 60 * 60 * 24));
                        if (daysOverdue <= matchingRule.max_days_overdue) {
                          supplierReturnPercentage = matchingRule.return_percentage;
                        } else {

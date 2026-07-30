@@ -290,7 +290,19 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
         available_equipment: formData.availableEquipment,
         notes: notesWithPhoneAndDates,
         pickup_type: formData.pickupType || 'spedycja',
-        selected_drums: formData.selectedDrums, // Teraz to tablica obiektów
+        selected_drums: (formData.selectedDrums || []).map(item => {
+          if (typeof item === 'object' && item !== null) {
+            return {
+              ...item,
+              reported_at: item.reported_at || new Date().toISOString()
+            };
+          }
+          return {
+            cecha: item,
+            type: 'drum',
+            reported_at: new Date().toISOString()
+          };
+        }),
         
         // Dane profilu pracownika
         profile_id: profile?.id || null,

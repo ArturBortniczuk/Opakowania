@@ -1283,8 +1283,9 @@ export const drumsAPI = {
             const drums = req.selected_drums;
             if (Array.isArray(drums)) {
               drums.forEach(d => {
-                const cecha = typeof d === 'object' ? d.cecha : d;
-                if (cecha) reportedDrumsMap.set(cecha, req.created_at);
+                const cecha = typeof d === 'object' ? (d.cecha || d.kod_bebna) : d;
+                const reportedAt = (typeof d === 'object' && d?.reported_at) ? d.reported_at : req.created_at;
+                if (cecha) reportedDrumsMap.set(cecha, reportedAt);
               });
             }
           });
