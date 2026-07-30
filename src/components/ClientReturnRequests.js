@@ -226,14 +226,6 @@ const ClientReturnRequests = ({ user }) => {
                     </div>
                     <div className="shrink-0 flex items-center gap-2">
                       {getStatusBadge(req.status)}
-                      {(() => {
-                        const pInfo = returnsAPI.getPickupTypeInfo(req.pickup_type);
-                        return (
-                          <span className={`text-[9px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider border ${pInfo.badgeClass}`}>
-                            {pInfo.shortLabel}
-                          </span>
-                        );
-                      })()}
                     </div>
                   </div>
 
