@@ -57,9 +57,21 @@ const LogisticsMap = ({ user }) => {
   const [clientSearch, setClientSearch] = useState(''); // Po nazwie klienta
   const [sizeFilter, setSizeFilter] = useState(''); // Po rozmiar_bebna
   const [supplierFilter, setSupplierFilter] = useState(''); // Po kon_dostawca
-  const [pickupTypeFilter, setPickupTypeFilter] = useState('all'); // Po typie odbioru (spedycja, magazyn_bialystok, magazyn_zielonka)
+  const [pickupTypeFilter, setPickupTypeFilter] = useState(['spedycja', 'magazyn_bialystok', 'magazyn_zielonka']); // Po typie odbioru (spedycja, magazyn_bialystok, magazyn_zielonka)
   const [minAge, setMinAge] = useState(''); // Termin zwrotu od (dni)
   const [maxAge, setMaxAge] = useState(''); // Termin zwrotu do (dni)
+
+  const togglePickupType = (typeId) => {
+    setPickupTypeFilter(prev => {
+      const current = Array.isArray(prev) ? prev : ['spedycja', 'magazyn_bialystok', 'magazyn_zielonka'];
+      if (current.includes(typeId)) {
+        const updated = current.filter(id => id !== typeId);
+        return updated.length === 0 ? ['spedycja', 'magazyn_bialystok', 'magazyn_zielonka'] : updated;
+      } else {
+        return [...current, typeId];
+      }
+    });
+  };
 
   // Dynamiczne słowniki dla dropdownów
   const [availableSizes, setAvailableSizes] = useState([]);
@@ -763,6 +775,20 @@ const LogisticsMap = ({ user }) => {
     
     // Filtrowanie zawartości
     filtered = filtered.map(loc => {
+      if (loc.type === 'pickup') {
+        let filteredPickups = loc.pickups || [];
+        if (Array.isArray(pickupTypeFilter) && pickupTypeFilter.length > 0 && pickupTypeFilter.length < 3) {
+          filteredPickups = filteredPickups.filter(p => {
+            const info = returnsAPI.getPickupTypeInfo(p.originalRequest?.pickup_type);
+            return pickupTypeFilter.includes(info.value);
+          });
+        }
+        return {
+          ...loc,
+          pickups: filteredPickups,
+          visibleCount: filteredPickups.length
+        };
+      }
       if (loc.type === 'drums') {
         const filteredDrums = loc.drums.filter(d => {
           // Cecha
@@ -805,12 +831,8 @@ const LogisticsMap = ({ user }) => {
           return false;
         }
 
-        if (pickupTypeFilter && pickupTypeFilter !== 'all') {
-          const matchesType = loc.pickups && loc.pickups.some(p => {
-            const info = returnsAPI.getPickupTypeInfo(p.originalRequest?.pickup_type);
-            return info.value === pickupTypeFilter;
-          });
-          if (!matchesType) return false;
+        if (!loc.pickups || loc.pickups.length === 0) {
+          return false;
         }
 
         return true;
@@ -1043,18 +1065,54 @@ const LogisticsMap = ({ user }) => {
         {/* NOWY PANEL FILTROWANIA ZAAWANSOWANEGO */}
         <div className="bg-gray-50 p-4 rounded-lg mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">Metoda Odbioru</label>
-            <select
-              className="w-full py-2 px-3 border border-gray-300 rounded text-sm bg-white focus:ring-blue-500 focus:border-blue-500 font-medium"
-              value={pickupTypeFilter}
-              onChange={(e) => setPickupTypeFilter(e.target.value)}
-            >
-              <option value="all">Wszystkie metody</option>
-              <option value="spedycja">🚚 Spedycja</option>
-              <option value="magazyn_bialystok">🏢 Magazyn Białystok</option>
-              <option value="magazyn_zielonka">🏢 Magazyn Zielonka</option>
-            </select>
+          <div className="col-span-1 md:col-span-2 lg:col-span-3">
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-gray-700">Metoda Odbioru</label>
+              {Array.isArray(pickupTypeFilter) && pickupTypeFilter.length < 3 && (
+                <button
+                  type="button"
+                  onClick={() => setPickupTypeFilter(['spedycja', 'magazyn_bialystok', 'magazyn_zielonka'])}
+                  className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold underline cursor-pointer"
+                >
+                  Pokaż wszystkie
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5 items-center">
+              <button
+                type="button"
+                onClick={() => togglePickupType('spedycja')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                  Array.isArray(pickupTypeFilter) && pickupTypeFilter.includes('spedycja')
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <span>🚚</span> Spedycja
+              </button>
+              <button
+                type="button"
+                onClick={() => togglePickupType('magazyn_bialystok')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                  Array.isArray(pickupTypeFilter) && pickupTypeFilter.includes('magazyn_bialystok')
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <span>🏢</span> Magazyn Białystok
+              </button>
+              <button
+                type="button"
+                onClick={() => togglePickupType('magazyn_zielonka')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                  Array.isArray(pickupTypeFilter) && pickupTypeFilter.includes('magazyn_zielonka')
+                    ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <span>🏢</span> Magazyn Zielonka
+              </button>
+            </div>
           </div>
           
           <div className="relative">
