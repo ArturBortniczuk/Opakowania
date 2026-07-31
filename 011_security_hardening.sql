@@ -64,14 +64,18 @@ CREATE POLICY "Admini zarządzają firmami" ON public.companies
 -- C) client_profiles (wcześniej FOR ALL USING (true))
 DROP POLICY IF EXISTS "Zarządzanie profilami dla wszystkich" ON public.client_profiles;
 DROP POLICY IF EXISTS "Pracownik klienta widzi swoje dane" ON public.client_profiles;
+DROP POLICY IF EXISTS "Klient zarządza profilami swojej firmy" ON public.client_profiles;
 DROP POLICY IF EXISTS "Admini zarządzają profilami klientów" ON public.client_profiles;
 
-CREATE POLICY "Pracownik klienta widzi swoje dane" ON public.client_profiles
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Admini zarządzają profilami klientów" ON public.client_profiles
-  FOR ALL USING (
-    public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista')
+CREATE POLICY "Klient zarządza profilami swojej firmy" ON public.client_profiles
+  FOR ALL
+  USING (
+    company_nip = (SELECT nip FROM public.profiles WHERE id = auth.uid() AND status = 'approved')
+    OR public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista')
+  )
+  WITH CHECK (
+    company_nip = (SELECT nip FROM public.profiles WHERE id = auth.uid() AND status = 'approved')
+    OR public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista')
   );
 
 -- D) client_drum_notes (wcześniej FOR ALL USING (true))
