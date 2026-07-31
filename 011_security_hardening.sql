@@ -143,3 +143,12 @@ CREATE POLICY "Klienci wysyłają wiadomości do swoich wątków" ON public.chat
         AND chat_threads.client_user_id = auth.uid()
     )
   );
+
+-- I) chat_threads (Modyfikacja wątków tylko dla własnych pól)
+DROP POLICY IF EXISTS "Klienci aktualizują swoje wątki" ON public.chat_threads;
+CREATE POLICY "Klienci aktualizują swoje wątki" ON public.chat_threads
+  FOR UPDATE USING (
+    auth.uid() = client_user_id
+  ) WITH CHECK (
+    auth.uid() = client_user_id
+  );
