@@ -80,12 +80,8 @@ DROP POLICY IF EXISTS "Klient odczytuje i tworzy swoje notatki bębnów" ON publ
 
 CREATE POLICY "Klient odczytuje i tworzy swoje notatki bębnów" ON public.client_drum_notes
   FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM public.drums d
-      JOIN public.profiles p ON p.nip = d.nip AND p.status = 'approved'
-      WHERE d.kod_bebna = client_drum_notes.drum_code
-        AND p.id = auth.uid()
-    ) OR public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista')
+    nip = (SELECT nip FROM public.profiles WHERE id = auth.uid() AND status = 'approved')
+    OR public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista')
   );
 
 -- E) drum_exceptions (wcześniej FOR ALL USING (true))
@@ -95,12 +91,8 @@ DROP POLICY IF EXISTS "Admini zarządzają wyjątkami" ON public.drum_exceptions
 
 CREATE POLICY "Klient odczytuje wyjątki swoich bębnów" ON public.drum_exceptions
   FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p 
-      WHERE p.id = auth.uid() AND p.status = 'approved' AND p.nip = (
-        SELECT d.nip FROM public.drums d WHERE d.kod_bebna = drum_exceptions.drum_code LIMIT 1
-      )
-    ) OR public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista')
+    nip = (SELECT nip FROM public.profiles WHERE id = auth.uid() AND status = 'approved')
+    OR public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista')
   );
 
 CREATE POLICY "Admini zarządzają wyjątkami" ON public.drum_exceptions
@@ -131,12 +123,8 @@ DROP POLICY IF EXISTS "Admini zarządzają terminami zwrotu" ON public.custom_dr
 
 CREATE POLICY "Klient odczytuje swoje terminy zwrotu" ON public.custom_drum_deadlines
   FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM public.drums d 
-      JOIN public.profiles p ON p.nip = d.nip AND p.status = 'approved'
-      WHERE d.kod_bebna = custom_drum_deadlines.drum_code
-        AND p.id = auth.uid()
-    ) OR public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista')
+    nip = (SELECT nip FROM public.profiles WHERE id = auth.uid() AND status = 'approved')
+    OR public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista')
   );
 
 CREATE POLICY "Admini zarządzają terminami zwrotu" ON public.custom_drum_deadlines
