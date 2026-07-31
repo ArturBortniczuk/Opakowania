@@ -41,6 +41,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
   const userRole = user?.role?.toLowerCase() || '';
   const canChangeStatus = ['admin', 'supervisor', 'magazyn'].includes(userRole);
+  const canChangePickupType = ['admin', 'supervisor'].includes(userRole);
 
   const lastScrollYRef = useRef(0);
 
@@ -764,7 +765,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                 <div className="flex items-center space-x-3 mt-2">
                   {getStatusBadge(selectedRequest.status)}
                   {getPriorityBadge(selectedRequest)}
-                  {canChangeStatus ? (
+                  {canChangePickupType ? (
                     <select
                       value={returnsAPI.getPickupTypeInfo(selectedRequest.pickup_type).value}
                       onChange={async (e) => {
