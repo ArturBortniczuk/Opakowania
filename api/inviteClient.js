@@ -1,3 +1,5 @@
+import { createClient } from '@supabase/supabase-js';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method Not Allowed' });
@@ -10,6 +12,42 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Brakuje wymaganych danych formularza.' });
     }
 
+    // 1. Weryfikacja tożsamości i uprawnień wywołującego (tylko pracownicy/admini)
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ message: 'Brak tokena autoryzacji.' });
+    }
+
+    const { NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
+    if (!NEXT_PUBLIC_SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Brak konfiguracji Supabase w zmiennych środowiskowych Vercel.');
+      return res.status(500).json({ message: 'Błąd konfiguracji serwera.' });
+    }
+
+    const supabaseAdmin = createClient(NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    if (userError || !user) {
+      return res.status(401).json({ message: 'Nieprawidłowy token autoryzacji.' });
+    }
+
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    const allowedRoles = ['admin', 'supervisor', 'dyrektor', 'kierownik', 'wsparcie', 'magazyn', 'specjalista'];
+    if (!profile || !allowedRoles.includes(profile.role.toLowerCase())) {
+      return res.status(403).json({ message: 'Brak uprawnień. Tylko uprawnieni pracownicy mogą wysyłać zaproszenia.' });
+    }
+
+    // 2. Wysyłanie e-maila zaproszenia przez SMTP
     const nodemailer = require('nodemailer');
     const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD } = process.env;
 
@@ -29,7 +67,7 @@ export default async function handler(req, res) {
     });
 
     const senderEmail = SMTP_USER.includes('@') ? SMTP_USER : 'opakowania@grupaeltron.pl';
-    const siteUrl = origin || 'https://opakowania.grupaeltron.pl'; // fallback w razie braku origin
+    const siteUrl = origin || 'https://opakowania.grupaeltron.pl';
 
     const mailOptions = {
       from: `"Grupa Eltron - System Opakowań" <${senderEmail}>`,
@@ -70,7 +108,7 @@ export default async function handler(req, res) {
     };
 
     await transporter.sendMail(mailOptions);
-    console.log(`Wysłano zaproszenie e-mail do klienta (${email}).`);
+    console.log(`Wysłano zaproszenie e-mail do klienta (${email}) przez użytkownika ${user.email}.`);
 
     return res.status(200).json({ success: true, message: 'Zaproszenie wysłane pomyślnie.' });
   } catch (error) {

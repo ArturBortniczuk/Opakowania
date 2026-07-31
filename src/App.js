@@ -120,50 +120,17 @@ const App = () => {
             navigate('/set-password', { replace: true });
           }
         } else {
-          // Fallback: jeśli Supabase nie odpowiada, ale mamy lokalnego użytkownika z poprzedniej sesji
-          const localUserStr = localStorage.getItem('currentUser');
-          if (localUserStr) {
-            try {
-              const localUser = JSON.parse(localUserStr);
-              console.log("💾 Przywrócono sesję lokalną z localStorage (Fallback):", localUser.email);
-              if (isMounted) {
-                setCurrentUser(localUser);
-                const savedProfile = localStorage.getItem('currentProfile');
-                if (savedProfile) {
-                  setCurrentProfile(JSON.parse(savedProfile));
-                }
-                
-                if (location.pathname === '/') {
-                  navigate(isStaff(localUser.role) ? '/admin' : '/dashboard', { replace: true });
-                }
-              }
-            } catch (parseErr) {
-              console.error("Błąd parsowania lokalnego użytkownika:", parseErr);
-            }
-          } else {
-            console.log("ℹ️ Brak aktywnej sesji (brak fallbacku w localStorage).");
-            if (isMounted) {
-              setCurrentUser(null);
-              setCurrentProfile(null);
-              localStorage.removeItem('currentUser');
-              localStorage.removeItem('currentProfile');
-            }
+          console.log("ℹ️ Brak aktywnej sesji w Supabase Auth.");
+          if (isMounted) {
+            setCurrentUser(null);
+            setCurrentProfile(null);
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('currentProfile');
           }
         }
       } catch (e) {
         console.error("❌ Błąd podczas inicjalizacji sesji:", e);
-        // Próba ratunkowego przywrócenia z localStorage
-        const localUserStr = localStorage.getItem('currentUser');
-        if (localUserStr && isMounted) {
-          try {
-            const localUser = JSON.parse(localUserStr);
-            setCurrentUser(localUser);
-            const savedProfile = localStorage.getItem('currentProfile');
-            if (savedProfile) {
-              setCurrentProfile(JSON.parse(savedProfile));
-            }
-          } catch (_) {}
-        } else if (isMounted) {
+        if (isMounted) {
           setCurrentUser(null);
           setCurrentProfile(null);
           localStorage.removeItem('currentUser');

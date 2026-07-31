@@ -1,20 +1,39 @@
 -- 006_reports_views.sql
--- Skrypt tworzący zoptymalizowane widoki i funkcje do generowania kompleksowych raportów
+-- Skrypt tworzący zoptymalizowane widoki i funkcje do generowania kompleksowych raportów (ZABEZPIECZONY)
 
 -- 1. Funkcja: Pobieranie ogólnych statystyk bębnów pogrupowanych dla wykresów
 CREATE OR REPLACE FUNCTION get_drums_analytics(allowed_nips text[] DEFAULT NULL)
 RETURNS jsonb AS $$
 DECLARE
   result jsonb;
+  caller_role TEXT;
+  caller_nip TEXT;
+  caller_status TEXT;
+  effective_nips TEXT[];
 BEGIN
-  IF allowed_nips IS NOT NULL AND array_length(allowed_nips, 1) = 0 THEN
+  -- Weryfikacja tożsamości wywołującego w Supabase Auth
+  SELECT role, nip, status INTO caller_role, caller_nip, caller_status
+  FROM public.profiles
+  WHERE id = auth.uid();
+
+  IF caller_role IS NOT NULL AND LOWER(caller_role) = 'client' THEN
+    IF caller_status IS DISTINCT FROM 'approved' OR caller_nip IS NULL OR caller_nip = '' THEN
+      RETURN '{}'::jsonb;
+    END IF;
+    -- Wymuszone ograniczenie dla klienta: widzi tylko swój NIP
+    effective_nips := ARRAY[caller_nip];
+  ELSE
+    effective_nips := allowed_nips;
+  END IF;
+
+  IF effective_nips IS NOT NULL AND array_length(effective_nips, 1) = 0 THEN
     RETURN '{}'::jsonb;
   END IF;
 
   WITH filtered_drums AS (
     SELECT * FROM drums 
     WHERE (typ_opakowania = 'Bęben' OR typ_opakowania IS NULL)
-      AND (allowed_nips IS NULL OR nip = ANY(allowed_nips))
+      AND (effective_nips IS NULL OR nip = ANY(effective_nips))
   )
   SELECT jsonb_build_object(
     'total_count', COALESCE((SELECT COUNT(*) FROM filtered_drums), 0),
@@ -92,14 +111,31 @@ CREATE OR REPLACE FUNCTION get_returns_analytics(allowed_nips text[] DEFAULT NUL
 RETURNS jsonb AS $$
 DECLARE
   result jsonb;
+  caller_role TEXT;
+  caller_nip TEXT;
+  caller_status TEXT;
+  effective_nips TEXT[];
 BEGIN
-  IF allowed_nips IS NOT NULL AND array_length(allowed_nips, 1) = 0 THEN
+  SELECT role, nip, status INTO caller_role, caller_nip, caller_status
+  FROM public.profiles
+  WHERE id = auth.uid();
+
+  IF caller_role IS NOT NULL AND LOWER(caller_role) = 'client' THEN
+    IF caller_status IS DISTINCT FROM 'approved' OR caller_nip IS NULL OR caller_nip = '' THEN
+      RETURN '{}'::jsonb;
+    END IF;
+    effective_nips := ARRAY[caller_nip];
+  ELSE
+    effective_nips := allowed_nips;
+  END IF;
+
+  IF effective_nips IS NOT NULL AND array_length(effective_nips, 1) = 0 THEN
     RETURN '{}'::jsonb;
   END IF;
 
   WITH filtered_returns AS (
     SELECT * FROM return_requests 
-    WHERE (allowed_nips IS NULL OR user_nip = ANY(allowed_nips))
+    WHERE (effective_nips IS NULL OR user_nip = ANY(effective_nips))
   )
   SELECT jsonb_build_object(
     'total_count', COALESCE((SELECT COUNT(*) FROM filtered_returns), 0),
@@ -140,8 +176,25 @@ CREATE OR REPLACE FUNCTION get_clients_analytics(allowed_nips text[] DEFAULT NUL
 RETURNS jsonb AS $$
 DECLARE
   result jsonb;
+  caller_role TEXT;
+  caller_nip TEXT;
+  caller_status TEXT;
+  effective_nips TEXT[];
 BEGIN
-  IF allowed_nips IS NOT NULL AND array_length(allowed_nips, 1) = 0 THEN
+  SELECT role, nip, status INTO caller_role, caller_nip, caller_status
+  FROM public.profiles
+  WHERE id = auth.uid();
+
+  IF caller_role IS NOT NULL AND LOWER(caller_role) = 'client' THEN
+    IF caller_status IS DISTINCT FROM 'approved' OR caller_nip IS NULL OR caller_nip = '' THEN
+      RETURN '{}'::jsonb;
+    END IF;
+    effective_nips := ARRAY[caller_nip];
+  ELSE
+    effective_nips := allowed_nips;
+  END IF;
+
+  IF effective_nips IS NOT NULL AND array_length(effective_nips, 1) = 0 THEN
     RETURN '{}'::jsonb;
   END IF;
 
@@ -153,12 +206,12 @@ BEGIN
       AND nip IS NOT NULL AND nip != ''
       AND kontrahent != 'Nie wydany' AND kontrahent NOT ILIKE '%magazyn%'
       AND status != 'Lost'
-      AND (allowed_nips IS NULL OR nip = ANY(allowed_nips))
+      AND (effective_nips IS NULL OR nip = ANY(effective_nips))
     GROUP BY nip
   )
   SELECT jsonb_build_object(
     'total_companies', COALESCE((
-      SELECT COUNT(*) FROM companies WHERE (allowed_nips IS NULL OR nip = ANY(allowed_nips))
+      SELECT COUNT(*) FROM companies WHERE (effective_nips IS NULL OR nip = ANY(effective_nips))
     ), 0),
     'top_clients_by_drums', COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
@@ -196,7 +249,7 @@ BEGIN
           FROM drums
           WHERE czy_zaplacona = 'Nie'
             AND nip IS NOT NULL AND nip != ''
-            AND (allowed_nips IS NULL OR nip = ANY(allowed_nips))
+            AND (effective_nips IS NULL OR nip = ANY(effective_nips))
           GROUP BY nip
           ORDER BY unpaid_count DESC
           LIMIT 5
@@ -212,20 +265,37 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
--- 4. Funkcja: Analityka palet (NOWA)
+-- 4. Funkcja: Analityka palet
 CREATE OR REPLACE FUNCTION get_pallets_analytics(allowed_nips text[] DEFAULT NULL)
 RETURNS jsonb AS $$
 DECLARE
   result jsonb;
+  caller_role TEXT;
+  caller_nip TEXT;
+  caller_status TEXT;
+  effective_nips TEXT[];
 BEGIN
-  IF allowed_nips IS NOT NULL AND array_length(allowed_nips, 1) = 0 THEN
+  SELECT role, nip, status INTO caller_role, caller_nip, caller_status
+  FROM public.profiles
+  WHERE id = auth.uid();
+
+  IF caller_role IS NOT NULL AND LOWER(caller_role) = 'client' THEN
+    IF caller_status IS DISTINCT FROM 'approved' OR caller_nip IS NULL OR caller_nip = '' THEN
+      RETURN '{}'::jsonb;
+    END IF;
+    effective_nips := ARRAY[caller_nip];
+  ELSE
+    effective_nips := allowed_nips;
+  END IF;
+
+  IF effective_nips IS NOT NULL AND array_length(effective_nips, 1) = 0 THEN
     RETURN '{}'::jsonb;
   END IF;
 
   WITH filtered_pallets AS (
     SELECT * FROM drums 
     WHERE typ_opakowania = 'Paleta'
-      AND (allowed_nips IS NULL OR nip = ANY(allowed_nips))
+      AND (effective_nips IS NULL OR nip = ANY(effective_nips))
   )
   SELECT jsonb_build_object(
     'total_count', COALESCE((SELECT COUNT(*) FROM filtered_pallets), 0),
