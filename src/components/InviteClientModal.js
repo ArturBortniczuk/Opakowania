@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Mail, User, Send, CheckCircle, AlertTriangle } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 const InviteClientModal = ({ isOpen, onClose }) => {
   const [formData, setFormData] = useState({
@@ -33,11 +34,17 @@ const InviteClientModal = ({ isOpen, onClose }) => {
     setErrorMessage('');
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Brak aktywnej sesji autoryzacji. Zaloguj się ponownie.');
+      }
+
       const origin = window.location.origin;
       const response = await fetch('/api/inviteClient', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           ...formData,
