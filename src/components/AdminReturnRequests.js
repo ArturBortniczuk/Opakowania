@@ -34,6 +34,444 @@ const formatPalletName = (size) => {
   return `Paleta ${str}`;
 };
 
+const MergeRequestsModal = ({
+  showMergeModal,
+  setShowMergeModal,
+  selectedMergeIds,
+  setSelectedMergeIds,
+  setMergeMode,
+  requests,
+  handleRefresh,
+  returnsAPI
+}) => {
+  const selectedRequests = requests.filter(r => selectedMergeIds.includes(r.id));
+
+  // Ekstrakcja unikalnych opcji dla poszczególnych pól
+  const clientOptions = (() => {
+    const map = new Map();
+    selectedRequests.forEach(r => {
+      const key = `${r.user_nip}_${r.company_name}`;
+      if (!map.has(key)) {
+        map.set(key, { user_nip: r.user_nip, company_name: r.company_name });
+      }
+    });
+    return Array.from(map.values());
+  })();
+
+  const streetOptions = Array.from(new Set(selectedRequests.map(r => r.street).filter(Boolean)));
+  const postalOptions = Array.from(new Set(selectedRequests.map(r => r.postal_code).filter(Boolean)));
+  const cityOptions = Array.from(new Set(selectedRequests.map(r => r.city).filter(Boolean)));
+  const dateOptions = Array.from(new Set(selectedRequests.map(r => r.collection_date).filter(Boolean)));
+  const loadingHoursOptions = Array.from(new Set(selectedRequests.map(r => r.loading_hours || 'Brak').filter(Boolean)));
+  const equipmentOptions = Array.from(new Set(selectedRequests.map(r => r.available_equipment || 'Brak').filter(Boolean)));
+  const emailOptions = Array.from(new Set(selectedRequests.map(r => r.email).filter(Boolean)));
+
+  const profileOptions = (() => {
+    const map = new Map();
+    selectedRequests.forEach(r => {
+      if (r.profile_name) {
+        const key = `${r.profile_name}_${r.profile_email || ''}_${r.profile_phone || ''}`;
+        if (!map.has(key)) {
+          map.set(key, {
+            profile_id: r.profile_id || null,
+            profile_name: r.profile_name,
+            profile_email: r.profile_email || '',
+            profile_phone: r.profile_phone || ''
+          });
+        }
+      }
+    });
+    return Array.from(map.values());
+  })();
+
+  const initialClient = clientOptions[0] || { user_nip: '', company_name: '' };
+  const hasApproved = selectedRequests.some(r => r.status === 'Approved');
+  const hasInTransit = selectedRequests.some(r => r.status === 'InTransit');
+  const hasHighPriority = selectedRequests.some(r => r.priority === 'High');
+
+  const initialStatus = hasInTransit ? 'InTransit' : (hasApproved ? 'Approved' : 'Pending');
+  const initialPriority = hasHighPriority ? 'High' : 'Normal';
+
+  const combinedNotes = selectedRequests
+    .map(r => `[Zgłoszenie ${returnsAPI.getRequestDisplayId(r, requests)}]: ${r.notes ? r.notes.trim() : 'Brak dodatkowych uwag'}`)
+    .join('\n\n') + `\n\n[Połączono ze zgłoszeń: ${selectedRequests.map(r => returnsAPI.getRequestDisplayId(r, requests)).join(', ')}]`;
+
+  const [formData, setFormData] = useState({
+    user_nip: initialClient.user_nip,
+    company_name: initialClient.company_name,
+    street: streetOptions[0] || '',
+    postal_code: postalOptions[0] || '',
+    city: cityOptions[0] || '',
+    collection_date: dateOptions[0] || '',
+    loading_hours: loadingHoursOptions[0] || '',
+    available_equipment: equipmentOptions[0] || '',
+    email: emailOptions[0] || '',
+    profileIndex: 0,
+    status: initialStatus,
+    priority: initialPriority,
+    notes: combinedNotes
+  });
+
+  const [submitting, setSubmitting] = useState(false);
+
+  if (!showMergeModal || selectedMergeIds.length < 2) return null;
+
+  // Scalanie pozycji z wybranym asortymentem przy zachowaniu pierwotnych dat zgłoszenia
+  const mergedDrumsAndPallets = (() => {
+    const items = [];
+    const palletsMap = {};
+
+    selectedRequests.forEach(req => {
+      if (Array.isArray(req.selected_drums)) {
+        req.selected_drums.forEach(item => {
+          const itemReportedAt = (typeof item === 'object' && item !== null && item.reported_at) ? item.reported_at : req.created_at;
+          const itemOriginalReqId = (typeof item === 'object' && item !== null && item.original_request_id) ? item.original_request_id : req.id;
+
+          if (typeof item === 'object' && item !== null && item.type === 'pallet') {
+            const key = `${item.size || 'EURO'}_${itemReportedAt}`;
+            if (palletsMap[key]) {
+              palletsMap[key].quantity = (palletsMap[key].quantity || 0) + (item.quantity || 0);
+              if (item.transportedQuantity !== undefined) {
+                palletsMap[key].transportedQuantity = (palletsMap[key].transportedQuantity || 0) + (item.transportedQuantity || 0);
+              }
+            } else {
+              palletsMap[key] = {
+                ...item,
+                reported_at: itemReportedAt,
+                original_request_id: itemOriginalReqId
+              };
+            }
+          } else if (typeof item === 'object' && item !== null) {
+            items.push({
+              ...item,
+              reported_at: itemReportedAt,
+              original_request_id: itemOriginalReqId
+            });
+          } else {
+            items.push({
+              cecha: item,
+              type: 'drum',
+              reported_at: itemReportedAt,
+              original_request_id: itemOriginalReqId
+            });
+          }
+        });
+      }
+    });
+
+    Object.values(palletsMap).forEach(p => items.push(p));
+    return items;
+  })();
+
+  const totalDrumsCount = mergedDrumsAndPallets.filter(d => typeof d !== 'object' || d.type !== 'pallet').length;
+  const totalPalletsCount = mergedDrumsAndPallets
+    .filter(d => typeof d === 'object' && d.type === 'pallet')
+    .reduce((sum, p) => sum + (p.quantity || 0), 0);
+
+  const handleMergeSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const selectedProf = profileOptions[formData.profileIndex] || null;
+      const payload = {
+        user_nip: formData.user_nip,
+        company_name: formData.company_name,
+        street: formData.street,
+        postal_code: formData.postal_code,
+        city: formData.city,
+        collection_date: formData.collection_date,
+        loading_hours: formData.loading_hours === 'Brak' ? '' : formData.loading_hours,
+        available_equipment: formData.available_equipment === 'Brak' ? '' : formData.available_equipment,
+        email: formData.email,
+        profile_id: selectedProf?.profile_id || null,
+        profile_name: selectedProf?.profile_name || null,
+        profile_email: selectedProf?.profile_email || null,
+        profile_phone: selectedProf?.profile_phone || null,
+        status: formData.status,
+        priority: formData.priority,
+        notes: formData.notes,
+        selected_drums: mergedDrumsAndPallets
+      };
+
+      const newReturn = await returnsAPI.createReturn(payload);
+      await returnsAPI.deleteReturn(selectedMergeIds);
+
+      setShowMergeModal(false);
+      setSelectedMergeIds([]);
+      setMergeMode(false);
+      handleRefresh();
+
+      alert(`Pomyślnie połączono wybrane zgłoszenia w nowe zgłoszenie ${returnsAPI.getRequestDisplayId(newReturn, requests)}!`);
+    } catch (err) {
+      console.error('Błąd podczas łączenia zgłoszeń:', err);
+      alert('Wystąpił błąd podczas łączenia zgłoszeń: ' + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={() => setShowMergeModal(false)}
+    >
+      <div
+        className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-indigo-900 via-indigo-800 to-blue-900 text-white rounded-t-3xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
+                <GitMerge className="w-6 h-6 text-indigo-200" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold">Łączenie zgłoszeń zwrotu</h2>
+                <p className="text-xs text-indigo-200 mt-1 font-medium">
+                  Łączysz {selectedRequests.length} wybrane zgłoszenia w jedno skonsolidowane zgłoszenie
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowMergeModal(false)}
+              className="p-2 text-indigo-200 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleMergeSubmit} className="p-6 space-y-6">
+          <div className="bg-indigo-50/50 rounded-2xl p-4 border border-indigo-100">
+            <h3 className="text-xs font-bold text-indigo-900 uppercase tracking-wider mb-2">Łączone zgłoszenia:</h3>
+            <div className="flex flex-wrap gap-2">
+              {selectedRequests.map(r => (
+                <span key={r.id} className="text-xs font-semibold bg-white text-indigo-700 px-3 py-1.5 rounded-lg border border-indigo-200 shadow-xs">
+                  {returnsAPI.getRequestDisplayId(r, requests)} ({r.company_name})
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-extrabold text-gray-900 uppercase tracking-wider mb-3">1. Wybierz dane Klienta i Dostawy</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Klient / Firma</label>
+                <select
+                  value={`${formData.user_nip}_${formData.company_name}`}
+                  onChange={(e) => {
+                    const [nip, name] = e.target.value.split('_');
+                    setFormData(prev => ({ ...prev, user_nip: nip, company_name: name }));
+                  }}
+                  className="w-full text-xs font-semibold p-2.5 rounded-xl border border-gray-300 bg-white"
+                >
+                  {clientOptions.map((c, idx) => (
+                    <option key={idx} value={`${c.user_nip}_${c.company_name}`}>{c.company_name} (NIP: {c.user_nip})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Ulica i numer</label>
+                <select
+                  value={formData.street}
+                  onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
+                  className="w-full text-xs font-semibold p-2.5 rounded-xl border border-gray-300 bg-white"
+                >
+                  {streetOptions.map((s, idx) => (
+                    <option key={idx} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Kod pocztowy</label>
+                <select
+                  value={formData.postal_code}
+                  onChange={(e) => setFormData(prev => ({ ...prev, postal_code: e.target.value }))}
+                  className="w-full text-xs font-semibold p-2.5 rounded-xl border border-gray-300 bg-white"
+                >
+                  {postalOptions.map((p, idx) => (
+                    <option key={idx} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Miasto</label>
+                <select
+                  value={formData.city}
+                  onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                  className="w-full text-xs font-semibold p-2.5 rounded-xl border border-gray-300 bg-white"
+                >
+                  {cityOptions.map((c, idx) => (
+                    <option key={idx} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-extrabold text-gray-900 uppercase tracking-wider mb-3">2. Wybierz preferencje Odbioru</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Preferowana data odbioru</label>
+                <select
+                  value={formData.collection_date}
+                  onChange={(e) => setFormData(prev => ({ ...prev, collection_date: e.target.value }))}
+                  className="w-full text-xs font-semibold p-2.5 rounded-xl border border-gray-300 bg-white"
+                >
+                  {dateOptions.map((d, idx) => (
+                    <option key={idx} value={d}>{new Date(d).toLocaleDateString('pl-PL')}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Godziny załadunku</label>
+                <select
+                  value={formData.loading_hours}
+                  onChange={(e) => setFormData(prev => ({ ...prev, loading_hours: e.target.value }))}
+                  className="w-full text-xs font-semibold p-2.5 rounded-xl border border-gray-300 bg-white"
+                >
+                  {loadingHoursOptions.map((h, idx) => (
+                    <option key={idx} value={h}>{h}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Dostępny sprzęt</label>
+                <select
+                  value={formData.available_equipment}
+                  onChange={(e) => setFormData(prev => ({ ...prev, available_equipment: e.target.value }))}
+                  className="w-full text-xs font-semibold p-2.5 rounded-xl border border-gray-300 bg-white"
+                >
+                  {equipmentOptions.map((eq, idx) => (
+                    <option key={idx} value={eq}>{eq}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-extrabold text-gray-900 uppercase tracking-wider mb-3">3. Wybierz osobę zgłaszającą i kontakt</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Email główny zgłoszenia</label>
+                <select
+                  value={formData.email}
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  className="w-full text-xs font-semibold p-2.5 rounded-xl border border-gray-300 bg-white"
+                >
+                  {emailOptions.map((em, idx) => (
+                    <option key={idx} value={em}>{em}</option>
+                  ))}
+                </select>
+              </div>
+
+              {profileOptions.length > 0 && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Profil pracownika zgłaszającego</label>
+                  <select
+                    value={formData.profileIndex}
+                    onChange={(e) => setFormData(prev => ({ ...prev, profileIndex: Number(e.target.value) }))}
+                    className="w-full text-xs font-semibold p-2.5 rounded-xl border border-gray-300 bg-white"
+                  >
+                    {profileOptions.map((p, idx) => (
+                      <option key={idx} value={idx}>
+                        {p.profile_name} {p.profile_email ? `(${p.profile_email})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-extrabold text-gray-900 uppercase tracking-wider mb-3">4. Status i Priorytet nowego zgłoszenia</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Status połączonego zgłoszenia</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                  className="w-full text-xs font-semibold p-2.5 rounded-xl border border-gray-300 bg-white"
+                >
+                  <option value="Pending">Oczekuje (Pending)</option>
+                  <option value="Approved">Przekazane do transportu (Approved)</option>
+                  <option value="InTransit">W trakcie transportu (InTransit)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Priorytet</label>
+                <select
+                  value={formData.priority}
+                  onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
+                  className="w-full text-xs font-semibold p-2.5 rounded-xl border border-gray-300 bg-white"
+                >
+                  <option value="Normal">Normalny</option>
+                  <option value="High">Pilne (High)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">Uwagi połączone (możesz edytować)</label>
+            <textarea
+              rows={4}
+              value={formData.notes}
+              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+              className="w-full text-xs font-medium p-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </div>
+
+          <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 flex items-center justify-between text-xs font-bold text-slate-700">
+            <span>Zostanie utworzone 1 nowe zgłoszenie z zawartością:</span>
+            <div className="flex gap-3">
+              <span className="bg-blue-100 text-blue-800 px-2.5 py-1 rounded-md">{totalDrumsCount} bębnów</span>
+              <span className="bg-purple-100 text-purple-800 px-2.5 py-1 rounded-md">{totalPalletsCount} palet</span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={() => setShowMergeModal(false)}
+              className="px-5 py-3 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+            >
+              Anuluj
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-6 py-3 text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 rounded-xl shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              {submitting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Łączenie...</span>
+                </>
+              ) : (
+                <>
+                  <GitMerge className="w-4 h-4" />
+                  <span>Utwórz połączone zgłoszenie</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -514,7 +952,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     );
   };
 
-  const RequestCard = ({ request }) => {
+  const renderRequestCard = (request) => {
     const isSelectedForMerge = selectedMergeIds.includes(request.id);
     const drumsList = Array.isArray(request.selected_drums) ? request.selected_drums.filter(d => typeof d !== 'object' || d.type !== 'pallet') : [];
     const palletsList = Array.isArray(request.selected_drums) ? request.selected_drums.filter(d => typeof d === 'object' && d.type === 'pallet') : [];
@@ -746,7 +1184,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     );
   };
 
-  const RequestDetailsModal = () => {
+  const renderRequestDetailsModal = () => {
     if (!showRequestDetails || !selectedRequest) return null;
 
     return (
@@ -1363,444 +1801,6 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     );
   };
 
-  const MergeRequestsModal = () => {
-    const selectedRequests = requests.filter(r => selectedMergeIds.includes(r.id));
-
-    // Ekstrakcja unikalnych opcji dla poszczególnych pól
-    const clientOptions = (() => {
-      const map = new Map();
-      selectedRequests.forEach(r => {
-        const key = `${r.user_nip}_${r.company_name}`;
-        if (!map.has(key)) {
-          map.set(key, { user_nip: r.user_nip, company_name: r.company_name });
-        }
-      });
-      return Array.from(map.values());
-    })();
-
-    const streetOptions = Array.from(new Set(selectedRequests.map(r => r.street).filter(Boolean)));
-    const postalOptions = Array.from(new Set(selectedRequests.map(r => r.postal_code).filter(Boolean)));
-    const cityOptions = Array.from(new Set(selectedRequests.map(r => r.city).filter(Boolean)));
-    const dateOptions = Array.from(new Set(selectedRequests.map(r => r.collection_date).filter(Boolean)));
-    const loadingHoursOptions = Array.from(new Set(selectedRequests.map(r => r.loading_hours || 'Brak').filter(Boolean)));
-    const equipmentOptions = Array.from(new Set(selectedRequests.map(r => r.available_equipment || 'Brak').filter(Boolean)));
-    const emailOptions = Array.from(new Set(selectedRequests.map(r => r.email).filter(Boolean)));
-
-    const profileOptions = (() => {
-      const map = new Map();
-      selectedRequests.forEach(r => {
-        if (r.profile_name) {
-          const key = `${r.profile_name}_${r.profile_email || ''}_${r.profile_phone || ''}`;
-          if (!map.has(key)) {
-            map.set(key, {
-              profile_id: r.profile_id || null,
-              profile_name: r.profile_name,
-              profile_email: r.profile_email || '',
-              profile_phone: r.profile_phone || ''
-            });
-          }
-        }
-      });
-      return Array.from(map.values());
-    })();
-
-    const initialClient = clientOptions[0] || { user_nip: '', company_name: '' };
-    const hasApproved = selectedRequests.some(r => r.status === 'Approved');
-    const hasInTransit = selectedRequests.some(r => r.status === 'InTransit');
-    const hasHighPriority = selectedRequests.some(r => r.priority === 'High');
-
-    const initialStatus = hasInTransit ? 'InTransit' : (hasApproved ? 'Approved' : 'Pending');
-    const initialPriority = hasHighPriority ? 'High' : 'Normal';
-
-    const combinedNotes = selectedRequests
-      .map(r => `[Zgłoszenie ${returnsAPI.getRequestDisplayId(r, requests)}]: ${r.notes ? r.notes.trim() : 'Brak dodatkowych uwag'}`)
-      .join('\n\n') + `\n\n[Połączono ze zgłoszeń: ${selectedRequests.map(r => returnsAPI.getRequestDisplayId(r, requests)).join(', ')}]`;
-
-    const [formData, setFormData] = useState({
-      user_nip: initialClient.user_nip,
-      company_name: initialClient.company_name,
-      street: streetOptions[0] || '',
-      postal_code: postalOptions[0] || '',
-      city: cityOptions[0] || '',
-      collection_date: dateOptions[0] || '',
-      loading_hours: loadingHoursOptions[0] || '',
-      available_equipment: equipmentOptions[0] || '',
-      email: emailOptions[0] || '',
-      profileIndex: 0,
-      status: initialStatus,
-      priority: initialPriority,
-      notes: combinedNotes
-    });
-
-    const [submitting, setSubmitting] = useState(false);
-
-    if (!showMergeModal || selectedMergeIds.length < 2) return null;
-
-    // Scalanie pozycji z wybranym asortymentem przy zachowaniu pierwotnych dat zgłoszenia
-    const mergedDrumsAndPallets = (() => {
-      const items = [];
-      const palletsMap = {};
-
-      selectedRequests.forEach(req => {
-        if (Array.isArray(req.selected_drums)) {
-          req.selected_drums.forEach(item => {
-            const itemReportedAt = (typeof item === 'object' && item !== null && item.reported_at) ? item.reported_at : req.created_at;
-            const itemOriginalReqId = (typeof item === 'object' && item !== null && item.original_request_id) ? item.original_request_id : req.id;
-
-            if (typeof item === 'object' && item !== null && item.type === 'pallet') {
-              const key = `${item.size || 'EURO'}_${itemReportedAt}`;
-              if (palletsMap[key]) {
-                palletsMap[key].quantity = (palletsMap[key].quantity || 0) + (item.quantity || 0);
-                if (item.transportedQuantity !== undefined) {
-                  palletsMap[key].transportedQuantity = (palletsMap[key].transportedQuantity || 0) + (item.transportedQuantity || 0);
-                }
-              } else {
-                palletsMap[key] = {
-                  ...item,
-                  reported_at: itemReportedAt,
-                  original_request_id: itemOriginalReqId
-                };
-              }
-            } else if (typeof item === 'object' && item !== null) {
-              items.push({
-                ...item,
-                reported_at: itemReportedAt,
-                original_request_id: itemOriginalReqId
-              });
-            } else {
-              items.push({
-                cecha: item,
-                type: 'drum',
-                reported_at: itemReportedAt,
-                original_request_id: itemOriginalReqId
-              });
-            }
-          });
-        }
-      });
-
-      Object.values(palletsMap).forEach(p => items.push(p));
-      return items;
-    })();
-
-    const totalDrumsCount = mergedDrumsAndPallets.filter(d => typeof d !== 'object' || d.type !== 'pallet').length;
-    const totalPalletsCount = mergedDrumsAndPallets
-      .filter(d => typeof d === 'object' && d.type === 'pallet')
-      .reduce((sum, p) => sum + (p.quantity || 0), 0);
-
-    const handleMergeSubmit = async (e) => {
-      e.preventDefault();
-      setSubmitting(true);
-      try {
-        const selectedProf = profileOptions[formData.profileIndex] || null;
-        const payload = {
-          user_nip: formData.user_nip,
-          company_name: formData.company_name,
-          street: formData.street,
-          postal_code: formData.postal_code,
-          city: formData.city,
-          collection_date: formData.collection_date,
-          loading_hours: formData.loading_hours === 'Brak' ? '' : formData.loading_hours,
-          available_equipment: formData.available_equipment === 'Brak' ? '' : formData.available_equipment,
-          email: formData.email,
-          profile_id: selectedProf?.profile_id || null,
-          profile_name: selectedProf?.profile_name || null,
-          profile_email: selectedProf?.profile_email || null,
-          profile_phone: selectedProf?.profile_phone || null,
-          status: formData.status,
-          priority: formData.priority,
-          notes: formData.notes,
-          selected_drums: mergedDrumsAndPallets
-        };
-
-        const newReturn = await returnsAPI.createReturn(payload);
-        await returnsAPI.deleteReturn(selectedMergeIds);
-
-        setShowMergeModal(false);
-        setSelectedMergeIds([]);
-        setMergeMode(false);
-        handleRefresh();
-
-        alert(`Pomyślnie połączono wybrane zgłoszenia w nowe zgłoszenie ${returnsAPI.getRequestDisplayId(newReturn, requests)}!`);
-      } catch (err) {
-        console.error('Błąd podczas łączenia zgłoszeń:', err);
-        alert('Wystąpił błąd podczas łączenia zgłoszeń: ' + err.message);
-      } finally {
-        setSubmitting(false);
-      }
-    };
-
-    return (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-        onClick={() => setShowMergeModal(false)}
-      >
-        <div
-          className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-indigo-900 via-indigo-800 to-blue-900 text-white rounded-t-3xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md">
-                  <GitMerge className="w-6 h-6 text-indigo-200" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">Łączenie zgłoszeń zwrotu</h2>
-                  <p className="text-xs text-indigo-200 mt-1 font-medium">
-                    Wybrano {selectedRequests.length} zgłoszeń: {selectedRequests.map(r => `#${r.id}`).join(', ')}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowMergeModal(false)}
-                className="p-2 text-indigo-200 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-
-          <form onSubmit={handleMergeSubmit} className="p-6 space-y-6">
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold text-amber-900 text-sm mb-1">Konfiguracja połączonego zgłoszenia</p>
-                <p>
-                  Poniżej możesz wybrać, które odpowiedzi mają się pojawić w nowym połączonym zgłoszeniu. Gdy zgłoszenia różnią się w danym polu, z listy rozwijanej możesz wybrać właściwą opcję ze scalanych zgłoszeń.
-                </p>
-              </div>
-            </div>
-
-            {/* Klient / Firma */}
-            <div className="p-5 bg-gray-50/80 rounded-2xl border border-gray-200/80 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
-                  <Package className="w-4 h-4 text-indigo-600" />
-                  Klient / Firma
-                </h3>
-                {clientOptions.length > 1 ? (
-                  <span className="text-[11px] font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full border border-amber-200">
-                    ⚠️ Wykryto {clientOptions.length} różnych klientów
-                  </span>
-                ) : (
-                  <span className="text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full border border-emerald-200">
-                    ✓ Zgodny klient
-                  </span>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                  Wybierz firmę i NIP
-                </label>
-                <select
-                  value={`${formData.user_nip}_${formData.company_name}`}
-                  onChange={(e) => {
-                    const found = clientOptions.find(c => `${c.user_nip}_${c.company_name}` === e.target.value);
-                    if (found) {
-                      setFormData(prev => ({ ...prev, user_nip: found.user_nip, company_name: found.company_name }));
-                    }
-                  }}
-                  className="w-full p-3 border border-gray-300 rounded-xl bg-white text-sm font-semibold focus:ring-2 focus:ring-indigo-500"
-                >
-                  {clientOptions.map((c, idx) => (
-                    <option key={idx} value={`${c.user_nip}_${c.company_name}`}>
-                      {c.company_name} (NIP: {c.user_nip})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Adres odbioru */}
-            <div className="p-5 bg-gray-50/80 rounded-2xl border border-gray-200/80 space-y-4">
-              <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-indigo-600" />
-                Adres odbioru
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Ulica</label>
-                    {streetOptions.length > 1 && <span className="text-[10px] font-bold text-amber-600 uppercase">Różne opcje ({streetOptions.length})</span>}
-                  </div>
-                  <select
-                    value={formData.street}
-                    onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
-                    className={`w-full p-3 border rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-indigo-500 ${streetOptions.length > 1 ? 'border-amber-300 bg-amber-50/30' : 'border-gray-300'}`}
-                  >
-                    {streetOptions.map((opt, i) => (
-                      <option key={i} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Kod pocztowy</label>
-                    {postalOptions.length > 1 && <span className="text-[10px] font-bold text-amber-600 uppercase">Różne opcje ({postalOptions.length})</span>}
-                  </div>
-                  <select
-                    value={formData.postal_code}
-                    onChange={(e) => setFormData(prev => ({ ...prev, postal_code: e.target.value }))}
-                    className={`w-full p-3 border rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-indigo-500 ${postalOptions.length > 1 ? 'border-amber-300 bg-amber-50/30' : 'border-gray-300'}`}
-                  >
-                    {postalOptions.map((opt, i) => (
-                      <option key={i} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Miasto</label>
-                    {cityOptions.length > 1 && <span className="text-[10px] font-bold text-amber-600 uppercase">Różne opcje ({cityOptions.length})</span>}
-                  </div>
-                  <select
-                    value={formData.city}
-                    onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                    className={`w-full p-3 border rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-indigo-500 ${cityOptions.length > 1 ? 'border-amber-300 bg-amber-50/30' : 'border-gray-300'}`}
-                  >
-                    {cityOptions.map((opt, i) => (
-                      <option key={i} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Szczegóły odbioru i kontakt */}
-            <div className="p-5 bg-gray-50/80 rounded-2xl border border-gray-200/80 space-y-4">
-              <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-indigo-600" />
-                Szczegóły odbioru i kontakt
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Sugerowana data odbioru</label>
-                    {dateOptions.length > 1 && <span className="text-[10px] font-bold text-amber-600 uppercase">Różne opcje ({dateOptions.length})</span>}
-                  </div>
-                  <select
-                    value={formData.collection_date}
-                    onChange={(e) => setFormData(prev => ({ ...prev, collection_date: e.target.value }))}
-                    className={`w-full p-3 border rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-indigo-500 ${dateOptions.length > 1 ? 'border-amber-300 bg-amber-50/30' : 'border-gray-300'}`}
-                  >
-                    {dateOptions.map((opt, i) => (
-                      <option key={i} value={opt}>
-                        {new Date(opt).toLocaleDateString('pl-PL')} ({opt})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Godziny załadunku</label>
-                    {loadingHoursOptions.length > 1 && <span className="text-[10px] font-bold text-amber-600 uppercase">Różne opcje ({loadingHoursOptions.length})</span>}
-                  </div>
-                  <select
-                    value={formData.loading_hours}
-                    onChange={(e) => setFormData(prev => ({ ...prev, loading_hours: e.target.value }))}
-                    className={`w-full p-3 border rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-indigo-500 ${loadingHoursOptions.length > 1 ? 'border-amber-300 bg-amber-50/30' : 'border-gray-300'}`}
-                  >
-                    {loadingHoursOptions.map((opt, i) => (
-                      <option key={i} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Dostępny sprzęt</label>
-                    {equipmentOptions.length > 1 && <span className="text-[10px] font-bold text-amber-600 uppercase">Różne opcje ({equipmentOptions.length})</span>}
-                  </div>
-                  <select
-                    value={formData.available_equipment}
-                    onChange={(e) => setFormData(prev => ({ ...prev, available_equipment: e.target.value }))}
-                    className={`w-full p-3 border rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-indigo-500 ${equipmentOptions.length > 1 ? 'border-amber-300 bg-amber-50/30' : 'border-gray-300'}`}
-                  >
-                    {equipmentOptions.map((opt, i) => (
-                      <option key={i} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Email kontaktowy</label>
-                    {emailOptions.length > 1 && <span className="text-[10px] font-bold text-amber-600 uppercase">Różne opcje ({emailOptions.length})</span>}
-                  </div>
-                  <select
-                    value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                    className={`w-full p-3 border rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-indigo-500 ${emailOptions.length > 1 ? 'border-amber-300 bg-amber-50/30' : 'border-gray-300'}`}
-                  >
-                    {emailOptions.map((opt, i) => (
-                      <option key={i} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {profileOptions.length > 0 && (
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase">Osoba zgłaszająca (Profil)</label>
-                    {profileOptions.length > 1 && <span className="text-[10px] font-bold text-amber-600 uppercase">Różne opcje ({profileOptions.length})</span>}
-                  </div>
-                  <select
-                    value={formData.profileIndex}
-                    onChange={(e) => setFormData(prev => ({ ...prev, profileIndex: Number(e.target.value) }))}
-                    className="w-full p-3 border border-gray-300 rounded-xl text-sm font-medium bg-white focus:ring-2 focus:ring-indigo-500"
-                  >
-                    {profileOptions.map((p, i) => (
-                      <option key={i} value={i}>
-                        {p.profile_name} {p.profile_email ? `(${p.profile_email})` : ''} {p.profile_phone ? `- tel. ${p.profile_phone}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            {/* Status & Priorytet */}
-            <div className="p-5 bg-gray-50/80 rounded-2xl border border-gray-200/80 space-y-4">
-              <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
-                <Clock className="w-4 h-4 text-indigo-600" />
-                Status i Priorytet zgłoszenia
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Status zgłoszenia</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
-                    className="w-full p-3 border border-gray-300 rounded-xl text-sm font-semibold bg-white focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="Pending">Oczekujące (Pending)</option>
-                    <option value="Approved">Przekazane do transportu (Approved)</option>
-                    <option value="InTransit">W trakcie transportu (InTransit)</option>
-                    <option value="Completed">Zakończone (Completed)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Priorytet</label>
-                  <select
-                    value={formData.priority}
-                    onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
-                    className="w-full p-3 border border-gray-300 rounded-xl text-sm font-semibold bg-white focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="Normal">Normalny</option>
-                    <option value="High">Wysoki</option>
-                    <option value="Low">Niski</option>
-                  </select>
                 </div>
               </div>
             </div>
@@ -2063,7 +2063,9 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
         {filteredAndSortedRequests.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
             {filteredAndSortedRequests.map((request) => (
-              <RequestCard key={request.id} request={request} />
+              <React.Fragment key={request.id}>
+                {renderRequestCard(request)}
+              </React.Fragment>
             ))}
           </div>
         ) : (
@@ -2127,9 +2129,18 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
           </div>
         )}
 
-        <RequestDetailsModal />
+        {renderRequestDetailsModal()}
 
-        <MergeRequestsModal />
+        <MergeRequestsModal
+          showMergeModal={showMergeModal}
+          setShowMergeModal={setShowMergeModal}
+          selectedMergeIds={selectedMergeIds}
+          setSelectedMergeIds={setSelectedMergeIds}
+          setMergeMode={setMergeMode}
+          requests={requests}
+          handleRefresh={handleRefresh}
+          returnsAPI={returnsAPI}
+        />
 
         <TransportOrderModal
           isOpen={showTransportModal}
