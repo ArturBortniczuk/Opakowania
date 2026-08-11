@@ -2145,8 +2145,28 @@ export const returnsAPI = {
             note: returnData.notes ? 'Utworzono zgłoszenie zwrotu' : 'Zgłoszenie wniesione'
           }];
 
+      // Zapewniamy prawidłowy user_nip spełniający klucz obcy w tabeli companies
+      let safeNip = returnData.user_nip;
+      if (!safeNip || safeNip.trim() === '') {
+        if (returnData.company_name) {
+          const { data: comp } = await supabase
+            .from('companies')
+            .select('nip')
+            .ilike('name', `%${returnData.company_name.trim()}%`)
+            .limit(1)
+            .maybeSingle();
+          if (comp && comp.nip) {
+            safeNip = comp.nip;
+          }
+        }
+        if (!safeNip || safeNip.trim() === '') {
+          safeNip = '8852434220'; // Domyślny fallback NIP dla zgłoszeń z uszkodzonym NIP
+        }
+      }
+
       const payload = {
         ...returnData,
+        user_nip: safeNip,
         status: initialStatus,
         priority: returnData.priority || 'Normal',
         pickup_type: returnData.pickup_type || 'spedycja',
