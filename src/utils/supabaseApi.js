@@ -790,7 +790,7 @@ export const drumsAPI = {
           reportedDate = reportedDrumsMap.get(drum.kod_bebna);
         }
 
-        const refDateForPossession = reportedDate ? new Date(reportedDate) : new Date();
+        let refDateForPossession = reportedDate ? new Date(reportedDate) : new Date();
 
         let rawIssueDate = drum.data_wydania || drum.DATA_WYDANIA || drum.data_przyjecia_na_stan || drum.DATA_PRZYJECIA_NA_STAN || drum['Data przyjęcia na stan'] || drum.data_faktury;
         let parsedIssueStr = parseToIsoDate(rawIssueDate, null);
@@ -810,6 +810,10 @@ export const drumsAPI = {
 
         let daysInPossession = 0;
         if (issueDate && !isNaN(issueDate.getTime())) {
+          // Jeśli data zgłoszenia (reportedDate) jest wcześniejsza niż data wydania (stare zgłoszenie), odnieś się do dzisiaj
+          if (refDateForPossession < issueDate) {
+            refDateForPossession = new Date();
+          }
           const diffMs = refDateForPossession - issueDate;
           const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
           daysInPossession = diffDays > 0 ? diffDays : 0;
@@ -1338,7 +1342,7 @@ export const drumsAPI = {
           reportedDate = reportedDrumsMap.get(drum.kod_bebna);
         }
 
-        const refDateForPossession = reportedDate ? new Date(reportedDate) : new Date();
+        let refDateForPossession = reportedDate ? new Date(reportedDate) : new Date();
 
         let rawIssueDate = drum.data_wydania || drum.DATA_WYDANIA || drum.data_przyjecia_na_stan || drum.DATA_PRZYJECIA_NA_STAN || drum['Data przyjęcia na stan'] || drum.data_faktury;
         let parsedIssueStr = parseToIsoDate(rawIssueDate, null);
@@ -1358,6 +1362,10 @@ export const drumsAPI = {
 
         let daysInPossession = 0;
         if (issueDate && !isNaN(issueDate.getTime())) {
+          // Jeśli data zgłoszenia (reportedDate) jest wcześniejsza niż data wydania (stare zgłoszenie), odnieś się do dzisiaj
+          if (refDateForPossession < issueDate) {
+            refDateForPossession = new Date();
+          }
           const diffMs = refDateForPossession - issueDate;
           const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
           daysInPossession = diffDays > 0 ? diffDays : 0;

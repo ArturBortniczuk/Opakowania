@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase, drumsAPI, companiesAPI, returnsAPI, getCurrentUserFromCache } from '../utils/supabaseApi';
+import { supabase, drumsAPI, companiesAPI, returnsAPI, getCurrentUserFromCache, parseToIsoDate } from '../utils/supabaseApi';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { pl } from 'date-fns/locale/pl';
@@ -1517,7 +1517,26 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
                     <div className="bg-gray-900 p-3 rounded-lg border border-gray-800 text-center shadow-md">
                       <p className="text-xs text-gray-400 mb-1">W posiadaniu</p>
                       <p className="font-bold text-sm text-white">
-                        {selectedDrum.daysInPossession || 0} dni
+                        {(() => {
+                          const rawWydania = selectedDrum.data_wydania || selectedDrum.DATA_WYDANIA || selectedDrum.data_przyjecia_na_stan;
+                          const parsedStr = parseToIsoDate(rawWydania, null);
+                          let iDate = parsedStr ? new Date(parsedStr) : null;
+                          if (!iDate || isNaN(iDate.getTime())) {
+                            const baseStr = parseToIsoDate(selectedDrum.clientReturnDeadline || selectedDrum.data_zwrotu_do_dostawcy, null);
+                            if (baseStr) {
+                              const bD = new Date(baseStr);
+                              if (!isNaN(bD.getTime())) {
+                                bD.setDate(bD.getDate() - (selectedDrum.returnPeriodDays || 120));
+                                iDate = bD;
+                              }
+                            }
+                          }
+                          if (!iDate || isNaN(iDate.getTime())) return selectedDrum.daysInPossession || 0;
+                          let rDate = selectedDrum.reportedDate ? new Date(selectedDrum.reportedDate) : new Date();
+                          if (rDate < iDate) rDate = new Date();
+                          const diff = Math.ceil((rDate - iDate) / (1000 * 60 * 60 * 24));
+                          return diff > 0 ? diff : 0;
+                        })()} dni
                       </p>
                     </div>
                   </div>
