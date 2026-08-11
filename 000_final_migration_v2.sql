@@ -202,10 +202,14 @@ LEFT JOIN (
     nip, 
     COUNT(*)::INTEGER as drums_count,
     COUNT(*) FILTER (
-      WHERE COALESCE(data_zwrotu_do_dostawcy, data_wydania + 120) < CURRENT_DATE 
+      WHERE COALESCE(
+        NULLIF(data_zwrotu_do_dostawcy, '')::date,
+        (NULLIF(data_wydania, '')::date + INTERVAL '120 days')::date
+      ) < CURRENT_DATE 
       AND (kontrahent <> 'Nie wydany')
     )::INTEGER as overdue_drums
   FROM public.drums
+  WHERE (typ_opakowania = 'Bęben' OR typ_opakowania IS NULL)
   GROUP BY nip
 ) d ON c.nip = d.nip
 LEFT JOIN (
