@@ -529,6 +529,9 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
 
     if (urlClientNip) {
       filtered = filtered.filter(d => d.nip === urlClientNip);
+      if (filterStatus === 'all') {
+        filtered = filtered.filter(d => d.kontrahent !== 'Nie wydany' && !(d.kontrahent && d.kontrahent.toLowerCase().includes('magazyn')));
+      }
     }
 
     if (filterReportedOnly) {

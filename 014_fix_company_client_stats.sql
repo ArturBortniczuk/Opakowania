@@ -28,10 +28,10 @@ LEFT JOIN (
         NULLIF(data_zwrotu_do_dostawcy, '')::date,
         (NULLIF(data_wydania, '')::date + INTERVAL '120 days')::date
       ) < CURRENT_DATE 
-      AND (kontrahent <> 'Nie wydany')
     )::INTEGER as overdue_drums
   FROM public.drums
   WHERE (typ_opakowania = 'Bęben' OR typ_opakowania IS NULL)
+    AND (kontrahent IS NOT NULL AND kontrahent <> 'Nie wydany' AND kontrahent NOT ILIKE '%magazyn%')
   GROUP BY nip
 ) d ON c.nip = d.nip
 LEFT JOIN (

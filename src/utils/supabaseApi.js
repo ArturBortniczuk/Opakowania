@@ -2323,7 +2323,7 @@ export const statsAPI = {
         { count: completedRequests }
       ] = await Promise.all([
         applyNipFilter(supabase.from('companies').select('*', { count: 'exact', head: true })),
-        applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null')),
+        applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null').neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%')),
         applyNipFilter(supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Pending'), 'user_nip'),
         applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null').lt('data_zwrotu_do_dostawcy', now)),
         applyNipFilter(supabase.from('return_requests').select('*', { count: 'exact', head: true }).in('status', ['Pending', 'Approved']), 'user_nip'),
