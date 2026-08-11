@@ -2078,13 +2078,15 @@ export const returnsAPI = {
         let fixedReq = { ...req, company_name: req.companies?.name || req.company_name };
 
         // Auto-naprawa konkretnego zgłoszenia ZO/0018/08/26 uszkodzonego przez dawny błąd scalania
-        if (fixedReq.company_name?.includes('503-09-27/2019') || (!fixedReq.user_nip && fixedReq.notes?.includes('ZO/0002/08/26'))) {
+        if (fixedReq.company_name?.includes('503-09-27/2019') || (!fixedReq.user_nip && fixedReq.notes?.includes('ZO/0002/08/26')) || (fixedReq.request_number?.includes('0018') && fixedReq.loading_hours === 'Brak')) {
           fixedReq.user_nip = '8852434220';
           fixedReq.company_name = 'Mixel firma elektryczna Kowalski Tomasz';
           fixedReq.street = 'Topolowa 3';
           fixedReq.postal_code = '37-450';
           fixedReq.city = 'Stalowa Wola';
           fixedReq.email = 'magazyn@mixel.com.pl';
+          fixedReq.loading_hours = '06:00 - 14:00';
+          fixedReq.available_equipment = 'Wózek widłowy.';
 
           supabase.from('return_requests').update({
             user_nip: '8852434220',
@@ -2092,7 +2094,9 @@ export const returnsAPI = {
             street: 'Topolowa 3',
             postal_code: '37-450',
             city: 'Stalowa Wola',
-            email: 'magazyn@mixel.com.pl'
+            email: 'magazyn@mixel.com.pl',
+            loading_hours: '06:00 - 14:00',
+            available_equipment: 'Wózek widłowy.'
           }).eq('id', req.id).then(() => {});
         }
 

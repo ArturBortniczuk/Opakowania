@@ -62,8 +62,15 @@ const MergeRequestsModal = ({
   const postalOptions = Array.from(new Set(selectedRequests.map(r => r.postal_code).filter(Boolean)));
   const cityOptions = Array.from(new Set(selectedRequests.map(r => r.city).filter(Boolean)));
   const dateOptions = Array.from(new Set(selectedRequests.map(r => parseToIsoDate(r.collection_date)).filter(Boolean)));
-  const loadingHoursOptions = Array.from(new Set(selectedRequests.map(r => r.loading_hours || 'Brak').filter(Boolean)));
-  const equipmentOptions = Array.from(new Set(selectedRequests.map(r => r.available_equipment || 'Brak').filter(Boolean)));
+  const loadingHoursOptions = (() => {
+    const opts = Array.from(new Set(selectedRequests.map(r => r.loading_hours).filter(h => h && h !== 'Brak')));
+    return opts.length > 0 ? opts : ['Brak'];
+  })();
+
+  const equipmentOptions = (() => {
+    const opts = Array.from(new Set(selectedRequests.map(r => r.available_equipment).filter(e => e && e !== 'Brak')));
+    return opts.length > 0 ? opts : ['Brak'];
+  })();
   const emailOptions = Array.from(new Set(selectedRequests.map(r => r.email).filter(Boolean)));
 
   const profileOptions = (() => {
@@ -225,8 +232,8 @@ const MergeRequestsModal = ({
         postal_code: formData.postal_code || firstReq.postal_code || '',
         city: formData.city || firstReq.city || '',
         collection_date: parseToIsoDate(formData.collection_date) || parseToIsoDate(firstReq.collection_date) || new Date().toISOString().split('T')[0],
-        loading_hours: formData.loading_hours === 'Brak' ? '' : (formData.loading_hours || firstReq.loading_hours || ''),
-        available_equipment: formData.available_equipment === 'Brak' ? '' : (formData.available_equipment || firstReq.available_equipment || ''),
+        loading_hours: (formData.loading_hours && formData.loading_hours !== 'Brak') ? formData.loading_hours : (selectedRequests.find(r => r.loading_hours && r.loading_hours !== 'Brak')?.loading_hours || formData.loading_hours || ''),
+        available_equipment: (formData.available_equipment && formData.available_equipment !== 'Brak') ? formData.available_equipment : (selectedRequests.find(r => r.available_equipment && r.available_equipment !== 'Brak')?.available_equipment || formData.available_equipment || ''),
         email: formData.email || firstReq.email || '',
         profile_id: selectedProf?.profile_id || firstReq.profile_id || null,
         profile_name: selectedProf?.profile_name || firstReq.profile_name || null,
