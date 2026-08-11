@@ -644,7 +644,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
       alert('Brak uprawnień do zmiany numeru korekty.');
       return;
     }
-    const currentReq = requests.find(r => r.id === requestId);
+    const currentReq = requests.find(r => r.id === requestId) || (selectedRequest?.id === requestId ? selectedRequest : null);
     const number = prompt("Podaj numer(y) korekt (oddziel przecinkami):", currentReq?.correction_number || "");
     if (number === null) return;
 
@@ -652,6 +652,9 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
       await returnsAPI.updateReturnStatus(requestId, {
         correction_number: number
       });
+      if (selectedRequest && selectedRequest.id === requestId) {
+        setSelectedRequest(prev => prev ? { ...prev, correction_number: number } : null);
+      }
       handleRefresh();
     } catch (err) {
       console.error('Błąd dodawania numeru korekty:', err);
@@ -1075,9 +1078,12 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
         {request.correction_number ? (
           <div className="mb-6 p-4 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-emerald-600" />
-              <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Wystawiono korektę</span>
+            <div className="flex items-center gap-2 overflow-hidden">
+              <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+              <div className="truncate">
+                <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider block">Wystawiono korektę</span>
+                <span className="text-xs font-medium text-emerald-800 truncate block">{request.correction_number}</span>
+              </div>
             </div>
           </div>
         ) : (
@@ -1128,36 +1134,76 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
           )}
 
           {request.status === 'Approved' && canChangeStatus && (
-            <button
-              onClick={(e) => {
-                if (mergeMode) {
-                  e.stopPropagation();
-                  toggleSelectMerge(request.id);
-                  return;
-                }
-                setRequestForTransport(request);
-                setShowTransportModal(true);
-              }}
-              className="flex-1 bg-indigo-600 text-white py-2.5 px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors text-sm"
-            >
-              Transport
-            </button>
+            <>
+              <button
+                onClick={(e) => {
+                  if (mergeMode) {
+                    e.stopPropagation();
+                    toggleSelectMerge(request.id);
+                    return;
+                  }
+                  setRequestForTransport(request);
+                  setShowTransportModal(true);
+                }}
+                className="flex-1 bg-indigo-600 text-white py-2.5 px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors text-sm"
+              >
+                Transport
+              </button>
+              <button
+                onClick={(e) => {
+                  if (mergeMode) {
+                    e.stopPropagation();
+                    toggleSelectMerge(request.id);
+                    return;
+                  }
+                  handleAddCorrectionNumber(request.id);
+                }}
+                className={`py-2.5 px-3 rounded-xl font-bold transition-colors text-sm border ${
+                  request.correction_number 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100' 
+                  : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                }`}
+                title={request.correction_number ? `Korekty: ${request.correction_number}` : 'Dodaj numer korekty'}
+              >
+                {request.correction_number ? 'Korekta' : '+ Korekta'}
+              </button>
+            </>
           )}
 
           {request.status === 'InTransit' && canChangeStatus && (
-            <button
-              onClick={(e) => {
-                if (mergeMode) {
-                  e.stopPropagation();
-                  toggleSelectMerge(request.id);
-                  return;
-                }
-                handleStatusChange(request.id, 'Completed');
-              }}
-              className="flex-1 bg-emerald-600 text-white py-2.5 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors text-sm"
-            >
-              Zakończ
-            </button>
+            <>
+              <button
+                onClick={(e) => {
+                  if (mergeMode) {
+                    e.stopPropagation();
+                    toggleSelectMerge(request.id);
+                    return;
+                  }
+                  handleStatusChange(request.id, 'Completed');
+                }}
+                className="flex-1 bg-emerald-600 text-white py-2.5 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors text-sm"
+              >
+                Zakończ
+              </button>
+              <button
+                onClick={(e) => {
+                  if (mergeMode) {
+                    e.stopPropagation();
+                    toggleSelectMerge(request.id);
+                    return;
+                  }
+                  handleAddCorrectionNumber(request.id);
+                }}
+                className={`py-2.5 px-3 rounded-xl font-bold transition-colors text-sm border ${
+                  request.correction_number 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100' 
+                  : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                }`}
+                title={request.correction_number ? `Korekty: ${request.correction_number}` : 'Dodaj numer korekty'}
+              >
+                {request.correction_number ? 'Korekta' : '+ Korekta'}
+              </button>
+            </>
           )}
 
           {request.status === 'Completed' && canChangeStatus && (
@@ -1781,11 +1827,10 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                   </button>
                 )}
 
-                {(selectedRequest.status === 'Completed' || selectedRequest.status === 'InTransit') && (
+                {canChangeStatus && (
                   <button
                     onClick={() => {
                       handleAddCorrectionNumber(selectedRequest.id);
-                      handleCloseModal();
                     }}
                     className="flex-1 bg-indigo-50 text-indigo-700 py-3 px-4 rounded-xl font-bold hover:bg-indigo-100 border border-indigo-100 transition-colors flex items-center justify-center gap-2"
                   >
