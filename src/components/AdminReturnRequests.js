@@ -99,22 +99,63 @@ const MergeRequestsModal = ({
   const defaultCollectionDate = dateOptions[0] || new Date().toISOString().split('T')[0];
 
   const [formData, setFormData] = useState({
-    user_nip: initialClient.user_nip,
-    company_name: initialClient.company_name,
-    street: streetOptions[0] || '',
-    postal_code: postalOptions[0] || '',
-    city: cityOptions[0] || '',
-    collection_date: defaultCollectionDate,
-    loading_hours: loadingHoursOptions[0] || '',
-    available_equipment: equipmentOptions[0] || '',
-    email: emailOptions[0] || '',
+    clientIndex: 0,
+    user_nip: '',
+    company_name: '',
+    street: '',
+    postal_code: '',
+    city: '',
+    collection_date: '',
+    loading_hours: '',
+    available_equipment: '',
+    email: '',
     profileIndex: 0,
-    status: initialStatus,
-    priority: initialPriority,
-    notes: combinedNotes
+    status: 'Pending',
+    priority: 'Normal',
+    notes: ''
   });
 
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (showMergeModal && selectedRequests.length >= 2) {
+      const firstReq = selectedRequests[0] || {};
+      const initialClient = clientOptions[0] || { 
+        user_nip: firstReq.user_nip || '', 
+        company_name: firstReq.company_name || '' 
+      };
+      
+      const hasApproved = selectedRequests.some(r => r.status === 'Approved');
+      const hasInTransit = selectedRequests.some(r => r.status === 'InTransit');
+      const hasHighPriority = selectedRequests.some(r => r.priority === 'High');
+
+      const initialStatus = hasInTransit ? 'InTransit' : (hasApproved ? 'Approved' : 'Pending');
+      const initialPriority = hasHighPriority ? 'High' : 'Normal';
+
+      const combinedNotes = selectedRequests
+        .map(r => `[Zgłoszenie ${returnsAPI.getRequestDisplayId(r, requests)}]: ${r.notes ? r.notes.trim() : 'Brak dodatkowych uwag'}`)
+        .join('\n\n') + `\n\n[Połączono ze zgłoszeń: ${selectedRequests.map(r => returnsAPI.getRequestDisplayId(r, requests)).join(', ')}]`;
+
+      const defaultCollectionDate = dateOptions[0] || parseToIsoDate(firstReq.collection_date) || new Date().toISOString().split('T')[0];
+
+      setFormData({
+        clientIndex: 0,
+        user_nip: initialClient.user_nip || firstReq.user_nip || '',
+        company_name: initialClient.company_name || firstReq.company_name || '',
+        street: streetOptions[0] || firstReq.street || '',
+        postal_code: postalOptions[0] || firstReq.postal_code || '',
+        city: cityOptions[0] || firstReq.city || '',
+        collection_date: defaultCollectionDate,
+        loading_hours: loadingHoursOptions[0] || firstReq.loading_hours || '',
+        available_equipment: equipmentOptions[0] || firstReq.available_equipment || '',
+        email: emailOptions[0] || firstReq.email || '',
+        profileIndex: 0,
+        status: initialStatus,
+        priority: initialPriority,
+        notes: combinedNotes
+      });
+    }
+  }, [showMergeModal, selectedMergeIds]);
 
   if (!showMergeModal || selectedMergeIds.length < 2) return null;
 
@@ -174,23 +215,25 @@ const MergeRequestsModal = ({
     e.preventDefault();
     setSubmitting(true);
     try {
+      const firstReq = selectedRequests[0] || {};
       const selectedProf = profileOptions[formData.profileIndex] || null;
+
       const payload = {
-        user_nip: formData.user_nip,
-        company_name: formData.company_name,
-        street: formData.street,
-        postal_code: formData.postal_code,
-        city: formData.city,
-        collection_date: formData.collection_date,
-        loading_hours: formData.loading_hours === 'Brak' ? '' : formData.loading_hours,
-        available_equipment: formData.available_equipment === 'Brak' ? '' : formData.available_equipment,
-        email: formData.email,
-        profile_id: selectedProf?.profile_id || null,
-        profile_name: selectedProf?.profile_name || null,
-        profile_email: selectedProf?.profile_email || null,
-        profile_phone: selectedProf?.profile_phone || null,
-        status: formData.status,
-        priority: formData.priority,
+        user_nip: formData.user_nip || firstReq.user_nip || '',
+        company_name: formData.company_name || firstReq.company_name || '',
+        street: formData.street || firstReq.street || '',
+        postal_code: formData.postal_code || firstReq.postal_code || '',
+        city: formData.city || firstReq.city || '',
+        collection_date: parseToIsoDate(formData.collection_date) || parseToIsoDate(firstReq.collection_date) || new Date().toISOString().split('T')[0],
+        loading_hours: formData.loading_hours === 'Brak' ? '' : (formData.loading_hours || firstReq.loading_hours || ''),
+        available_equipment: formData.available_equipment === 'Brak' ? '' : (formData.available_equipment || firstReq.available_equipment || ''),
+        email: formData.email || firstReq.email || '',
+        profile_id: selectedProf?.profile_id || firstReq.profile_id || null,
+        profile_name: selectedProf?.profile_name || firstReq.profile_name || null,
+        profile_email: selectedProf?.profile_email || firstReq.profile_email || null,
+        profile_phone: selectedProf?.profile_phone || firstReq.profile_phone || null,
+        status: formData.status || 'Pending',
+        priority: formData.priority || 'Normal',
         notes: formData.notes,
         selected_drums: mergedDrumsAndPallets
       };
@@ -261,15 +304,23 @@ const MergeRequestsModal = ({
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">Klient / Firma</label>
                 <select
-                  value={`${formData.user_nip}_${formData.company_name}`}
+                  value={formData.clientIndex || 0}
                   onChange={(e) => {
-                    const [nip, name] = e.target.value.split('_');
-                    setFormData(prev => ({ ...prev, user_nip: nip, company_name: name }));
+                    const idx = Number(e.target.value);
+                    const selectedC = clientOptions[idx];
+                    if (selectedC) {
+                      setFormData(prev => ({
+                        ...prev,
+                        clientIndex: idx,
+                        user_nip: selectedC.user_nip,
+                        company_name: selectedC.company_name
+                      }));
+                    }
                   }}
                   className="w-full text-xs font-semibold p-2.5 rounded-xl border border-gray-300 bg-white"
                 >
                   {clientOptions.map((c, idx) => (
-                    <option key={idx} value={`${c.user_nip}_${c.company_name}`}>{c.company_name} (NIP: {c.user_nip})</option>
+                    <option key={idx} value={idx}>{c.company_name} (NIP: {c.user_nip})</option>
                   ))}
                 </select>
               </div>
