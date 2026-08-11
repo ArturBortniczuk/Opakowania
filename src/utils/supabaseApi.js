@@ -1997,19 +1997,28 @@ export function getPickupTypeInfo(type) {
 // ==================================
 /**
  * Pomocnicza funkcja parsująca dowolny format daty (np. 3.08.2026, 03.08.2026, 2026-08-03, ISO)
- * na bezpieczny format YYYY-MM-DD lub null dla kolumn typu DATE w PostgreSQL.
+ * na bezpieczny format YYYY-MM-DD dla kolumn typu DATE w PostgreSQL (z domyślnym fallbackiem na dzisiejszą datę).
  */
-export function parseToIsoDate(dateVal) {
-  if (!dateVal || dateVal === '' || dateVal === 'null' || dateVal === 'undefined') return null;
+export function parseToIsoDate(dateVal, defaultDate = null) {
+  const getFallback = () => {
+    if (defaultDate) return defaultDate;
+    return new Date().toISOString().split('T')[0];
+  };
+
+  if (!dateVal || dateVal === '' || dateVal === 'null' || dateVal === 'undefined') {
+    return getFallback();
+  }
   if (typeof dateVal !== 'string') {
     if (dateVal instanceof Date && !isNaN(dateVal.getTime())) {
       return dateVal.toISOString().split('T')[0];
     }
-    return null;
+    return getFallback();
   }
 
   const trimmed = dateVal.trim();
-  if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') return null;
+  if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') {
+    return getFallback();
+  }
 
   // 1. Format YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
@@ -2033,7 +2042,7 @@ export function parseToIsoDate(dateVal) {
     return parsed.toISOString().split('T')[0];
   }
 
-  return null;
+  return getFallback();
 }
 
 // ==================================

@@ -96,13 +96,15 @@ const MergeRequestsModal = ({
     .map(r => `[Zgłoszenie ${returnsAPI.getRequestDisplayId(r, requests)}]: ${r.notes ? r.notes.trim() : 'Brak dodatkowych uwag'}`)
     .join('\n\n') + `\n\n[Połączono ze zgłoszeń: ${selectedRequests.map(r => returnsAPI.getRequestDisplayId(r, requests)).join(', ')}]`;
 
+  const defaultCollectionDate = dateOptions[0] || new Date().toISOString().split('T')[0];
+
   const [formData, setFormData] = useState({
     user_nip: initialClient.user_nip,
     company_name: initialClient.company_name,
     street: streetOptions[0] || '',
     postal_code: postalOptions[0] || '',
     city: cityOptions[0] || '',
-    collection_date: dateOptions[0] || '',
+    collection_date: defaultCollectionDate,
     loading_hours: loadingHoursOptions[0] || '',
     available_equipment: equipmentOptions[0] || '',
     email: emailOptions[0] || '',
