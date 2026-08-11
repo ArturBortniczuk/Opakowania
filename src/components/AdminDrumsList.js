@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase, drumsAPI, companiesAPI, returnsAPI, getCurrentUserFromCache, parseToIsoDate } from '../utils/supabaseApi';
+import { supabase, drumsAPI, companiesAPI, returnsAPI, getCurrentUserFromCache, parseToIsoDate, canUserSeeSalespersonFilter, getAvailableSalespeopleForUser } from '../utils/supabaseApi';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { pl } from 'date-fns/locale/pl';
@@ -38,6 +38,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
   const currentUser = user || getCurrentUserFromCache();
   const roleStr = currentUser?.role?.toLowerCase() || '';
   const isSalesperson = ['dyrektor', 'kierownik', 'specjalista', 'wsparcie'].some(r => roleStr.includes(r));
+  const canSeeSalespersonFilter = canUserSeeSalespersonFilter(currentUser);
 
   const urlSearchTerm = searchParams.get('searchTerm');
   const urlOpenModal = searchParams.get('openModal') === 'true';
@@ -109,17 +110,19 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
     const fetchSizesAndSalespeople = async () => {
       const sizes = await drumsAPI.getAllDrumSizes();
       setAvailableSizes(sizes);
-      try {
-        const { data } = await supabase.from('salespeople').select('name').order('name');
-        if (data && data.length > 0) {
-          setAvailableSalespeople(data.map(s => s.name));
+      if (canSeeSalespersonFilter) {
+        try {
+          const sps = await getAvailableSalespeopleForUser(currentUser);
+          setAvailableSalespeople(sps);
+        } catch (err) {
+          console.error('Błąd pobierania handlowców:', err);
         }
-      } catch (err) {
-        console.error('Błąd pobierania handlowców:', err);
+      } else {
+        setAvailableSalespeople([]);
       }
     };
     fetchSizesAndSalespeople();
-  }, []);
+  }, [currentUser, canSeeSalespersonFilter]);
 
   useEffect(() => {
     setCurrentPage(1); // Resetuj do pierwszej strony przy zmianie filtrów
@@ -625,7 +628,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
         });
     }
 
-    if (filterSalesperson && filterSalesperson !== 'all') {
+    if (canSeeSalespersonFilter && filterSalesperson && filterSalesperson !== 'all') {
       filtered = filtered.filter(d => {
         const spName = d.companies?.salesperson_name || d.salesperson_name;
         return spName === filterSalesperson;
@@ -1080,24 +1083,24 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
               {/* Row 1 */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type="text"
                     placeholder="Dane bębna (cecha, faktura)..."
                     value={localSearchTerm}
                     onChange={(e) => setLocalSearchTerm(e.target.value)}
-                    className="pl-10 w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    className="pl-10 w-full h-[46px] p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white shadow-sm"
                   />
                 </div>
 
                 <div className="relative">
-                  <Building2 className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type="text"
                     placeholder="Dane firmy (nazwa, NIP)..."
                     value={localCompanySearchTerm}
                     onChange={(e) => setLocalCompanySearchTerm(e.target.value)}
-                    className="pl-10 w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    className="pl-10 w-full h-[46px] p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white shadow-sm"
                   />
                 </div>
 
@@ -1105,11 +1108,11 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
                   <button
                     type="button"
                     onClick={() => setShowSizesMenu(!showSizesMenu)}
-                    className="w-full flex items-center justify-between p-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 bg-white text-sm"
+                    className="w-full h-[46px] flex items-center justify-between p-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors text-gray-700 bg-white text-sm shadow-sm"
                   >
-                    <div className="flex items-center">
-                      <Filter className="w-4 h-4 mr-2 text-blue-500" />
-                      <span className="truncate">Rozmiary ({selectedSizes.length > 0 ? selectedSizes.length : 'Wszystkie'})</span>
+                    <div className="flex items-center truncate">
+                      <Filter className="w-4 h-4 mr-2 text-blue-500 flex-shrink-0" />
+                      <span className="truncate font-medium">Rozmiary ({selectedSizes.length > 0 ? selectedSizes.length : 'Wszystkie'})</span>
                     </div>
                     <ChevronLeft className={`w-4 h-4 transition-transform flex-shrink-0 ml-1 ${showSizesMenu ? '-rotate-90' : ''}`} />
                   </button>
@@ -1158,7 +1161,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
                       setSortBy(field);
                       setSortOrder(order);
                     }}
-                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white font-medium"
+                    className="w-full h-[46px] p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white font-medium shadow-sm"
                   >
                     <option value="daysInPossession_desc">⏱️ Czas u klienta: Najdłużej (najstarsze)</option>
                     <option value="daysInPossession_asc">⏱️ Czas u klienta: Najkrócej (najnowsze)</option>
@@ -1172,8 +1175,8 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
               </div>
 
               {/* Row 2 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div className="flex items-center p-3 border border-gray-300 rounded-xl bg-white hover:bg-gray-50 transition-colors text-sm">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center h-[46px] p-3 border border-gray-300 rounded-xl bg-white hover:bg-gray-50 transition-colors text-sm shadow-sm flex-1 min-w-[200px]">
                   <label className="flex items-center w-full cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -1188,7 +1191,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
+                    className="h-[46px] p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white shadow-sm flex-1 min-w-[170px]"
                   >
                     <option value="all">Status: Wszystkie</option>
                     <option value="wydane">Wydane u klientów</option>
@@ -1197,21 +1200,23 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
                   </select>
                 )}
 
-                <select
-                  value={filterSalesperson}
-                  onChange={(e) => setFilterSalesperson(e.target.value)}
-                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
-                >
-                  <option value="all">Handlowiec: Wszyscy</option>
-                  {availableSalespeople.map(sp => (
-                    <option key={sp} value={sp}>{sp}</option>
-                  ))}
-                </select>
+                {canSeeSalespersonFilter && availableSalespeople.length > 0 && (
+                  <select
+                    value={filterSalesperson}
+                    onChange={(e) => setFilterSalesperson(e.target.value)}
+                    className="h-[46px] p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white shadow-sm flex-1 min-w-[170px]"
+                  >
+                    <option value="all">Handlowiec: Wszyscy</option>
+                    {availableSalespeople.map(sp => (
+                      <option key={sp} value={sp}>{sp}</option>
+                    ))}
+                  </select>
+                )}
 
                 <select
                   value={filterSupplierDateRange}
                   onChange={(e) => setFilterSupplierDateRange(e.target.value)}
-                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
+                  className="h-[46px] p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white shadow-sm flex-1 min-w-[170px]"
                 >
                   <option value="all">Termin do kablowni: Wszystkie</option>
                   <option value="active">Bez przekroczeń</option>
@@ -1222,7 +1227,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
                 <select
                   value={filterClientDateRange}
                   onChange={(e) => setFilterClientDateRange(e.target.value)}
-                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
+                  className="h-[46px] p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white shadow-sm flex-1 min-w-[170px]"
                 >
                   <option value="all">Termin od klienta: Wszystkie</option>
                   <option value="active">Bez przekroczeń</option>
@@ -1234,7 +1239,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
                 <select
                   value={filterPaymentStatus}
                   onChange={(e) => setFilterPaymentStatus(e.target.value)}
-                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
+                  className="h-[46px] p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white shadow-sm flex-1 min-w-[170px]"
                 >
                   <option value="all">Płatność: Wszystkie</option>
                   <option value="paid">Opłacone</option>

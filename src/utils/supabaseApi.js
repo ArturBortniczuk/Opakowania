@@ -83,6 +83,93 @@ export async function getAllowedNips(user) {
   return [];
 }
 
+/**
+ * Sprawdza czy użytkownik ma rolę powyżej specjalisty (widzi więcej niż tylko swoich klientów).
+ * Dostęp dla: admin, supervisor, dyrektor, kierownik, wsparcie, magazyn.
+ * Brak dostępu dla: specjalista, client.
+ */
+export function canUserSeeSalespersonFilter(user) {
+  if (!user || !user.role) return false;
+  const roleLower = user.role.toLowerCase();
+  return ['admin', 'supervisor', 'dyrektor', 'kierownik', 'wsparcie', 'magazyn'].includes(roleLower);
+}
+
+/**
+ * Pobiera listę handlowców dostępnych dla danego użytkownika w filtrze.
+ * - Administrator / Supervisor: ma do wyboru wszystkich handlowców.
+ * - Wsparcie / Kierownik (np. Wsparcie rynku podlaskiego): widzi tylko handlowców ze swojego rynku.
+ * - Dyrektor: widzi handlowców ze swojego regionu (lub wszystkich jeśli region 'Wszystkie').
+ * - Specjalista / Klient: pusta tablica.
+ */
+export async function getAvailableSalespeopleForUser(user) {
+  if (!user) return [];
+  const roleLower = user.role?.toLowerCase() || '';
+
+  if (!canUserSeeSalespersonFilter(user)) {
+    return [];
+  }
+
+  // Administratorzy i Supervisorzy widzą wszystkich handlowców
+  if (roleLower === 'admin' || roleLower === 'supervisor') {
+    const { data } = await supabase
+      .from('salespeople')
+      .select('name')
+      .order('name');
+    return data ? data.map(s => s.name).filter(Boolean) : [];
+  }
+
+  try {
+    // Sprawdzamy rynek/region dla danego pracownika w tabeli salespeople
+    const { data: myData } = await supabase
+      .from('salespeople')
+      .select('market, region')
+      .eq('email', user.email)
+      .maybeSingle();
+
+    const myMarket = myData?.market || user.market;
+    const myRegion = myData?.region || user.region;
+
+    if (roleLower === 'wsparcie' || roleLower === 'kierownik') {
+      if (myMarket) {
+        const { data: sps } = await supabase
+          .from('salespeople')
+          .select('name')
+          .eq('market', myMarket)
+          .order('name');
+        if (sps && sps.length > 0) {
+          return sps.map(s => s.name).filter(Boolean);
+        }
+      }
+    } else if (roleLower === 'dyrektor') {
+      if (myRegion && myRegion !== 'Wszystkie') {
+        const { data: sps } = await supabase
+          .from('salespeople')
+          .select('name')
+          .eq('region', myRegion)
+          .order('name');
+        if (sps && sps.length > 0) {
+          return sps.map(s => s.name).filter(Boolean);
+        }
+      }
+    }
+
+    // Fallback gdy nie znaleziono rynku lub rynek == 'Wszystkie'
+    const { data } = await supabase
+      .from('salespeople')
+      .select('name')
+      .order('name');
+    return data ? data.map(s => s.name).filter(Boolean) : [];
+  } catch (err) {
+    console.error('Błąd getAvailableSalespeopleForUser:', err);
+    const { data } = await supabase
+      .from('salespeople')
+      .select('name')
+      .order('name');
+    return data ? data.map(s => s.name).filter(Boolean) : [];
+  }
+}
+
+
 // ==================================
 //  API do Autoryzacji
 // ==================================

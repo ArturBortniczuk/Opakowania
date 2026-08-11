@@ -1,7 +1,7 @@
 // src/components/DrumsList.js
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { drumsAPI, returnsAPI } from '../utils/supabaseApi';
+import { drumsAPI, returnsAPI, getCurrentUserFromCache, canUserSeeSalespersonFilter, getAvailableSalespeopleForUser } from '../utils/supabaseApi';
 import { getClientPrice } from '../utils/priceHelpers';
 import {
   Package, Calendar, Search, Filter, AlertCircle, CheckCircle, Clock,
@@ -298,6 +298,8 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
 const DrumsList = ({ user }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const currentUser = user || getCurrentUserFromCache();
+  const canSeeSalespersonFilter = canUserSeeSalespersonFilter(currentUser);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('data_zwrotu_do_dostawcy');
@@ -312,6 +314,22 @@ const DrumsList = ({ user }) => {
   const [availableSalespeople, setAvailableSalespeople] = useState([]);
   const [availableSizes, setAvailableSizes] = useState([]);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
+
+  useEffect(() => {
+    const fetchSalespeople = async () => {
+      if (canSeeSalespersonFilter) {
+        try {
+          const sps = await getAvailableSalespeopleForUser(currentUser);
+          setAvailableSalespeople(sps);
+        } catch (err) {
+          console.error('Błąd pobierania handlowców:', err);
+        }
+      } else {
+        setAvailableSalespeople([]);
+      }
+    };
+    fetchSalespeople();
+  }, [currentUser, canSeeSalespersonFilter]);
 
   // Dropdown States
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
@@ -451,11 +469,7 @@ const DrumsList = ({ user }) => {
       );
       setAvailableSizes(sizes);
 
-      // Wyciągamy unikalnych handlowców
-      const salespeople = [...new Set(allDrums.map(d => d.companies?.salesperson_name || d.salesperson_name).filter(Boolean))].sort();
-      setAvailableSalespeople(salespeople);
-
-      // 1. Filtrowanie (Search) - WYRZUCONO kod_bebna i cecha
+      // 1. Filtrowanie (Search)
       let filtered = mappedDrums;
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
@@ -463,7 +477,9 @@ const DrumsList = ({ user }) => {
           (d.nazwa || '').toLowerCase().includes(term) ||
           (d.adres_dostawy || '').toLowerCase().includes(term) ||
           (d.numer_faktury || '').toLowerCase().includes(term) ||
-          (d.rozmiar_bebna || '').toLowerCase().includes(term)
+          (d.rozmiar_bebna || '').toLowerCase().includes(term) ||
+          (d.kod_bebna || '').toLowerCase().includes(term) ||
+          (d.cecha || '').toLowerCase().includes(term)
         );
       }
 
@@ -504,7 +520,7 @@ const DrumsList = ({ user }) => {
       }
 
       // 2d. Filtrowanie po Handlowcu
-      if (filterSalesperson && filterSalesperson !== 'all') {
+      if (canSeeSalespersonFilter && filterSalesperson && filterSalesperson !== 'all') {
         filtered = filtered.filter(d => {
           const spName = d.companies?.salesperson_name || d.salesperson_name;
           return spName === filterSalesperson;
@@ -815,12 +831,12 @@ const DrumsList = ({ user }) => {
                   </div>
                 )}
               </div>
-              {availableSalespeople.length > 0 && (
+              {canSeeSalespersonFilter && availableSalespeople.length > 0 && (
                 <div className="relative min-w-[200px]">
                   <select
                     value={filterSalesperson}
                     onChange={(e) => { setFilterSalesperson(e.target.value); setPage(1); }}
-                    className="w-full p-3 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm h-[46px]"
+                    className="w-full p-3 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm h-[46px] shadow-sm font-medium"
                   >
                     <option value="all">Handlowiec: Wszyscy</option>
                     {availableSalespeople.map(sp => (
