@@ -872,20 +872,75 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     }
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (requestOrStatus) => {
+    const status = typeof requestOrStatus === 'object' && requestOrStatus !== null ? requestOrStatus.status : requestOrStatus;
+    const reqObj = typeof requestOrStatus === 'object' && requestOrStatus !== null ? requestOrStatus : null;
+
     const badges = {
-      Pending: { color: 'text-amber-500', bg: 'bg-amber-50', text: 'Oczekuje', icon: Clock },
-      Approved: { color: 'text-sky-500', bg: 'bg-sky-50', text: 'Przekazane do transportu', icon: Truck },
-      InTransit: { color: 'text-indigo-500', bg: 'bg-indigo-50', text: 'W trakcie transportu', icon: Truck },
-      Completed: { color: 'text-emerald-500', bg: 'bg-emerald-50', text: 'Zakończony', icon: CheckCircle },
-      Rejected: { color: 'text-rose-500', bg: 'bg-rose-50', text: 'Odrzucony', icon: XCircle }
+      Pending: { color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200', text: 'Oczekuje na akceptację', label: '🟡 Oczekujące', icon: Clock },
+      Approved: { color: 'text-sky-600', bg: 'bg-sky-50 border-sky-200', text: 'Zaakceptowane (Przekazane do transportu)', label: '🔵 Zaakceptowane', icon: Truck },
+      InTransit: { color: 'text-indigo-600', bg: 'bg-indigo-600 text-white border-indigo-700', text: 'W trakcie transportu', label: '🟣 W transporcie', icon: Truck },
+      Completed: { color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', text: 'Zakończony', label: '🟢 Zakończony', icon: CheckCircle },
+      Rejected: { color: 'text-rose-600', bg: 'bg-rose-50 border-rose-200', text: 'Odrzucony', label: '🔴 Odrzucony', icon: XCircle }
     };
 
     const badge = badges[status] || badges.Pending;
     const Icon = badge.icon;
 
+    if (canChangeStatus && reqObj && reqObj.id) {
+      return (
+        <div className="relative group z-30" onClick={(e) => e.stopPropagation()}>
+          <button
+            onClick={(e) => { e.stopPropagation(); }}
+            className={`p-2 rounded-xl border transition-all cursor-pointer shadow-sm hover:scale-110 active:scale-95 flex items-center justify-center ${
+              status === 'InTransit' 
+                ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 shadow-indigo-200' 
+                : `${badge.bg} ${badge.color} hover:bg-opacity-80`
+            }`}
+            title={`Status: ${badge.text}\n(Kliknij lub najedź myszką, aby cofnąć/zmienić status)`}
+          >
+            <Icon className="w-5 h-5" />
+          </button>
+
+          {/* Rozwijane menu wyboru/cofnięcia statusu z ikony ciężarówki/statusu */}
+          <div className="absolute right-0 top-full mt-1.5 hidden group-hover:block w-56 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 p-2 space-y-1">
+            <div className="text-[10px] font-extrabold text-gray-400 px-2.5 py-1 uppercase tracking-wider border-b border-gray-100 mb-1">
+              Zmień / Cofnij status:
+            </div>
+            {[
+              { code: 'Pending', label: '🟡 Oczekujące' },
+              { code: 'Approved', label: '🔵 Zaakceptowane' },
+              { code: 'InTransit', label: '🟣 W transporcie' },
+              { code: 'Completed', label: '🟢 Zakończone' },
+              { code: 'Rejected', label: '🔴 Odrzucone' }
+            ].map(st => (
+              <button
+                key={st.code}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (st.code === status) return;
+                  const confirmMsg = `Czy na pewno chcesz zmienić status zgłoszenia na "${st.label}"?`;
+                  if (window.confirm(confirmMsg)) {
+                    handleStatusChange(reqObj.id, st.code);
+                  }
+                }}
+                className={`w-full text-left px-3 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-between ${
+                  status === st.code
+                    ? 'bg-blue-50 text-blue-700 font-extrabold'
+                    : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <span>{st.label}</span>
+                {status === st.code && <span className="text-[10px] text-blue-600 font-extrabold">✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className={`p-2 rounded-xl border border-transparent hover:border-current transition-colors cursor-help ${badge.bg} ${badge.color}`} title={badge.text}>
+      <div className={`p-2 rounded-xl border ${badge.bg} ${badge.color}`} title={badge.text}>
         <Icon className="w-5 h-5" />
       </div>
     );
@@ -1047,7 +1102,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            {getStatusBadge(request.status)}
+            {getStatusBadge(request)}
             {getPriorityBadge(request)}
           </div>
         </div>
@@ -1257,7 +1312,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                 }
                 handleAddCorrectionNumber(request.id);
               }}
-              className={`py-2.5 px-3 rounded-xl font-bold transition-colors text-sm border ${
+              className={`flex-1 py-2.5 px-4 rounded-xl font-bold transition-colors text-sm border ${
                 request.correction_number 
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100' 
                 : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
@@ -1265,31 +1320,6 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
             >
               {request.correction_number ? 'Korekta' : '+ Korekta'}
             </button>
-          )}
-
-          {canChangeStatus && !mergeMode && (
-            <select
-              value={request.status}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => {
-                e.stopPropagation();
-                const newSt = e.target.value;
-                if (newSt !== request.status) {
-                  const confirmChange = window.confirm(`Czy na pewno chcesz zmienić status zgłoszenia na "${newSt}"?`);
-                  if (confirmChange) {
-                    handleStatusChange(request.id, newSt);
-                  }
-                }
-              }}
-              className="py-2.5 px-2 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm"
-              title="Ręczna zmiana / cofnięcie statusu zgłoszenia (Opcja Administratora)"
-            >
-              <option value="Pending">🟡 Oczekujące</option>
-              <option value="Approved">🔵 Zaakceptowane</option>
-              <option value="InTransit">🟣 W transporcie</option>
-              <option value="Completed">🟢 Zakończone</option>
-              <option value="Rejected">🔴 Odrzucone</option>
-            </select>
           )}
         </div>
       </div>
