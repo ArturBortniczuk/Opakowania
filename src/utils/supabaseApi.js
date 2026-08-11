@@ -2,6 +2,7 @@
 // FINALNA, KOMPLETNA WERSJA Z PAGINACJĄ - Przeznaczona do pracy z rzeczywistymi danymi z Supabase.
 
 import { supabase, supabaseHelpers } from '../lib/supabase';
+export { supabase, supabaseHelpers };
 
 // ============================================================
 // BEZPIECZNY CACHE UŻYTKOWNIKA
@@ -504,7 +505,7 @@ export const drumsAPI = {
       // Podstawowe zapytanie
       let query = supabase
         .from('drums')
-        .select(`*, companies (name, email, phone, address, custom_return_periods(return_period_days))`, { count: 'exact' })
+        .select(`*, companies (name, email, phone, address, salesperson_name, market, custom_return_periods(return_period_days))`, { count: 'exact' })
         .or('typ_opakowania.eq.Bęben,typ_opakowania.is.null');
 
       // Zawsze pobieramy aktywne zlecenia zwrotu, by znać datę ich zgłoszenia
@@ -1157,7 +1158,7 @@ export const drumsAPI = {
         if (isCount) {
           q = q.select('*', { count: 'exact', head: true });
         } else {
-          q = q.select(`*, companies (name, email, phone, address, custom_return_periods(return_period_days))`);
+          q = q.select(`*, companies (name, email, phone, address, salesperson_name, market, custom_return_periods(return_period_days))`);
         }
         q = q.or('typ_opakowania.eq.Bęben,typ_opakowania.is.null');
 

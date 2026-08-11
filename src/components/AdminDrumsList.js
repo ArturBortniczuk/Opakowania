@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { drumsAPI, companiesAPI, returnsAPI, getCurrentUserFromCache } from '../utils/supabaseApi';
+import { supabase, drumsAPI, companiesAPI, returnsAPI, getCurrentUserFromCache } from '../utils/supabaseApi';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { pl } from 'date-fns/locale/pl';
@@ -57,6 +57,9 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
   const [selectedSizes, setSelectedSizes] = useState([]);
   const [showSizesMenu, setShowSizesMenu] = useState(false);
   
+  const [availableSalespeople, setAvailableSalespeople] = useState([]);
+  const [filterSalesperson, setFilterSalesperson] = useState('all');
+
   const initialStatus = urlFilterStatus || 'all';
   const [filterStatus, setFilterStatus] = useState(initialStatus);
   const [filterSupplierDateRange, setFilterSupplierDateRange] = useState('all');
@@ -103,16 +106,24 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
   }, [localSearchTerm, localCompanySearchTerm]);
 
   useEffect(() => {
-    const fetchSizes = async () => {
+    const fetchSizesAndSalespeople = async () => {
       const sizes = await drumsAPI.getAllDrumSizes();
       setAvailableSizes(sizes);
+      try {
+        const { data } = await supabase.from('salespeople').select('name').order('name');
+        if (data && data.length > 0) {
+          setAvailableSalespeople(data.map(s => s.name));
+        }
+      } catch (err) {
+        console.error('Błąd pobierania handlowców:', err);
+      }
     };
-    fetchSizes();
+    fetchSizesAndSalespeople();
   }, []);
 
   useEffect(() => {
     setCurrentPage(1); // Resetuj do pierwszej strony przy zmianie filtrów
-  }, [sortBy, sortOrder, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, filterPaymentStatus, selectedSizes, filterReportedOnly]);
+  }, [sortBy, sortOrder, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, filterPaymentStatus, filterSalesperson, selectedSizes, filterReportedOnly]);
   useEffect(() => {
     if (initialFilter && initialFilter.status) {
       setFilterStatus(initialFilter.status);
@@ -611,6 +622,13 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
         });
     }
 
+    if (filterSalesperson && filterSalesperson !== 'all') {
+      filtered = filtered.filter(d => {
+        const spName = d.companies?.salesperson_name || d.salesperson_name;
+        return spName === filterSalesperson;
+      });
+    }
+
     setDynamicStats({
       total: filtered.length,
       overdue: filtered.filter(d => d.status === 'overdue').length,
@@ -623,10 +641,25 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
     let sorted = [...filtered];
     if (sortBy) {
       sorted.sort((a, b) => {
-        let valA = a[sortBy] || a[sortBy.toLowerCase()] || '';
-        let valB = b[sortBy] || b[sortBy.toLowerCase()] || '';
-        if (typeof valA === 'string') valA = valA.toLowerCase();
-        if (typeof valB === 'string') valB = valB.toLowerCase();
+        let valA, valB;
+        if (sortBy === 'daysInPossession') {
+          valA = a.daysInPossession !== undefined ? Number(a.daysInPossession) : -1;
+          valB = b.daysInPossession !== undefined ? Number(b.daysInPossession) : -1;
+        } else if (sortBy === 'clientReturnDeadline') {
+          valA = a.clientReturnDeadline ? new Date(a.clientReturnDeadline).getTime() : 0;
+          valB = b.clientReturnDeadline ? new Date(b.clientReturnDeadline).getTime() : 0;
+        } else if (sortBy === 'data_zwrotu_do_dostawcy') {
+          valA = a.data_zwrotu_do_dostawcy ? new Date(a.data_zwrotu_do_dostawcy).getTime() : 0;
+          valB = b.data_zwrotu_do_dostawcy ? new Date(b.data_zwrotu_do_dostawcy).getTime() : 0;
+        } else if (sortBy === 'company') {
+          valA = (a.company || a.pelna_nazwa_kontrahenta || '').toLowerCase();
+          valB = (b.company || b.pelna_nazwa_kontrahenta || '').toLowerCase();
+        } else {
+          valA = a[sortBy] || a[sortBy.toLowerCase()] || '';
+          valB = b[sortBy] || b[sortBy.toLowerCase()] || '';
+          if (typeof valA === 'string') valA = valA.toLowerCase();
+          if (typeof valB === 'string') valB = valB.toLowerCase();
+        }
         
         if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
         if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
@@ -658,7 +691,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
     });
 
     setLoading(false);
-  }, [allAdminDrums, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, selectedSizes, filterPaymentStatus, urlClientNip, filterReportedOnly, currentPage, sortBy, sortOrder]);
+  }, [allAdminDrums, searchTerm, companySearchTerm, filterStatus, filterSupplierDateRange, filterClientDateRange, selectedSizes, filterPaymentStatus, filterSalesperson, urlClientNip, filterReportedOnly, currentPage, sortBy, sortOrder]);
 
   const stats = dynamicStats;
 
@@ -1042,7 +1075,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
           <div className="bg-white/80 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-blue-100 mb-6 relative z-40">
             <div className="space-y-4">
               {/* Row 1 */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <input
@@ -1110,10 +1143,33 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
                     </div>
                   )}
                 </div>
+
+                <div className="relative">
+                  <select
+                    value={`${sortBy}_${sortOrder}`}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const parts = val.split('_');
+                      const order = parts.pop();
+                      const field = parts.join('_');
+                      setSortBy(field);
+                      setSortOrder(order);
+                    }}
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white font-medium"
+                  >
+                    <option value="daysInPossession_desc">⏱️ Czas u klienta: Najdłużej (najstarsze)</option>
+                    <option value="daysInPossession_asc">⏱️ Czas u klienta: Najkrócej (najnowsze)</option>
+                    <option value="cecha_asc">Cecha: A - Z</option>
+                    <option value="cecha_desc">Cecha: Z - A</option>
+                    <option value="company_asc">Firma: A - Z</option>
+                    <option value="clientReturnDeadline_asc">Termin od klienta: Rosnąco</option>
+                    <option value="data_zwrotu_do_dostawcy_asc">Termin do kablowni: Rosnąco</option>
+                  </select>
+                </div>
               </div>
 
               {/* Row 2 */}
-              <div className={`grid grid-cols-1 ${isSalesperson ? 'md:grid-cols-4' : 'md:grid-cols-5'} gap-4`}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <div className="flex items-center p-3 border border-gray-300 rounded-xl bg-white hover:bg-gray-50 transition-colors text-sm">
                   <label className="flex items-center w-full cursor-pointer select-none">
                     <input
@@ -1129,7 +1185,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
                   >
                     <option value="all">Status: Wszystkie</option>
                     <option value="wydane">Wydane u klientów</option>
@@ -1139,9 +1195,20 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
                 )}
 
                 <select
+                  value={filterSalesperson}
+                  onChange={(e) => setFilterSalesperson(e.target.value)}
+                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
+                >
+                  <option value="all">Handlowiec: Wszyscy</option>
+                  {availableSalespeople.map(sp => (
+                    <option key={sp} value={sp}>{sp}</option>
+                  ))}
+                </select>
+
+                <select
                   value={filterSupplierDateRange}
                   onChange={(e) => setFilterSupplierDateRange(e.target.value)}
-                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
                 >
                   <option value="all">Termin do kablowni: Wszystkie</option>
                   <option value="active">Bez przekroczeń</option>
@@ -1152,7 +1219,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
                 <select
                   value={filterClientDateRange}
                   onChange={(e) => setFilterClientDateRange(e.target.value)}
-                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
                 >
                   <option value="all">Termin od klienta: Wszystkie</option>
                   <option value="active">Bez przekroczeń</option>
@@ -1164,13 +1231,13 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
                 <select
                   value={filterPaymentStatus}
                   onChange={(e) => setFilterPaymentStatus(e.target.value)}
-                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
                 >
                   <option value="all">Płatność: Wszystkie</option>
                   <option value="paid">Opłacone</option>
                   <option value="unpaid">Nieopłacone</option>
+                  <option value="overdue_payment">⚠️ Zaległe po terminie</option>
                   <option value="no_invoice">Brak faktury</option>
-                  <option value="overdue_payment">Zaległe po terminie</option>
                 </select>
               </div>
             </div>

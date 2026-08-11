@@ -308,6 +308,8 @@ const DrumsList = ({ user }) => {
   });
   const [filterSize, setFilterSize] = useState([]);
   const [filterPayment, setFilterPayment] = useState([]);
+  const [filterSalesperson, setFilterSalesperson] = useState('all');
+  const [availableSalespeople, setAvailableSalespeople] = useState([]);
   const [availableSizes, setAvailableSizes] = useState([]);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
 
@@ -449,6 +451,10 @@ const DrumsList = ({ user }) => {
       );
       setAvailableSizes(sizes);
 
+      // Wyciągamy unikalnych handlowców
+      const salespeople = [...new Set(allDrums.map(d => d.companies?.salesperson_name || d.salesperson_name).filter(Boolean))].sort();
+      setAvailableSalespeople(salespeople);
+
       // 1. Filtrowanie (Search) - WYRZUCONO kod_bebna i cecha
       let filtered = mappedDrums;
       if (searchTerm) {
@@ -497,10 +503,21 @@ const DrumsList = ({ user }) => {
         });
       }
 
+      // 2d. Filtrowanie po Handlowcu
+      if (filterSalesperson && filterSalesperson !== 'all') {
+        filtered = filtered.filter(d => {
+          const spName = d.companies?.salesperson_name || d.salesperson_name;
+          return spName === filterSalesperson;
+        });
+      }
+
       // 3. Sortowanie
       filtered.sort((a, b) => {
         let valA, valB;
-        if (sortBy === 'kod_bebna') {
+        if (sortBy === 'daysInPossession') {
+          valA = a.daysInPossession !== undefined ? Number(a.daysInPossession) : -1;
+          valB = b.daysInPossession !== undefined ? Number(b.daysInPossession) : -1;
+        } else if (sortBy === 'kod_bebna') {
           valA = a.kod_bebna || a.cecha || '';
           valB = b.kod_bebna || b.cecha || '';
         } else if (
@@ -550,7 +567,7 @@ const DrumsList = ({ user }) => {
 
   useEffect(() => {
     fetchDrums();
-  }, [user?.nip, page, sortBy, sortOrder, filterStatus, filterSize, filterPayment]); // Debounce search term ideally
+  }, [user?.nip, page, sortBy, sortOrder, filterStatus, filterSize, filterPayment, filterSalesperson]); // Debounce search term ideally
 
   // Debounce search
   useEffect(() => {
@@ -798,15 +815,51 @@ const DrumsList = ({ user }) => {
                   </div>
                 )}
               </div>
-              <div className="flex gap-2">
+              {availableSalespeople.length > 0 && (
+                <div className="relative min-w-[200px]">
+                  <select
+                    value={filterSalesperson}
+                    onChange={(e) => { setFilterSalesperson(e.target.value); setPage(1); }}
+                    className="w-full p-3 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm h-[46px]"
+                  >
+                    <option value="all">Handlowiec: Wszyscy</option>
+                    {availableSalespeople.map(sp => (
+                      <option key={sp} value={sp}>{sp}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => {
+                    if (sortBy === 'daysInPossession' && sortOrder === 'desc') {
+                      setSortBy('daysInPossession');
+                      setSortOrder('asc');
+                    } else {
+                      setSortBy('daysInPossession');
+                      setSortOrder('desc');
+                    }
+                    setPage(1);
+                  }}
+                  className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 text-sm font-medium ${sortBy === 'daysInPossession'
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
+                    }`}
+                  title="Sortuj od najstarszych bębnów (najdłużej u klienta)"
+                >
+                  <span>⏱️ Najdłużej u klienta</span>
+                  <ArrowUpDown className="w-4 h-4" />
+                </button>
+
                 <button
                   onClick={() => handleSort('data_zwrotu_do_dostawcy')}
-                  className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 ${sortBy === 'data_zwrotu_do_dostawcy'
+                  className={`px-4 py-3 rounded-xl border transition-all duration-200 flex items-center space-x-2 text-sm font-medium ${sortBy === 'data_zwrotu_do_dostawcy'
                       ? 'bg-blue-600 text-white border-blue-600'
                       : 'bg-white text-gray-600 border-gray-300 hover:bg-blue-50'
                     }`}
                 >
-                  <span>Termin</span>
+                  <span>Termin zwrotu</span>
                   <ArrowUpDown className="w-4 h-4" />
                 </button>
               </div>
