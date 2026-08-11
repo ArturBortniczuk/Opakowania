@@ -817,7 +817,15 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
         profile_phone: selectedRequest.profile_phone || null
       };
 
-      await returnsAPI.createReturn(newReturnData);
+      const createdNewReturn = await returnsAPI.createReturn(newReturnData);
+
+      const newDisplayId = returnsAPI.getRequestDisplayId(createdNewReturn, requests);
+      const updatedOriginalNotes = (selectedRequest.notes || '') + `\n\n[Wydzielono ${enrichedDrumsToMove.length} bębnów do zgłoszenia ${newDisplayId}]`;
+
+      await returnsAPI.updateReturnStatus(selectedRequest.id, {
+        selected_drums: drumsToKeep,
+        notes: updatedOriginalNotes
+      });
 
       setSplitMode(false);
       setSplitSelectedDrums([]);
