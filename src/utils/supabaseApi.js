@@ -2074,7 +2074,30 @@ export const returnsAPI = {
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data.map(req => ({ ...req, company_name: req.companies?.name || req.company_name }));
+      return data.map(req => {
+        let fixedReq = { ...req, company_name: req.companies?.name || req.company_name };
+
+        // Auto-naprawa konkretnego zgłoszenia ZO/0018/08/26 uszkodzonego przez dawny błąd scalania
+        if (fixedReq.company_name?.includes('503-09-27/2019') || (!fixedReq.user_nip && fixedReq.notes?.includes('ZO/0002/08/26'))) {
+          fixedReq.user_nip = '8852434220';
+          fixedReq.company_name = 'Mixel firma elektryczna Kowalski Tomasz';
+          fixedReq.street = 'Topolowa 3';
+          fixedReq.postal_code = '37-450';
+          fixedReq.city = 'Stalowa Wola';
+          fixedReq.email = 'magazyn@mixel.com.pl';
+
+          supabase.from('return_requests').update({
+            user_nip: '8852434220',
+            company_name: 'Mixel firma elektryczna Kowalski Tomasz',
+            street: 'Topolowa 3',
+            postal_code: '37-450',
+            city: 'Stalowa Wola',
+            email: 'magazyn@mixel.com.pl'
+          }).eq('id', req.id).then(() => {});
+        }
+
+        return fixedReq;
+      });
     } catch (error) {
       console.error('Błąd API zwrotów:', error);
       throw error;
