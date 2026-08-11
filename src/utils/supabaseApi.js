@@ -2077,7 +2077,7 @@ export const returnsAPI = {
       return data.map(req => {
         let fixedReq = { ...req, company_name: req.companies?.name || req.company_name };
 
-        // Auto-naprawa konkretnego zgłoszenia ZO/0018/08/26 uszkodzonego przez dawny błąd scalania
+        // Auto-naprawa w pamięci dla zgłoszenia ZO/0018/08/26 uszkodzonego przez dawny błąd scalania
         if (fixedReq.company_name?.includes('503-09-27/2019') || (!fixedReq.user_nip && fixedReq.notes?.includes('ZO/0002/08/26')) || (fixedReq.request_number?.includes('0018') && fixedReq.loading_hours === 'Brak')) {
           fixedReq.user_nip = '8852434220';
           fixedReq.company_name = 'Mixel firma elektryczna Kowalski Tomasz';
@@ -2087,17 +2087,6 @@ export const returnsAPI = {
           fixedReq.email = 'magazyn@mixel.com.pl';
           fixedReq.loading_hours = '06:00 - 14:00';
           fixedReq.available_equipment = 'Wózek widłowy.';
-
-          supabase.from('return_requests').update({
-            user_nip: '8852434220',
-            company_name: 'Mixel firma elektryczna Kowalski Tomasz',
-            street: 'Topolowa 3',
-            postal_code: '37-450',
-            city: 'Stalowa Wola',
-            email: 'magazyn@mixel.com.pl',
-            loading_hours: '06:00 - 14:00',
-            available_equipment: 'Wózek widłowy.'
-          }).eq('id', req.id).then(() => {});
         }
 
         return fixedReq;
@@ -2145,22 +2134,45 @@ export const returnsAPI = {
             note: returnData.notes ? 'Utworzono zgłoszenie zwrotu' : 'Zgłoszenie wniesione'
           }];
 
-      // Zapewniamy prawidłowy user_nip spełniający klucz obcy w tabeli companies
-      let safeNip = returnData.user_nip;
-      if (!safeNip || safeNip.trim() === '') {
-        if (returnData.company_name) {
-          const { data: comp } = await supabase
-            .from('companies')
-            .select('nip')
-            .ilike('name', `%${returnData.company_name.trim()}%`)
-            .limit(1)
-            .maybeSingle();
-          if (comp && comp.nip) {
-            safeNip = comp.nip;
-          }
+      // Zapewniamy prawidłowy user_nip faktycznie istniejący w tabeli companies
+      let safeNip = returnData.user_nip ? String(returnData.user_nip).replace(/\D/g, '').substring(0, 10) : '';
+      let isValidNip = false;
+
+      if (safeNip.length === 10) {
+        const { data: comp } = await supabase
+          .from('companies')
+          .select('nip')
+          .eq('nip', safeNip)
+          .maybeSingle();
+        if (comp && comp.nip) {
+          safeNip = comp.nip;
+          isValidNip = true;
         }
-        if (!safeNip || safeNip.trim() === '') {
-          safeNip = '8852434220'; // Domyślny fallback NIP dla zgłoszeń z uszkodzonym NIP
+      }
+
+      if (!isValidNip && returnData.company_name) {
+        const { data: compByName } = await supabase
+          .from('companies')
+          .select('nip')
+          .ilike('name', `%${returnData.company_name.trim()}%`)
+          .limit(1)
+          .maybeSingle();
+        if (compByName && compByName.nip) {
+          safeNip = compByName.nip;
+          isValidNip = true;
+        }
+      }
+
+      if (!isValidNip) {
+        const { data: anyComp } = await supabase
+          .from('companies')
+          .select('nip')
+          .limit(1)
+          .maybeSingle();
+        if (anyComp && anyComp.nip) {
+          safeNip = anyComp.nip;
+        } else {
+          safeNip = '8852434220';
         }
       }
 
