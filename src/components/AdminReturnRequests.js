@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { returnsAPI, companiesAPI, drumsAPI, transportAPI, rulesAPI } from '../utils/supabaseApi';
+import { returnsAPI, companiesAPI, drumsAPI, transportAPI, rulesAPI, parseToIsoDate } from '../utils/supabaseApi';
 import { parsePriceRaw, getClientPrice } from '../utils/priceHelpers';
 import TransportOrderModal from './TransportOrderModal';
 import {
@@ -61,7 +61,7 @@ const MergeRequestsModal = ({
   const streetOptions = Array.from(new Set(selectedRequests.map(r => r.street).filter(Boolean)));
   const postalOptions = Array.from(new Set(selectedRequests.map(r => r.postal_code).filter(Boolean)));
   const cityOptions = Array.from(new Set(selectedRequests.map(r => r.city).filter(Boolean)));
-  const dateOptions = Array.from(new Set(selectedRequests.map(r => r.collection_date).filter(Boolean)));
+  const dateOptions = Array.from(new Set(selectedRequests.map(r => parseToIsoDate(r.collection_date)).filter(Boolean)));
   const loadingHoursOptions = Array.from(new Set(selectedRequests.map(r => r.loading_hours || 'Brak').filter(Boolean)));
   const equipmentOptions = Array.from(new Set(selectedRequests.map(r => r.available_equipment || 'Brak').filter(Boolean)));
   const emailOptions = Array.from(new Set(selectedRequests.map(r => r.email).filter(Boolean)));
@@ -536,11 +536,44 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
       return;
     }
     try {
+      const statusVal = typeof newStatus === 'string' ? newStatus : newStatus.status;
       await returnsAPI.updateReturnStatus(requestId, newStatus);
+      
+      if (selectedRequest && selectedRequest.id === requestId) {
+        setSelectedRequest(prev => prev ? { ...prev, status: statusVal } : null);
+      }
+      
       handleRefresh();
     } catch (err) {
       console.error('Błąd zmiany statusu:', err);
       alert('Nie udało się zmienić statusu.');
+    }
+  };
+
+  const handleToggleDrumTransport = async (itemToToggle) => {
+    if (!canChangeStatus || !selectedRequest) return;
+    const itemLabel = getDrumLabel(itemToToggle);
+    const updatedDrums = selectedRequest.selected_drums.map(d => {
+      if (getDrumLabel(d) === itemLabel) {
+        const isObj = typeof d === 'object' && d !== null;
+        const currentTransported = isObj ? d.transported : true;
+        const newTransported = currentTransported === false ? true : false;
+        return isObj 
+          ? { ...d, transported: newTransported } 
+          : { cecha: d, type: 'drum', transported: newTransported };
+      }
+      return d;
+    });
+
+    try {
+      await returnsAPI.updateReturnStatus(selectedRequest.id, {
+        selected_drums: updatedDrums
+      });
+      setSelectedRequest(prev => prev ? { ...prev, selected_drums: updatedDrums } : null);
+      handleRefresh();
+    } catch (err) {
+      console.error('Błąd zmiany statusu opakowania:', err);
+      alert('Nie udało się zmienić statusu opakowania.');
     }
   };
 
@@ -1224,7 +1257,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                 }
                 handleAddCorrectionNumber(request.id);
               }}
-              className={`flex-1 py-2.5 px-4 rounded-xl font-bold transition-colors text-sm border ${
+              className={`py-2.5 px-3 rounded-xl font-bold transition-colors text-sm border ${
                 request.correction_number 
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100' 
                 : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
@@ -1232,6 +1265,31 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
             >
               {request.correction_number ? 'Korekta' : '+ Korekta'}
             </button>
+          )}
+
+          {canChangeStatus && !mergeMode && (
+            <select
+              value={request.status}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                e.stopPropagation();
+                const newSt = e.target.value;
+                if (newSt !== request.status) {
+                  const confirmChange = window.confirm(`Czy na pewno chcesz zmienić status zgłoszenia na "${newSt}"?`);
+                  if (confirmChange) {
+                    handleStatusChange(request.id, newSt);
+                  }
+                }
+              }}
+              className="py-2.5 px-2 text-xs font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm"
+              title="Ręczna zmiana / cofnięcie statusu zgłoszenia (Opcja Administratora)"
+            >
+              <option value="Pending">🟡 Oczekujące</option>
+              <option value="Approved">🔵 Zaakceptowane</option>
+              <option value="InTransit">🟣 W transporcie</option>
+              <option value="Completed">🟢 Zakończone</option>
+              <option value="Rejected">🔴 Odrzucone</option>
+            </select>
           )}
         </div>
       </div>
@@ -1565,13 +1623,29 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                         <div className="flex items-center gap-1">
                           {damaged && <AlertTriangle className="w-5 h-5 text-red-500" title="Uszkodzony" />}
                           {canChangeStatus && !splitMode && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleRemoveDrum(drum); }}
-                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Usuń ze zgłoszenia (klient będzie mógł go ponownie zgłosić)"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleDrumTransport(drum);
+                                }}
+                                className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
+                                  drum.transported === false
+                                    ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                                    : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                                }`}
+                                title={drum.transported === false ? "Przywróć status bębna jako odebrany w transporcie" : "Cofnij status bębna (Oznacz jako nieodebrany/pominięty)"}
+                              >
+                                {drum.transported === false ? 'Przywróć' : 'Cofnij'}
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleRemoveDrum(drum); }}
+                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Usuń ze zgłoszenia (klient będzie mógł go ponownie zgłosić)"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -1705,13 +1779,29 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                             </div>
                             <div className="flex items-center gap-1">
                               {canChangeStatus && !splitMode && (
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleRemoveDrum(pallet); }}
-                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                  title="Usuń ze zgłoszenia"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                                <>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleToggleDrumTransport(pallet);
+                                    }}
+                                    className={`px-2 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
+                                      pallet.transported === false
+                                        ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                                        : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                                    }`}
+                                    title={pallet.transported === false ? "Przywróć status palety do transportu" : "Cofnij status palety (Oznacz jako nieodebraną)"}
+                                  >
+                                    {pallet.transported === false ? 'Przywróć' : 'Cofnij'}
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleRemoveDrum(pallet); }}
+                                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    title="Usuń ze zgłoszenia"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </>
                               )}
                             </div>
                           </div>
@@ -1783,7 +1873,48 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
             )}
 
             {canChangeStatus && (
-              <div className="flex flex-col sm:flex-row gap-4 mt-8">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mt-6 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <RefreshCw className="w-4 h-4 text-indigo-600" />
+                    Ręczna zmiana / Cofnięcie statusu zgłoszenia (Administrator)
+                  </span>
+                  <span className="text-xs text-slate-600">
+                    Obecny status: <strong className="text-slate-900">{selectedRequest.status}</strong>
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { code: 'Pending', label: '🟡 Oczekujące', bg: 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100' },
+                    { code: 'Approved', label: '🔵 Zaakceptowane (Do transportu)', bg: 'bg-sky-50 text-sky-900 border-sky-300 hover:bg-sky-100' },
+                    { code: 'InTransit', label: '🟣 W transporcie', bg: 'bg-indigo-50 text-indigo-900 border-indigo-300 hover:bg-indigo-100' },
+                    { code: 'Completed', label: '🟢 Zakończony', bg: 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100' },
+                    { code: 'Rejected', label: '🔴 Odrzucony', bg: 'bg-rose-50 text-rose-900 border-rose-300 hover:bg-rose-100' }
+                  ].map(st => (
+                    <button
+                      key={st.code}
+                      onClick={() => {
+                        if (st.code === selectedRequest.status) return;
+                        const confirmChange = window.confirm(`Czy na pewno chcesz ręcznie zmienić status zgłoszenia na "${st.label}"?`);
+                        if (confirmChange) {
+                          handleStatusChange(selectedRequest.id, st.code);
+                        }
+                      }}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+                        st.code === selectedRequest.status 
+                          ? 'ring-2 ring-blue-600 bg-white text-blue-900 font-extrabold shadow-sm scale-[1.02]' 
+                          : st.bg
+                      }`}
+                    >
+                      {st.code === selectedRequest.status ? '✓ ' : ''}{st.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {canChangeStatus && (
+              <div className="flex flex-col sm:flex-row gap-4 mt-4">
                 {selectedRequest.status === 'Pending' && (
                   <>
                     <button

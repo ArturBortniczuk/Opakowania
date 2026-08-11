@@ -1995,6 +1995,48 @@ export function getPickupTypeInfo(type) {
 }
 
 // ==================================
+/**
+ * Pomocnicza funkcja parsująca dowolny format daty (np. 3.08.2026, 03.08.2026, 2026-08-03, ISO)
+ * na bezpieczny format YYYY-MM-DD lub null dla kolumn typu DATE w PostgreSQL.
+ */
+export function parseToIsoDate(dateVal) {
+  if (!dateVal || dateVal === '' || dateVal === 'null' || dateVal === 'undefined') return null;
+  if (typeof dateVal !== 'string') {
+    if (dateVal instanceof Date && !isNaN(dateVal.getTime())) {
+      return dateVal.toISOString().split('T')[0];
+    }
+    return null;
+  }
+
+  const trimmed = dateVal.trim();
+  if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') return null;
+
+  // 1. Format YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    return trimmed.split('T')[0];
+  }
+
+  // 2. Format DD.MM.YYYY (np. 3.08.2026 lub 03.08.2026)
+  const parts = trimmed.split('.');
+  if (parts.length === 3) {
+    const day = parts[0].padStart(2, '0');
+    const month = parts[1].padStart(2, '0');
+    const year = parts[2];
+    if (year.length === 4) {
+      return `${year}-${month}-${day}`;
+    }
+  }
+
+  // 3. Fallback przez Date constructor
+  const parsed = new Date(trimmed);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString().split('T')[0];
+  }
+
+  return null;
+}
+
+// ==================================
 export const returnsAPI = {
   getRequestDisplayId,
   getPickupTypeInfo,
@@ -2072,6 +2114,7 @@ export const returnsAPI = {
         status: initialStatus,
         priority: returnData.priority || 'Normal',
         pickup_type: returnData.pickup_type || 'spedycja',
+        collection_date: parseToIsoDate(returnData.collection_date),
         selected_drums: enrichedDrums,
         status_history: initialHistory,
         status_updated_at: nowIso
@@ -2122,6 +2165,10 @@ export const returnsAPI = {
 
       const nowIso = new Date().toISOString();
       updatePayload.updated_at = nowIso;
+
+      if (updatePayload.collection_date !== undefined) {
+        updatePayload.collection_date = parseToIsoDate(updatePayload.collection_date);
+      }
 
       // Jeśli następuje zmiana statusu, pobieramy obecny stan zgłoszenia i archiwizujemy historię
       if (updatePayload.status) {
