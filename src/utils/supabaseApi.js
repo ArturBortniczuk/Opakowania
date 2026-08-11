@@ -791,9 +791,22 @@ export const drumsAPI = {
         }
 
         const refDateForPossession = reportedDate ? new Date(reportedDate) : new Date();
-        const rawIssueDate = drum.data_wydania || drum.data_przyjecia_na_stan || drum.created_at;
-        const parsedIssueStr = parseToIsoDate(rawIssueDate, null);
-        const issueDate = parsedIssueStr ? new Date(parsedIssueStr) : null;
+
+        let rawIssueDate = drum.data_wydania || drum.DATA_WYDANIA || drum.data_przyjecia_na_stan || drum.DATA_PRZYJECIA_NA_STAN || drum['Data przyjęcia na stan'] || drum.data_faktury;
+        let parsedIssueStr = parseToIsoDate(rawIssueDate, null);
+        let issueDate = parsedIssueStr ? new Date(parsedIssueStr) : null;
+
+        // Jeśli brak bezpośredniej daty wydania, wylicz wydanie z daty zwrotu dostawcy/klienta minus okres (120 dni)
+        if ((!issueDate || isNaN(issueDate.getTime())) && (finalReturnDate || extension)) {
+          const baseDateStr = parseToIsoDate(extension?.custom_return_date || finalReturnDate, null);
+          if (baseDateStr) {
+            const baseD = new Date(baseDateStr);
+            if (!isNaN(baseD.getTime())) {
+              baseD.setDate(baseD.getDate() - returnPeriodDays);
+              issueDate = baseD;
+            }
+          }
+        }
 
         let daysInPossession = 0;
         if (issueDate && !isNaN(issueDate.getTime())) {
@@ -809,6 +822,8 @@ export const drumsAPI = {
           const clientReturnDeadlineDate = new Date(issueDate);
           clientReturnDeadlineDate.setDate(clientReturnDeadlineDate.getDate() + returnPeriodDays);
           clientReturnDeadline = clientReturnDeadlineDate.toISOString().split('T')[0];
+        } else if (finalReturnDate) {
+          clientReturnDeadline = finalReturnDate;
         }
 
         const dateForStatus = extension
@@ -1324,9 +1339,22 @@ export const drumsAPI = {
         }
 
         const refDateForPossession = reportedDate ? new Date(reportedDate) : new Date();
-        const rawIssueDate = drum.data_wydania || drum.data_przyjecia_na_stan || drum.created_at;
-        const parsedIssueStr = parseToIsoDate(rawIssueDate, null);
-        const issueDate = parsedIssueStr ? new Date(parsedIssueStr) : null;
+
+        let rawIssueDate = drum.data_wydania || drum.DATA_WYDANIA || drum.data_przyjecia_na_stan || drum.DATA_PRZYJECIA_NA_STAN || drum['Data przyjęcia na stan'] || drum.data_faktury;
+        let parsedIssueStr = parseToIsoDate(rawIssueDate, null);
+        let issueDate = parsedIssueStr ? new Date(parsedIssueStr) : null;
+
+        // Jeśli brak bezpośredniej daty wydania, wylicz wydanie z daty zwrotu dostawcy/klienta minus okres (120 dni)
+        if ((!issueDate || isNaN(issueDate.getTime())) && (finalReturnDate || extension)) {
+          const baseDateStr = parseToIsoDate(extension?.custom_return_date || finalReturnDate, null);
+          if (baseDateStr) {
+            const baseD = new Date(baseDateStr);
+            if (!isNaN(baseD.getTime())) {
+              baseD.setDate(baseD.getDate() - returnPeriodDays);
+              issueDate = baseD;
+            }
+          }
+        }
 
         let daysInPossession = 0;
         if (issueDate && !isNaN(issueDate.getTime())) {
@@ -1342,6 +1370,8 @@ export const drumsAPI = {
           const clientReturnDeadlineDate = new Date(issueDate);
           clientReturnDeadlineDate.setDate(clientReturnDeadlineDate.getDate() + returnPeriodDays);
           clientReturnDeadline = clientReturnDeadlineDate.toISOString().split('T')[0];
+        } else if (finalReturnDate) {
+          clientReturnDeadline = finalReturnDate;
         }
 
         const dateForStatus = extension
