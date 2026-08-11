@@ -176,6 +176,13 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
             )}
 
             <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">Nr faktury</span>
+              <span className="text-sm font-medium text-gray-900 truncate max-w-[180px]" title={drum.numer_faktury || 'Brak faktury'}>
+                {drum.numer_faktury || 'Brak faktury'}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center">
               <span className="text-sm text-gray-500">Lokalizacja</span>
               <div className="text-sm font-medium text-gray-900 text-right max-w-xs truncate">
                 {drum.adres_dostawy ? (
