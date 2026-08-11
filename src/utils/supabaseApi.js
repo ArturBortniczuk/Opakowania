@@ -791,18 +791,24 @@ export const drumsAPI = {
         }
 
         const refDateForPossession = reportedDate ? new Date(reportedDate) : new Date();
-        const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
-        const daysInPossession = Math.ceil((refDateForPossession - issueDate) / (1000 * 60 * 60 * 24));
+        const rawIssueDate = drum.data_wydania || drum.data_przyjecia_na_stan || drum.created_at;
+        const parsedIssueStr = parseToIsoDate(rawIssueDate, null);
+        const issueDate = parsedIssueStr ? new Date(parsedIssueStr) : null;
+
+        let daysInPossession = 0;
+        if (issueDate && !isNaN(issueDate.getTime())) {
+          const diffMs = refDateForPossession - issueDate;
+          const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+          daysInPossession = diffDays > 0 ? diffDays : 0;
+        }
 
         let clientReturnDeadline = null;
         if (extension) {
           clientReturnDeadline = extension.custom_return_date;
-        } else {
+        } else if (issueDate && !isNaN(issueDate.getTime())) {
           const clientReturnDeadlineDate = new Date(issueDate);
-          if (!isNaN(clientReturnDeadlineDate.getTime())) {
-            clientReturnDeadlineDate.setDate(clientReturnDeadlineDate.getDate() + returnPeriodDays);
-            clientReturnDeadline = clientReturnDeadlineDate.toISOString().split('T')[0];
-          }
+          clientReturnDeadlineDate.setDate(clientReturnDeadlineDate.getDate() + returnPeriodDays);
+          clientReturnDeadline = clientReturnDeadlineDate.toISOString().split('T')[0];
         }
 
         const dateForStatus = extension
@@ -1318,18 +1324,24 @@ export const drumsAPI = {
         }
 
         const refDateForPossession = reportedDate ? new Date(reportedDate) : new Date();
-        const issueDate = new Date(drum.data_wydania || drum.data_przyjecia_na_stan);
-        const daysInPossession = Math.ceil((refDateForPossession - issueDate) / (1000 * 60 * 60 * 24));
+        const rawIssueDate = drum.data_wydania || drum.data_przyjecia_na_stan || drum.created_at;
+        const parsedIssueStr = parseToIsoDate(rawIssueDate, null);
+        const issueDate = parsedIssueStr ? new Date(parsedIssueStr) : null;
+
+        let daysInPossession = 0;
+        if (issueDate && !isNaN(issueDate.getTime())) {
+          const diffMs = refDateForPossession - issueDate;
+          const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+          daysInPossession = diffDays > 0 ? diffDays : 0;
+        }
 
         let clientReturnDeadline = null;
         if (extension) {
           clientReturnDeadline = extension.custom_return_date;
-        } else {
+        } else if (issueDate && !isNaN(issueDate.getTime())) {
           const clientReturnDeadlineDate = new Date(issueDate);
-          if (!isNaN(clientReturnDeadlineDate.getTime())) {
-            clientReturnDeadlineDate.setDate(clientReturnDeadlineDate.getDate() + returnPeriodDays);
-            clientReturnDeadline = clientReturnDeadlineDate.toISOString().split('T')[0];
-          }
+          clientReturnDeadlineDate.setDate(clientReturnDeadlineDate.getDate() + returnPeriodDays);
+          clientReturnDeadline = clientReturnDeadlineDate.toISOString().split('T')[0];
         }
 
         const dateForStatus = extension
