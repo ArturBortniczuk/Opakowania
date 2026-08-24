@@ -1401,6 +1401,9 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
       let deadlineDate = null;
       let daysOverdue = -99999;
       let isOverdue = false;
+      let sortWeight = -999999;
+
+      const isFinished = req.status === 'Completed' || req.status === 'Rejected';
 
       if (startDate && !isNaN(startDate.getTime())) {
         startDate.setHours(0, 0, 0, 0);
@@ -1409,9 +1412,14 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
         deadlineDate.setHours(0, 0, 0, 0);
         
         daysOverdue = Math.floor((today.getTime() - deadlineDate.getTime()) / (1000 * 60 * 60 * 24));
-        if (req.status !== 'Completed' && req.status !== 'Rejected') {
+        if (!isFinished) {
           isOverdue = daysOverdue > 0;
+          sortWeight = daysOverdue; // Największa liczba dni po terminie ma największą wagę
+        } else {
+          sortWeight = -999999; // Zakończone na sam spód
         }
+      } else {
+        sortWeight = isFinished ? -999999 : -50000;
       }
 
       // Dane osoby zgłaszającej i telefon
@@ -1428,10 +1436,12 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
         deadlineDate,
         daysOverdue,
         isOverdue,
+        isFinished,
+        sortWeight,
         submitterName,
         submitterPhone: submitterPhone || 'Brak tel.'
       };
-    }).sort((a, b) => b.daysOverdue - a.daysOverdue); // Najdłużej po terminie na samej górze!
+    }).sort((a, b) => b.sortWeight - a.sortWeight); // Najdłużej przeterminowane AKTYWNE zgłoszenia na samej górze!
 
     return (
       <div className="space-y-4 pb-12">
@@ -1443,7 +1453,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
             </div>
             <div>
               <h3 className="text-base font-bold text-gray-900">Harmonogram odbiorów według terminu</h3>
-              <p className="text-xs text-gray-500">Posegregowane od zgłoszeń najdłużej czekających na odbiór po terminie</p>
+              <p className="text-xs text-gray-500">Posegregowane od zgłoszeń aktywnie najdłużej czekających na odbiór po terminie</p>
             </div>
           </div>
 
@@ -1466,132 +1476,120 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
           </div>
         ) : (
           <div className="bg-white rounded-2xl shadow-lg border border-slate-200/80 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-100/80 border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
-                    <th className="py-3.5 px-4 whitespace-nowrap">Numer Zgłoszenia</th>
-                    <th className="py-3.5 px-4 whitespace-nowrap">Status Odbioru (Dni po terminie)</th>
-                    <th className="py-3.5 px-4 whitespace-nowrap">Okres Odbioru (Klienta)</th>
-                    <th className="py-3.5 px-4 min-w-[200px]">Firma & Miasto</th>
-                    <th className="py-3.5 px-4 whitespace-nowrap">Osoba Zgłaszająca (Kontakt)</th>
-                    <th className="py-3.5 px-4 whitespace-nowrap">Handlowiec</th>
-                    <th className="py-3.5 px-4 whitespace-nowrap">Status</th>
-                    <th className="py-3.5 px-3 text-center whitespace-nowrap">Akcja</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
-                  {scheduleList.map(req => {
-                    const reqNum = returnsAPI.getRequestDisplayId(req, requests);
-                    const drumsCount = Array.isArray(req.selected_drums) 
-                      ? req.selected_drums.filter(d => typeof d !== 'object' || d.type !== 'pallet').length 
-                      : 0;
-                    const palletsCount = Array.isArray(req.selected_drums)
-                      ? req.selected_drums.filter(d => typeof d === 'object' && d.type === 'pallet').length
-                      : 0;
+            <table className="w-full table-fixed text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-100/80 border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
+                  <th className="py-3 px-3 w-[15%]">Zgłoszenie</th>
+                  <th className="py-3 px-3 w-[22%]">Status Odbioru (Dni)</th>
+                  <th className="py-3 px-3 w-[17%]">Okres Odbioru</th>
+                  <th className="py-3 px-3 w-[24%]">Firma & Opiekun</th>
+                  <th className="py-3 px-3 w-[16%]">Zgłaszający (Kontakt)</th>
+                  <th className="py-3 px-2 w-[6%] text-center">Akcja</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
+                {scheduleList.map(req => {
+                  const reqNum = returnsAPI.getRequestDisplayId(req, requests);
+                  const drumsCount = Array.isArray(req.selected_drums) 
+                    ? req.selected_drums.filter(d => typeof d !== 'object' || d.type !== 'pallet').length 
+                    : 0;
+                  const palletsCount = Array.isArray(req.selected_drums)
+                    ? req.selected_drums.filter(d => typeof d === 'object' && d.type === 'pallet').length
+                    : 0;
 
-                    const salesperson = req.salesperson_name || req.companies?.salesperson_name || 'Brak przypisania';
+                  const salesperson = req.salesperson_name || req.companies?.salesperson_name || 'Brak opiekuna';
 
-                    return (
-                      <tr 
-                        key={req.id} 
-                        className={`hover:bg-blue-50/40 transition-colors ${req.isOverdue ? 'bg-red-50/40' : ''}`}
-                      >
-                        {/* Numer Zgłoszenia */}
-                        <td className="py-3.5 px-4 font-mono font-bold text-blue-700 whitespace-nowrap">
-                          <span className="bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg text-xs">
-                            {reqNum}
+                  return (
+                    <tr 
+                      key={req.id} 
+                      className={`hover:bg-blue-50/40 transition-colors ${req.isOverdue ? 'bg-red-50/40' : ''}`}
+                    >
+                      {/* Numer Zgłoszenia */}
+                      <td className="py-3 px-3">
+                        <span className="bg-blue-50 border border-blue-200 px-2 py-1 rounded-lg text-xs font-mono font-bold text-blue-700 block truncate" title={reqNum}>
+                          {reqNum}
+                        </span>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          {drumsCount > 0 && `${drumsCount} bęb. `}
+                          {palletsCount > 0 && `${palletsCount} pal.`}
+                        </div>
+                      </td>
+
+                      {/* Status Odbioru (Dni po terminie) */}
+                      <td className="py-3 px-3">
+                        {req.isFinished ? (
+                          <div className="inline-flex items-center gap-1">
+                            {getStatusBadge(req.status)}
+                          </div>
+                        ) : req.isOverdue ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-red-100 text-red-700 border border-red-300 shadow-xs animate-pulse truncate" title={`Po terminie o ${req.daysOverdue} dni`}>
+                            <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                            <span>Po terminie o {req.daysOverdue} {req.daysOverdue === 1 ? 'dzień' : 'dni'}</span>
                           </span>
-                        </td>
-
-                        {/* Status / Dni po terminie (Czerwony wyróżnik po terminie) */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          {req.isOverdue ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-extrabold bg-red-100 text-red-700 border border-red-300 shadow-xs animate-pulse">
-                              <AlertTriangle className="w-4 h-4 text-red-600" />
-                              <span>Po terminie o {req.daysOverdue} {req.daysOverdue === 1 ? 'dzień' : 'dni'}</span>
-                            </span>
-                          ) : req.daysOverdue === 0 ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                              <Clock className="w-3.5 h-3.5 text-amber-600" />
-                              <span>Ostatni dzień terminu (Dzisiaj)</span>
-                            </span>
-                          ) : req.daysOverdue > -99000 ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                              <Clock className="w-3.5 h-3.5 text-slate-400" />
-                              <span>Pozostało {Math.abs(req.daysOverdue)} dni terminu</span>
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 italic">Brak daty</span>
-                          )}
-                        </td>
-
-                        {/* Preferowany Okres Odbioru (Od - Do) */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <div className="flex flex-col text-[11px]">
-                            <span className="font-bold text-slate-900">
-                              Od: {req.startDate ? req.startDate.toLocaleDateString('pl-PL') : '-'}
-                            </span>
-                            <span className="font-bold text-blue-700">
-                              Do: {req.deadlineDate ? req.deadlineDate.toLocaleDateString('pl-PL') : '-'}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Firma & Miasto */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-bold text-slate-900 truncate max-w-[220px]" title={req.company_name}>
-                            {req.company_name}
-                          </div>
-                          <div className="text-[11px] text-slate-500 truncate">
-                            {req.city} {req.user_nip ? `(NIP: ${req.user_nip})` : ''}
-                          </div>
-                          <div className="text-[10px] text-slate-400 mt-0.5">
-                            {drumsCount > 0 && `${drumsCount} bębnów `}
-                            {palletsCount > 0 && `${palletsCount} palet`}
-                          </div>
-                        </td>
-
-                        {/* Osoba Zgłaszająca & Telefon */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                            <User className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                            <span>{req.submitterName}</span>
-                          </div>
-                          <div className="text-[11px] font-semibold text-blue-700 flex items-center gap-1 mt-0.5">
-                            <Phone className="w-3 h-3 text-blue-500 shrink-0" />
-                            <span>{req.submitterPhone}</span>
-                          </div>
-                        </td>
-
-                        {/* Handlowiec */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <span className="text-slate-700 font-semibold bg-slate-100 px-2 py-0.5 rounded-md text-[11px]">
-                            {salesperson}
+                        ) : req.daysOverdue === 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-xl text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 truncate">
+                            <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            <span>Ostatni dzień terminu (Dzisiaj)</span>
                           </span>
-                        </td>
+                        ) : req.daysOverdue > -99000 ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-xl text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 truncate">
+                            <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>Pozostało {Math.abs(req.daysOverdue)} dni terminu</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 italic text-[11px]">Brak daty</span>
+                        )}
+                      </td>
 
-                        {/* Status zgłoszenia */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          {getStatusBadge(req.status)}
-                        </td>
+                      {/* Preferowany Okres Odbioru (Od - Do) */}
+                      <td className="py-3 px-3">
+                        <div className="flex flex-col text-[11px] leading-tight">
+                          <span className="font-bold text-slate-900">
+                            Od: {req.startDate ? req.startDate.toLocaleDateString('pl-PL') : '-'}
+                          </span>
+                          <span className="font-bold text-blue-700">
+                            Do: {req.deadlineDate ? req.deadlineDate.toLocaleDateString('pl-PL') : '-'}
+                          </span>
+                        </div>
+                      </td>
 
-                        {/* Guzik akcji (strzałka) */}
-                        <td className="py-3.5 px-3 text-center whitespace-nowrap">
-                          <button
-                            onClick={() => handleViewRequest(req)}
-                            className="w-8 h-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold inline-flex items-center justify-center shadow-xs hover:shadow-md transition-all duration-200 hover:scale-110 cursor-pointer"
-                            title={`Przejdź do zgłoszenia ${reqNum}`}
-                          >
-                            <ArrowUpRight className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                      {/* Firma & Opiekun */}
+                      <td className="py-3 px-3">
+                        <div className="font-bold text-slate-900 truncate block" title={req.company_name}>
+                          {req.company_name}
+                        </div>
+                        <div className="text-[10px] text-slate-500 truncate block" title={`${req.city || ''} (Handlowiec: ${salesperson})`}>
+                          {req.city ? `${req.city} • ` : ''}Opiekun: <span className="font-semibold text-slate-700">{salesperson}</span>
+                        </div>
+                      </td>
+
+                      {/* Osoba Zgłaszająca & Telefon */}
+                      <td className="py-3 px-3">
+                        <div className="font-bold text-slate-900 truncate block flex items-center gap-1" title={req.submitterName}>
+                          <User className="w-3 h-3 text-blue-600 shrink-0" />
+                          <span className="truncate">{req.submitterName}</span>
+                        </div>
+                        <div className="text-[11px] font-semibold text-blue-700 flex items-center gap-1 mt-0.5 truncate" title={req.submitterPhone}>
+                          <Phone className="w-3 h-3 text-blue-500 shrink-0" />
+                          <span className="truncate">{req.submitterPhone}</span>
+                        </div>
+                      </td>
+
+                      {/* Guzik akcji (sama strzałka) */}
+                      <td className="py-3 px-2 text-center">
+                        <button
+                          onClick={() => handleViewRequest(req)}
+                          className="w-7 h-7 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold inline-flex items-center justify-center shadow-xs hover:shadow-md transition-all duration-200 hover:scale-110 cursor-pointer"
+                          title={`Przejdź do zgłoszenia ${reqNum}`}
+                        >
+                          <ArrowUpRight className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
