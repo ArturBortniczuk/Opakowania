@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, X, Send, Headphones, CheckCheck, Loader2 } from 'lucide-react';
-import { chatAPI } from '../utils/chatApi';
+import { chatAPI, formatChatMessageTime } from '../utils/chatApi';
 
 const ChatWidget = ({ currentUser, isUserStaff }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -197,7 +197,7 @@ const ChatWidget = ({ currentUser, isUserStaff }) => {
             ) : (
               messages.map((msg) => {
                 const isMyMessage = msg.sender_role === 'client';
-                const timeStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const timeStr = formatChatMessageTime(msg.created_at);
 
                 return (
                   <div

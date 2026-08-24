@@ -231,3 +231,25 @@ export const chatAPI = {
     return channel;
   }
 };
+
+/**
+ * Formatowanie czasu wysłania wiadomości (np. "24.08, 14:30" lub "24.08.2025, 14:30" dla innego roku)
+ */
+export const formatChatMessageTime = (dateInput) => {
+  if (!dateInput) return '';
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return '';
+
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const timeStr = d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+
+  const now = new Date();
+  if (d.getFullYear() !== now.getFullYear()) {
+    const year = d.getFullYear();
+    return `${day}.${month}.${year}, ${timeStr}`;
+  }
+
+  return `${day}.${month}, ${timeStr}`;
+};
+

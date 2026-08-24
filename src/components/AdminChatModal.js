@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, X, Send, Search, CheckCheck, Loader2, Building2, User, RefreshCw, BellRing } from 'lucide-react';
-import { chatAPI } from '../utils/chatApi';
+import { chatAPI, formatChatMessageTime } from '../utils/chatApi';
 
 const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
   const [threads, setThreads] = useState([]);
@@ -243,7 +243,7 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
                   const isSelected = selectedThread && selectedThread.id === t.id;
                   const hasUnread = t.unread_admin_count > 0;
                   const lastTime = t.last_message_at
-                    ? new Date(t.last_message_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    ? formatChatMessageTime(t.last_message_at)
                     : '';
 
                   return (
@@ -341,7 +341,7 @@ const AdminChatModal = ({ isOpen, onClose, currentUser }) => {
                   ) : (
                     messages.map((msg) => {
                       const isStaffMsg = msg.sender_role === 'staff';
-                      const timeStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      const timeStr = formatChatMessageTime(msg.created_at);
 
                       return (
                         <div
