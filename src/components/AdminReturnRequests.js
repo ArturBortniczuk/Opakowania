@@ -24,7 +24,9 @@ import {
   CheckSquare,
   Square,
   ArrowUpRight,
-  LayoutGrid
+  LayoutGrid,
+  User,
+  Phone
 } from 'lucide-react';
 
 const formatPalletName = (size) => {
@@ -1390,16 +1392,46 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   };
 
   const renderScheduleView = () => {
-    const scheduleList = [...filteredAndSortedRequests].sort((a, b) => {
-      const dateAStr = parseToIsoDate(a.collection_date);
-      const dateBStr = parseToIsoDate(b.collection_date);
-      const timeA = dateAStr ? new Date(dateAStr).getTime() : 8640000000000000;
-      const timeB = dateBStr ? new Date(dateBStr).getTime() : 8640000000000000;
-      return timeA - timeB;
-    });
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    const scheduleList = filteredAndSortedRequests.map(req => {
+      const cIso = parseToIsoDate(req.collection_date);
+      const startDate = cIso ? new Date(cIso) : null;
+      let deadlineDate = null;
+      let daysOverdue = -99999;
+      let isOverdue = false;
+
+      if (startDate && !isNaN(startDate.getTime())) {
+        startDate.setHours(0, 0, 0, 0);
+        // Preferowany okres odbioru = 14 dni od daty preferowanej klienta
+        deadlineDate = new Date(startDate.getTime() + 14 * 24 * 60 * 60 * 1000);
+        deadlineDate.setHours(0, 0, 0, 0);
+        
+        daysOverdue = Math.floor((today.getTime() - deadlineDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (req.status !== 'Completed' && req.status !== 'Rejected') {
+          isOverdue = daysOverdue > 0;
+        }
+      }
+
+      // Dane osoby zgłaszającej i telefon
+      const submitterName = req.profile_name || (req.email ? req.email.split('@')[0] : 'Klient');
+      let submitterPhone = req.profile_phone || '';
+      if (!submitterPhone && req.notes) {
+        const phoneMatch = req.notes.match(/(?:tel|telefon|kontakt)?:\s*([\d\s\+\-]{8,20})/i);
+        if (phoneMatch) submitterPhone = phoneMatch[1].trim();
+      }
+
+      return {
+        ...req,
+        startDate,
+        deadlineDate,
+        daysOverdue,
+        isOverdue,
+        submitterName,
+        submitterPhone: submitterPhone || 'Brak tel.'
+      };
+    }).sort((a, b) => b.daysOverdue - a.daysOverdue); // Najdłużej po terminie na samej górze!
 
     return (
       <div className="space-y-4 pb-12">
@@ -1411,7 +1443,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
             </div>
             <div>
               <h3 className="text-base font-bold text-gray-900">Harmonogram odbiorów według terminu</h3>
-              <p className="text-xs text-gray-500">Posegregowane chronologicznie od najstarszych terminów zwrotu podanych przez klientów</p>
+              <p className="text-xs text-gray-500">Posegregowane od zgłoszeń najdłużej czekających na odbiór po terminie</p>
             </div>
           </div>
 
@@ -1421,15 +1453,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
             </span>
             <span className="px-3.5 py-2 bg-red-50 text-red-700 rounded-xl border border-red-200 flex items-center gap-1.5">
               <AlertTriangle className="w-4 h-4 text-red-600" />
-              Po terminie: {
-                scheduleList.filter(r => {
-                  const cIso = parseToIsoDate(r.collection_date);
-                  if (!cIso) return false;
-                  const cDate = new Date(cIso);
-                  cDate.setHours(0,0,0,0);
-                  return Math.floor((today - cDate) / (1000 * 60 * 60 * 24)) > 0 && r.status !== 'Completed' && r.status !== 'Rejected';
-                }).length
-              }
+              Po terminie: {scheduleList.filter(r => r.isOverdue).length}
             </span>
           </div>
         </div>
@@ -1446,29 +1470,19 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-100/80 border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
-                    <th className="py-3.5 px-4">Numer Zgłoszenia</th>
-                    <th className="py-3.5 px-4">Termin zwrotu (Klient)</th>
-                    <th className="py-3.5 px-4">Status Odbioru (Dni)</th>
-                    <th className="py-3.5 px-4">Firma & Miasto</th>
-                    <th className="py-3.5 px-4">Osoba Odpowiedzialna</th>
-                    <th className="py-3.5 px-4">Status Zgłoszenia</th>
-                    <th className="py-3.5 px-4 text-right">Akcja</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Numer Zgłoszenia</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Status Odbioru (Dni po terminie)</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Okres Odbioru (Klienta)</th>
+                    <th className="py-3.5 px-4 min-w-[200px]">Firma & Miasto</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Osoba Zgłaszająca (Kontakt)</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Handlowiec</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Status</th>
+                    <th className="py-3.5 px-3 text-center whitespace-nowrap">Akcja</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
                   {scheduleList.map(req => {
                     const reqNum = returnsAPI.getRequestDisplayId(req, requests);
-                    const collIso = parseToIsoDate(req.collection_date);
-                    const cDate = collIso ? new Date(collIso) : null;
-                    let daysDiff = 0;
-                    let isOverdue = false;
-
-                    if (cDate && !isNaN(cDate.getTime())) {
-                      cDate.setHours(0,0,0,0);
-                      daysDiff = Math.floor((today - cDate) / (1000 * 60 * 60 * 24));
-                      isOverdue = daysDiff > 0 && req.status !== 'Completed' && req.status !== 'Rejected';
-                    }
-
                     const drumsCount = Array.isArray(req.selected_drums) 
                       ? req.selected_drums.filter(d => typeof d !== 'object' || d.type !== 'pallet').length 
                       : 0;
@@ -1481,7 +1495,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                     return (
                       <tr 
                         key={req.id} 
-                        className={`hover:bg-blue-50/50 transition-colors ${isOverdue ? 'bg-red-50/50' : ''}`}
+                        className={`hover:bg-blue-50/40 transition-colors ${req.isOverdue ? 'bg-red-50/40' : ''}`}
                       >
                         {/* Numer Zgłoszenia */}
                         <td className="py-3.5 px-4 font-mono font-bold text-blue-700 whitespace-nowrap">
@@ -1490,37 +1504,43 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                           </span>
                         </td>
 
-                        {/* Data podana przez klienta */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          <div className="flex items-center space-x-1.5 font-bold text-slate-900">
-                            <Calendar className="w-4 h-4 text-blue-500 shrink-0" />
-                            <span>{cDate ? cDate.toLocaleDateString('pl-PL') : 'Brak daty'}</span>
-                          </div>
-                        </td>
-
                         {/* Status / Dni po terminie (Czerwony wyróżnik po terminie) */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
-                          {isOverdue ? (
+                          {req.isOverdue ? (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-extrabold bg-red-100 text-red-700 border border-red-300 shadow-xs animate-pulse">
                               <AlertTriangle className="w-4 h-4 text-red-600" />
-                              <span>Po terminie o {daysDiff} {daysDiff === 1 ? 'dzień' : 'dni'}</span>
+                              <span>Po terminie o {req.daysOverdue} {req.daysOverdue === 1 ? 'dzień' : 'dni'}</span>
                             </span>
-                          ) : daysDiff === 0 ? (
+                          ) : req.daysOverdue === 0 ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
                               <Clock className="w-3.5 h-3.5 text-amber-600" />
-                              <span>Termin: Dzisiaj</span>
+                              <span>Ostatni dzień terminu (Dzisiaj)</span>
                             </span>
-                          ) : (
+                          ) : req.daysOverdue > -99000 ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
                               <Clock className="w-3.5 h-3.5 text-slate-400" />
-                              <span>Za {Math.abs(daysDiff)} dni</span>
+                              <span>Pozostało {Math.abs(req.daysOverdue)} dni terminu</span>
                             </span>
+                          ) : (
+                            <span className="text-slate-400 italic">Brak daty</span>
                           )}
+                        </td>
+
+                        {/* Preferowany Okres Odbioru (Od - Do) */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <div className="flex flex-col text-[11px]">
+                            <span className="font-bold text-slate-900">
+                              Od: {req.startDate ? req.startDate.toLocaleDateString('pl-PL') : '-'}
+                            </span>
+                            <span className="font-bold text-blue-700">
+                              Do: {req.deadlineDate ? req.deadlineDate.toLocaleDateString('pl-PL') : '-'}
+                            </span>
+                          </div>
                         </td>
 
                         {/* Firma & Miasto */}
                         <td className="py-3.5 px-4">
-                          <div className="font-bold text-slate-900 truncate max-w-[200px]" title={req.company_name}>
+                          <div className="font-bold text-slate-900 truncate max-w-[220px]" title={req.company_name}>
                             {req.company_name}
                           </div>
                           <div className="text-[11px] text-slate-500 truncate">
@@ -1532,16 +1552,23 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                           </div>
                         </td>
 
-                        {/* Osoba Odpowiedzialna */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-semibold text-slate-800">
-                            {salesperson}
+                        {/* Osoba Zgłaszająca & Telefon */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <span>{req.submitterName}</span>
                           </div>
-                          {req.profile_name && (
-                            <div className="text-[11px] text-slate-500">
-                              Zgłosił: {req.profile_name}
-                            </div>
-                          )}
+                          <div className="text-[11px] font-semibold text-blue-700 flex items-center gap-1 mt-0.5">
+                            <Phone className="w-3 h-3 text-blue-500 shrink-0" />
+                            <span>{req.submitterPhone}</span>
+                          </div>
+                        </td>
+
+                        {/* Handlowiec */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className="text-slate-700 font-semibold bg-slate-100 px-2 py-0.5 rounded-md text-[11px]">
+                            {salesperson}
+                          </span>
                         </td>
 
                         {/* Status zgłoszenia */}
@@ -1549,14 +1576,14 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                           {getStatusBadge(req.status)}
                         </td>
 
-                        {/* Guzik przejścia do zgłoszenia */}
-                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        {/* Guzik akcji (strzałka) */}
+                        <td className="py-3.5 px-3 text-center whitespace-nowrap">
                           <button
                             onClick={() => handleViewRequest(req)}
-                            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow-md transition-all duration-200 inline-flex items-center gap-1.5"
+                            className="w-8 h-8 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold inline-flex items-center justify-center shadow-xs hover:shadow-md transition-all duration-200 hover:scale-110 cursor-pointer"
+                            title={`Przejdź do zgłoszenia ${reqNum}`}
                           >
-                            <span>Przejdź do zgłoszenia</span>
-                            <ArrowUpRight className="w-3.5 h-3.5" />
+                            <ArrowUpRight className="w-4 h-4" />
                           </button>
                         </td>
                       </tr>
