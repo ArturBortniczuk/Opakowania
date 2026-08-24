@@ -319,25 +319,24 @@ const AdminDashboard = ({ user, onNavigate }) => {
     return date.toLocaleDateString('pl-PL');
   };
 
-  const StatCard = ({ icon: Icon, title, value, subtitle, color, trend, percentage, onClick }) => (
+  const StatCard = ({ icon: Icon, title, value, subtitle, color, bgLight, onClick }) => (
     <div
       onClick={onClick}
-      className={`
-        bg-white/90 rounded-2xl p-6 shadow-lg border border-blue-100 
-        hover:shadow-xl transition-all duration-300 transform hover:scale-105 cursor-pointer 
-        hover:border-blue-200 group
-      `}
+      className="bg-white/90 backdrop-blur-sm rounded-2xl p-5 shadow-sm border border-slate-200/80 hover:border-blue-300 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group flex flex-col justify-between h-full"
     >
-      <div className="flex items-center justify-between mb-4">
-        <div className={`p-3 rounded-xl ${color} bg-opacity-10 group-hover:bg-opacity-20 transition-all duration-300`}>
-          <Icon className={`w-6 h-6 ${color}`} />
+      <div className="flex items-center justify-between mb-3">
+        <div className={`p-2.5 rounded-xl ${bgLight} ${color} group-hover:scale-110 transition-transform duration-300`}>
+          <Icon className="w-5 h-5" />
+        </div>
+        <div className="w-7 h-7 rounded-full bg-slate-100/80 group-hover:bg-blue-50 text-slate-400 group-hover:text-blue-600 flex items-center justify-center transition-colors duration-200">
+          <ArrowUpRight className="w-4 h-4 transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-200" />
         </div>
       </div>
 
-      <div className="space-y-1">
-        <h3 className="text-sm font-medium text-gray-600">{title}</h3>
-        <div className="text-3xl font-bold text-gray-900">{value}</div>
-        <p className="text-sm text-gray-500">{subtitle}</p>
+      <div>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{title}</p>
+        <div className="text-2xl lg:text-3xl font-extrabold text-gray-900 mt-1 tracking-tight">{value}</div>
+        <p className="text-xs text-gray-500 mt-1 font-medium">{subtitle}</p>
       </div>
     </div>
   );
@@ -491,15 +490,14 @@ const AdminDashboard = ({ user, onNavigate }) => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
           <StatCard
             icon={Users}
             title="Wszyscy klienci"
             value={stats.totalClients}
             subtitle="Aktywne firmy"
             color="text-blue-600"
-            trend={1}
-            percentage={8}
+            bgLight="bg-blue-50"
             onClick={() => onNavigate('admin-clients')}
           />
 
@@ -508,9 +506,8 @@ const AdminDashboard = ({ user, onNavigate }) => {
             title="Wszystkie bębny"
             value={stats.totalDrums}
             subtitle="W systemie"
-            color="text-green-600"
-            trend={1}
-            percentage={12}
+            color="text-emerald-600"
+            bgLight="bg-emerald-50"
             onClick={() => onNavigate('admin-drums')}
           />
 
@@ -519,9 +516,8 @@ const AdminDashboard = ({ user, onNavigate }) => {
             title="Przekroczenia"
             value={stats.overdueReturns}
             subtitle="Przeterminowane"
-            color="text-red-600"
-            trend={-1}
-            percentage={15}
+            color="text-rose-600"
+            bgLight="bg-rose-50"
             onClick={() => onNavigate('admin-drums', { filterDateRange: 'overdue' })}
           />
 
@@ -531,8 +527,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
             value={stats.activeRequests}
             subtitle="W trakcie"
             color="text-purple-600"
-            trend={1}
-            percentage={20}
+            bgLight="bg-purple-50"
             onClick={() => onNavigate('admin-returns', { filterStatus: 'Approved' })}
           />
 
@@ -542,8 +537,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
             value={stats.completedRequests}
             subtitle="Ten miesiąc"
             color="text-teal-600"
-            trend={1}
-            percentage={25}
+            bgLight="bg-teal-50"
             onClick={() => onNavigate('admin-returns', { filterStatus: 'Completed' })}
           />
         </div>
