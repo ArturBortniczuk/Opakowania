@@ -491,7 +491,7 @@ const AdminDashboard = ({ user, onNavigate }) => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
           <StatCard
             icon={Users}
             title="Wszyscy klienci"
@@ -512,17 +512,6 @@ const AdminDashboard = ({ user, onNavigate }) => {
             trend={1}
             percentage={12}
             onClick={() => onNavigate('admin-drums')}
-          />
-
-          <StatCard
-            icon={Clock}
-            title="Oczekujące zwroty"
-            value={stats.pendingReturns}
-            subtitle="Do zatwierdzenia"
-            color="text-yellow-600"
-            trend={-1}
-            percentage={5}
-            onClick={() => onNavigate('admin-returns', { filterStatus: 'Pending' })}
           />
 
           <StatCard
