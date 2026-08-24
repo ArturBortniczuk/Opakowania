@@ -1395,47 +1395,52 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const scheduleList = filteredAndSortedRequests.map(req => {
-      const cIso = parseToIsoDate(req.collection_date);
-      const startDate = cIso ? new Date(cIso) : null;
-      let deadlineDate = null;
-      let daysOverdue = -99999;
-      let isOverdue = false;
-      let sortWeight = -999999;
+    const scheduleList = filteredAndSortedRequests
+      .filter(req => {
+        if (filterStatus === 'Completed' || filterStatus === 'Rejected') return true;
+        return req.status !== 'Completed' && req.status !== 'Rejected';
+      })
+      .map(req => {
+        const cIso = parseToIsoDate(req.collection_date);
+        const startDate = cIso ? new Date(cIso) : null;
+        let deadlineDate = null;
+        let daysOverdue = -99999;
+        let isOverdue = false;
+        let sortWeight = -999999;
 
-      const isFinished = req.status === 'Completed' || req.status === 'Rejected';
+        const isFinished = req.status === 'Completed' || req.status === 'Rejected';
 
-      if (startDate && !isNaN(startDate.getTime())) {
-        startDate.setHours(0, 0, 0, 0);
-        // Preferowany okres odbioru = 14 dni od daty preferowanej klienta
-        deadlineDate = new Date(startDate.getTime() + 14 * 24 * 60 * 60 * 1000);
-        deadlineDate.setHours(0, 0, 0, 0);
-        
-        daysOverdue = Math.floor((today.getTime() - deadlineDate.getTime()) / (1000 * 60 * 60 * 24));
-        if (!isFinished) {
-          isOverdue = daysOverdue > 0;
-          sortWeight = daysOverdue; // Największa liczba dni po terminie ma największą wagę
+        if (startDate && !isNaN(startDate.getTime())) {
+          startDate.setHours(0, 0, 0, 0);
+          // Preferowany okres odbioru = 14 dni od daty preferowanej klienta
+          deadlineDate = new Date(startDate.getTime() + 14 * 24 * 60 * 60 * 1000);
+          deadlineDate.setHours(0, 0, 0, 0);
+          
+          daysOverdue = Math.floor((today.getTime() - deadlineDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (!isFinished) {
+            isOverdue = daysOverdue > 0;
+            sortWeight = daysOverdue; // Największa liczba dni po terminie ma największą wagę
+          } else {
+            sortWeight = -999999;
+          }
         } else {
-          sortWeight = -999999; // Zakończone na sam spód
+          sortWeight = isFinished ? -999999 : -50000;
         }
-      } else {
-        sortWeight = isFinished ? -999999 : -50000;
-      }
 
-      // Dane osoby zgłaszającej i telefon
-      const submitterName = req.profile_name || (req.email ? req.email.split('@')[0] : 'Klient');
-      let submitterPhone = req.profile_phone || '';
-      if (!submitterPhone && req.notes) {
-        const phoneMatch = req.notes.match(/(?:tel|telefon|kontakt)?:\s*([\d\s\+\-]{8,20})/i);
-        if (phoneMatch) submitterPhone = phoneMatch[1].trim();
-      }
+        // Dane osoby zgłaszającej i telefon
+        const submitterName = req.profile_name || (req.email ? req.email.split('@')[0] : 'Klient');
+        let submitterPhone = req.profile_phone || '';
+        if (!submitterPhone && req.notes) {
+          const phoneMatch = req.notes.match(/(?:tel|telefon|kontakt)?:\s*([\d\s\+\-]{8,20})/i);
+          if (phoneMatch) submitterPhone = phoneMatch[1].trim();
+        }
 
-      return {
-        ...req,
-        startDate,
-        deadlineDate,
-        daysOverdue,
-        isOverdue,
+        return {
+          ...req,
+          startDate,
+          deadlineDate,
+          daysOverdue,
+          isOverdue,
         isFinished,
         sortWeight,
         submitterName,
