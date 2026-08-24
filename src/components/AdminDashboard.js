@@ -55,15 +55,19 @@ const AdminDashboard = ({ user, onNavigate }) => {
       setError(null);
 
       try {
-        // Pobierz statystyki dla administratora
-        const dashboardStats = await statsAPI.getDashboardStats();
-        setStats(dashboardStats);
-
-        // Pobierz dane do aktywności i pilnych spraw
-        const [allDrums, allReturns] = await Promise.all([
+        // Pobierz dane do aktywności i pilnych spraw oraz zsynchronizuj statystyki
+        const [dashboardStats, allDrums, allReturns] = await Promise.all([
+          statsAPI.getDashboardStats(),
           drumsAPI.getAllDrums(),
           returnsAPI.getReturns()
         ]);
+
+        const dynamicOverdue = allDrums.filter(d => d.status === 'overdue').length;
+
+        setStats({
+          ...dashboardStats,
+          overdueReturns: dynamicOverdue > 0 ? dynamicOverdue : dashboardStats.overdueReturns
+        });
 
         generateRecentActivity(allDrums, allReturns);
         findUrgentItems(allDrums, allReturns);

@@ -2569,12 +2569,14 @@ export const statsAPI = {
       const [
         { count: totalClients },
         { count: totalDrums },
+        { count: issuedDrums },
         { count: pendingReturns },
         { count: overdueReturns },
         { count: activeRequests },
         { count: completedRequests }
       ] = await Promise.all([
         applyNipFilter(supabase.from('companies').select('*', { count: 'exact', head: true })),
+        applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null')),
         applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null').neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%')),
         applyNipFilter(supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Pending'), 'user_nip'),
         applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null').lt('data_zwrotu_do_dostawcy', now)),
@@ -2582,11 +2584,15 @@ export const statsAPI = {
         applyNipFilter(supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Completed').gte('updated_at', thirtyDaysAgo), 'user_nip')
       ]);
 
-      console.log(`✅ Statystyki admina: ${totalDrums} bębnów, ${totalClients} klientów, ${pendingReturns} zwrotów`);
+      const warehouseDrums = (totalDrums || 0) - (issuedDrums || 0);
+
+      console.log(`✅ Statystyki admina: ${totalDrums} bębnów ogółem (${issuedDrums} u klientów, ${warehouseDrums} na magazynie), ${totalClients} klientów, ${pendingReturns} zwrotów`);
 
       return {
         totalClients: totalClients || 0,
         totalDrums: totalDrums || 0,
+        issuedDrums: issuedDrums || 0,
+        warehouseDrums: warehouseDrums >= 0 ? warehouseDrums : 0,
         pendingReturns: pendingReturns || 0,
         overdueReturns: overdueReturns || 0,
         activeRequests: activeRequests || 0,
