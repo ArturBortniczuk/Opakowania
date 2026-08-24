@@ -22,7 +22,9 @@ import {
   Trash2,
   GitMerge,
   CheckSquare,
-  Square
+  Square,
+  ArrowUpRight,
+  LayoutGrid
 } from 'lucide-react';
 
 const formatPalletName = (size) => {
@@ -553,6 +555,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'schedule'
   const [showRequestDetails, setShowRequestDetails] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [showTransportModal, setShowTransportModal] = useState(false);
@@ -1386,6 +1389,188 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     );
   };
 
+  const renderScheduleView = () => {
+    const scheduleList = [...filteredAndSortedRequests].sort((a, b) => {
+      const dateAStr = parseToIsoDate(a.collection_date);
+      const dateBStr = parseToIsoDate(b.collection_date);
+      const timeA = dateAStr ? new Date(dateAStr).getTime() : 8640000000000000;
+      const timeB = dateBStr ? new Date(dateBStr).getTime() : 8640000000000000;
+      return timeA - timeB;
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return (
+      <div className="space-y-4 pb-12">
+        {/* Nagłówek i podsumowanie modułu */}
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-blue-100 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center space-x-3">
+            <div className="p-3 bg-blue-100/80 text-blue-700 rounded-xl shadow-xs">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-gray-900">Harmonogram odbiorów według terminu</h3>
+              <p className="text-xs text-gray-500">Posegregowane chronologicznie od najstarszych terminów zwrotu podanych przez klientów</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 text-xs font-bold">
+            <span className="px-3.5 py-2 bg-slate-100 text-slate-700 rounded-xl border border-slate-200">
+              Łącznie: {scheduleList.length} zgłoszeń
+            </span>
+            <span className="px-3.5 py-2 bg-red-50 text-red-700 rounded-xl border border-red-200 flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4 text-red-600" />
+              Po terminie: {
+                scheduleList.filter(r => {
+                  const cIso = parseToIsoDate(r.collection_date);
+                  if (!cIso) return false;
+                  const cDate = new Date(cIso);
+                  cDate.setHours(0,0,0,0);
+                  return Math.floor((today - cDate) / (1000 * 60 * 60 * 24)) > 0 && r.status !== 'Completed' && r.status !== 'Rejected';
+                }).length
+              }
+            </span>
+          </div>
+        </div>
+
+        {scheduleList.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-2xl border border-gray-100">
+            <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <h3 className="text-base font-bold text-gray-800">Brak zgłoszeń w wybranym harmonogramie</h3>
+            <p className="text-xs text-gray-500">Zmień filtry lub wyszukiwanie, aby wyświetlić pozycje.</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-lg border border-slate-200/80 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-100/80 border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
+                    <th className="py-3.5 px-4">Numer Zgłoszenia</th>
+                    <th className="py-3.5 px-4">Termin zwrotu (Klient)</th>
+                    <th className="py-3.5 px-4">Status Odbioru (Dni)</th>
+                    <th className="py-3.5 px-4">Firma & Miasto</th>
+                    <th className="py-3.5 px-4">Osoba Odpowiedzialna</th>
+                    <th className="py-3.5 px-4">Status Zgłoszenia</th>
+                    <th className="py-3.5 px-4 text-right">Akcja</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
+                  {scheduleList.map(req => {
+                    const reqNum = returnsAPI.getRequestDisplayId(req, requests);
+                    const collIso = parseToIsoDate(req.collection_date);
+                    const cDate = collIso ? new Date(collIso) : null;
+                    let daysDiff = 0;
+                    let isOverdue = false;
+
+                    if (cDate && !isNaN(cDate.getTime())) {
+                      cDate.setHours(0,0,0,0);
+                      daysDiff = Math.floor((today - cDate) / (1000 * 60 * 60 * 24));
+                      isOverdue = daysDiff > 0 && req.status !== 'Completed' && req.status !== 'Rejected';
+                    }
+
+                    const drumsCount = Array.isArray(req.selected_drums) 
+                      ? req.selected_drums.filter(d => typeof d !== 'object' || d.type !== 'pallet').length 
+                      : 0;
+                    const palletsCount = Array.isArray(req.selected_drums)
+                      ? req.selected_drums.filter(d => typeof d === 'object' && d.type === 'pallet').length
+                      : 0;
+
+                    const salesperson = req.salesperson_name || req.companies?.salesperson_name || 'Brak przypisania';
+
+                    return (
+                      <tr 
+                        key={req.id} 
+                        className={`hover:bg-blue-50/50 transition-colors ${isOverdue ? 'bg-red-50/50' : ''}`}
+                      >
+                        {/* Numer Zgłoszenia */}
+                        <td className="py-3.5 px-4 font-mono font-bold text-blue-700 whitespace-nowrap">
+                          <span className="bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-lg text-xs">
+                            {reqNum}
+                          </span>
+                        </td>
+
+                        {/* Data podana przez klienta */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-1.5 font-bold text-slate-900">
+                            <Calendar className="w-4 h-4 text-blue-500 shrink-0" />
+                            <span>{cDate ? cDate.toLocaleDateString('pl-PL') : 'Brak daty'}</span>
+                          </div>
+                        </td>
+
+                        {/* Status / Dni po terminie (Czerwony wyróżnik po terminie) */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          {isOverdue ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-extrabold bg-red-100 text-red-700 border border-red-300 shadow-xs animate-pulse">
+                              <AlertTriangle className="w-4 h-4 text-red-600" />
+                              <span>Po terminie o {daysDiff} {daysDiff === 1 ? 'dzień' : 'dni'}</span>
+                            </span>
+                          ) : daysDiff === 0 ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                              <Clock className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Termin: Dzisiaj</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                              <Clock className="w-3.5 h-3.5 text-slate-400" />
+                              <span>Za {Math.abs(daysDiff)} dni</span>
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Firma & Miasto */}
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-slate-900 truncate max-w-[200px]" title={req.company_name}>
+                            {req.company_name}
+                          </div>
+                          <div className="text-[11px] text-slate-500 truncate">
+                            {req.city} {req.user_nip ? `(NIP: ${req.user_nip})` : ''}
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-0.5">
+                            {drumsCount > 0 && `${drumsCount} bębnów `}
+                            {palletsCount > 0 && `${palletsCount} palet`}
+                          </div>
+                        </td>
+
+                        {/* Osoba Odpowiedzialna */}
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold text-slate-800">
+                            {salesperson}
+                          </div>
+                          {req.profile_name && (
+                            <div className="text-[11px] text-slate-500">
+                              Zgłosił: {req.profile_name}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Status zgłoszenia */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          {getStatusBadge(req.status)}
+                        </td>
+
+                        {/* Guzik przejścia do zgłoszenia */}
+                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                          <button
+                            onClick={() => handleViewRequest(req)}
+                            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow-md transition-all duration-200 inline-flex items-center gap-1.5"
+                          >
+                            <span>Przejdź do zgłoszenia</span>
+                            <ArrowUpRight className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderRequestDetailsModal = () => {
     if (!showRequestDetails || !selectedRequest) return null;
 
@@ -2106,7 +2291,34 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
               </div>
             </div>
 
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner mr-2">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('cards')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                    viewMode === 'cards'
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Layers className="w-4 h-4" />
+                  <span>Karty</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('schedule')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                    viewMode === 'schedule'
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Calendar className="w-4 h-4 text-blue-600" />
+                  <span>Harmonogram odbiorów</span>
+                </button>
+              </div>
+
               {canChangeStatus && (
                 <button
                   onClick={() => {
@@ -2257,7 +2469,9 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
           </div>
         </div>
 
-        {filteredAndSortedRequests.length > 0 ? (
+        {viewMode === 'schedule' ? (
+          renderScheduleView()
+        ) : filteredAndSortedRequests.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
             {filteredAndSortedRequests.map((request) => (
               <React.Fragment key={request.id}>

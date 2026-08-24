@@ -2194,7 +2194,7 @@ export const returnsAPI = {
    */
   async getReturns(nip = null) {
     try {
-      let query = supabase.from('return_requests').select(`*, companies:user_nip (name)`);
+      let query = supabase.from('return_requests').select(`*, companies:user_nip (name, salesperson_name)`);
       if (nip) {
         query = query.eq('user_nip', nip);
       } else {
@@ -2212,7 +2212,11 @@ export const returnsAPI = {
 
       if (error) throw error;
       return data.map(req => {
-        let fixedReq = { ...req, company_name: req.companies?.name || req.company_name };
+        let fixedReq = {
+          ...req,
+          company_name: req.companies?.name || req.company_name,
+          salesperson_name: req.companies?.salesperson_name || req.salesperson_name || 'Brak przypisania'
+        };
 
         // Auto-naprawa w pamięci dla zgłoszenia ZO/0018/08/26 uszkodzonego przez dawny błąd scalania
         if (fixedReq.company_name?.includes('503-09-27/2019') || (!fixedReq.user_nip && fixedReq.notes?.includes('ZO/0002/08/26')) || (fixedReq.request_number?.includes('0018') && fixedReq.loading_hours === 'Brak')) {
