@@ -91,17 +91,18 @@ CREATE POLICY "Klient odczytuje i tworzy swoje notatki bębnów" ON public.clien
 -- E) drum_exceptions (wcześniej FOR ALL USING (true))
 DROP POLICY IF EXISTS "Zarządzanie wyjątkami dla wszystkich" ON public.drum_exceptions;
 DROP POLICY IF EXISTS "Klient odczytuje wyjątki swoich bębnów" ON public.drum_exceptions;
+DROP POLICY IF EXISTS "Klient zarządza wyjątkami swoich bębnów" ON public.drum_exceptions;
 DROP POLICY IF EXISTS "Admini zarządzają wyjątkami" ON public.drum_exceptions;
 
-CREATE POLICY "Klient odczytuje wyjątki swoich bębnów" ON public.drum_exceptions
-  FOR SELECT USING (
+CREATE POLICY "Klient zarządza wyjątkami swoich bębnów" ON public.drum_exceptions
+  FOR ALL
+  USING (
     nip = (SELECT nip FROM public.profiles WHERE id = auth.uid() AND status = 'approved')
     OR public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista')
-  );
-
-CREATE POLICY "Admini zarządzają wyjątkami" ON public.drum_exceptions
-  FOR ALL USING (
-    public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista')
+  )
+  WITH CHECK (
+    nip = (SELECT nip FROM public.profiles WHERE id = auth.uid() AND status = 'approved')
+    OR public.get_my_role() IN ('admin', 'supervisor', 'Dyrektor', 'Kierownik', 'Wsparcie', 'Magazyn', 'Specjalista')
   );
 
 -- F) custom_return_periods (wcześniej FOR ALL USING (true))

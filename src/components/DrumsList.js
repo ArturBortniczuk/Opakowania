@@ -56,7 +56,7 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
     >
       <div 
         className="w-full transition-transform duration-500 ease-in-out"
-        style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)', minHeight: '520px' }}
+        style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)', minHeight: '580px' }}
       >
         {/* FRONT */}
         <div 
