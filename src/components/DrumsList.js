@@ -219,8 +219,15 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
               </span>
             </div>
 
+            <div className="flex justify-between items-center mt-1 pt-1 border-t border-gray-50">
+              <span className="text-sm text-gray-500">Status</span>
+              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.bgColor ? drum.bgColor + ' ' : ''}${drum.color || 'bg-gray-100 text-gray-600'}`}>
+                {drum.text || drum.status || 'Aktywny'}
+              </div>
+            </div>
+
             {isUnpaidOverdue && (
-              <div className="flex justify-between items-center bg-red-50 p-2.5 rounded-xl border border-red-200 mt-1">
+              <div className="flex justify-between items-center bg-red-50 p-2.5 rounded-xl border border-red-200 mt-2">
                 <span className="text-xs font-bold text-red-600 flex items-center gap-1.5">
                   <AlertCircle className="w-4 h-4" />
                   Niezapłacona faktura
@@ -228,13 +235,6 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
                 <span className="text-xs font-bold text-red-700">Po terminie płatności</span>
               </div>
             )}
-
-            <div className="flex justify-between items-center mt-1 pt-1 border-t border-gray-50">
-              <span className="text-sm text-gray-500">Status</span>
-              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${drum.bgColor ? drum.bgColor + ' ' : ''}${drum.color || 'bg-gray-100 text-gray-600'}`}>
-                {drum.text || drum.status || 'Aktywny'}
-              </div>
-            </div>
             
           </div>
           
