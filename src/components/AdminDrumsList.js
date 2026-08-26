@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, drumsAPI, companiesAPI, returnsAPI, getCurrentUserFromCache, parseToIsoDate, canUserSeeSalespersonFilter, getAvailableSalespeopleForUser } from '../utils/supabaseApi';
+import { formatCableLength } from '../utils/priceHelpers';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { pl } from 'date-fns/locale/pl';
@@ -841,7 +842,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500">Ilość kabla</span>
                 <span className="text-sm font-medium text-gray-900">
-                  {drum.ilosc_kabla ? `${drum.ilosc_kabla} m` : 'Brak informacji'}
+                  {formatCableLength(drum.ilosc_kabla)}
                 </span>
               </div>
             </div>
@@ -943,7 +944,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
         'Termin płatności': drum.termin_platnosci,
         'Cena netto': drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA,
         'Kabel na bębnie': drum.nawiniety_kabel,
-        'Ilość kabla [m]': drum.ilosc_kabla,
+        'Ilość kabla [km]': formatCableLength(drum.ilosc_kabla),
         'Adres dostawy': drum.adres_dostawy || drum.nazwa_punktu_dostawy,
         'Dokument PZ': drum.nr_dokumentupz,
         'Numer faktury': drum.numer_faktury,
@@ -1485,7 +1486,7 @@ const AdminDrumsList = ({ user, initialFilter = {} }) => {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium text-gray-500">Ilość kabla</span>
-                          <span className="text-sm font-medium text-gray-900">{selectedDrum.ilosc_kabla ? `${selectedDrum.ilosc_kabla} m` : 'Brak informacji'}</span>
+                          <span className="text-sm font-medium text-gray-900">{formatCableLength(selectedDrum.ilosc_kabla)}</span>
                         </div>
                       </div>
                     </div>

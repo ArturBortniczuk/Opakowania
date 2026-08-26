@@ -21,3 +21,25 @@ export const getClientPrice = (drum) => {
   const netPrice = parsePriceRaw(drum.cena_netto_bebna || drum.CENA_NETTO_BEBNA || drum.cena_netto);
   return netPrice > 0 ? netPrice * 1.2 : 0;
 };
+
+/**
+ * Formatuje ilość/długość kabla do wyświetlania w kilometrach z 3 miejscami po przecinku (np. "0,300 km" lub "1,950 km").
+ * @param {string|number|null} val
+ * @returns {string} Sformatowany ciąg znaków np. "0,300 km" lub "Brak informacji"
+ */
+export const formatCableLength = (val) => {
+  if (val === null || val === undefined || val === '') return 'Brak informacji';
+  
+  let num = 0;
+  if (typeof val === 'number') {
+    num = val;
+  } else {
+    const cleaned = String(val).replace(/\s/g, '').replace(',', '.');
+    num = parseFloat(cleaned);
+  }
+  
+  if (isNaN(num) || num <= 0) return 'Brak informacji';
+
+  const formattedNum = num.toFixed(3).replace('.', ',');
+  return `${formattedNum} km`;
+};

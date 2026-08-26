@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { drumsAPI, returnsAPI, getCurrentUserFromCache, canUserSeeSalespersonFilter, getAvailableSalespeopleForUser } from '../utils/supabaseApi';
-import { getClientPrice } from '../utils/priceHelpers';
+import { getClientPrice, formatCableLength } from '../utils/priceHelpers';
 import {
   Package, Calendar, Search, Filter, AlertCircle, CheckCircle, Clock,
   ArrowUpDown, Truck, RefreshCw, ChevronLeft, ChevronRight, ChevronDown,
@@ -201,7 +201,7 @@ const DrumCard = ({ drum, index, userNip, onNoteSaved }) => {
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-500">Ilość kabla</span>
               <span className="text-sm font-medium text-gray-900">
-                {drum.ilosc_kabla ? `${drum.ilosc_kabla} m` : 'Brak informacji'}
+                {formatCableLength(drum.ilosc_kabla)}
               </span>
             </div>
 
