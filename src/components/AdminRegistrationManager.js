@@ -190,8 +190,30 @@ const AdminRegistrationManager = () => {
     setSuccessMsg('');
 
     try {
-      await authAPI.approveRegistration(userId, assignedNip, companyName);
-      setSuccessMsg(`Konto użytkownika zostało aktywowane i przypisane do firmy: ${companyName} (NIP: ${assignedNip})!`);
+      const updatedProfile = await authAPI.approveRegistration(userId, assignedNip, companyName);
+
+      // Wysłanie powiadomienia e-mail o aktywacji konta do klienta
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        await fetch('/api/notifyApproval', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token || ''}`
+          },
+          body: JSON.stringify({
+            email: targetUser?.email || updatedProfile?.email,
+            name: targetUser?.name || updatedProfile?.name,
+            companyName: companyName,
+            nip: assignedNip,
+            origin: window.location.origin
+          })
+        });
+      } catch (notifyErr) {
+        console.error('Nie udało się wysłać powiadomienia e-mail o aktywacji konta:', notifyErr);
+      }
+
+      setSuccessMsg(`Konto użytkownika zostało aktywowane i przypisane do firmy: ${companyName} (NIP: ${assignedNip})! Wysłano powiadomienie e-mail.`);
       // Usuń z lokalnego widoku
       setPendingUsers(prev => prev.filter(u => u.id !== userId));
     } catch (err) {

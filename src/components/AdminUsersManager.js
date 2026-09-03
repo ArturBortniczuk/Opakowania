@@ -95,6 +95,9 @@ const AdminUsersManager = ({ user: currentUser }) => {
     setIsSubmitting(true);
     
     try {
+      const originalUser = users.find(u => u.id === editForm.id);
+      const isNewlyApproved = originalUser && originalUser.status !== 'approved' && editForm.status === 'approved';
+
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -109,7 +112,30 @@ const AdminUsersManager = ({ user: currentUser }) => {
 
       if (error) throw error;
       
-      alert('Zapisano zmiany!');
+      // Jeśli status konta został zmieniony na zatwierdzony (approved), wysyłamy powiadomienie e-mail do klienta
+      if (isNewlyApproved) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          await fetch('/api/notifyApproval', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token || ''}`
+            },
+            body: JSON.stringify({
+              email: editForm.email,
+              name: editForm.name,
+              companyName: editForm.companyName,
+              nip: editForm.nip,
+              origin: window.location.origin
+            })
+          });
+        } catch (mailErr) {
+          console.error('Błąd podczas wysyłania powiadomienia o aktywacji:', mailErr);
+        }
+      }
+
+      alert('Zapisano zmiany!' + (isNewlyApproved ? ' Wysłano do klienta powiadomienie e-mail o aktywacji konta.' : ''));
       setShowEditModal(false);
       fetchUsers();
     } catch (err) {
