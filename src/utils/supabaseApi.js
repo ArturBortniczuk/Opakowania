@@ -2329,6 +2329,29 @@ export const returnsAPI = {
         status_updated_at: nowIso
       };
 
+      // 1. Próba utworzenia przez dedykowany endpoint API (gwarantujący unikalną numerację globalną)
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch('/api/createReturnRequest', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {})
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const resData = await res.json();
+          if (resData && resData.data) {
+            return resData.data;
+          }
+        }
+      } catch (apiErr) {
+        console.warn('Endpoint /api/createReturnRequest niedostępny (fallback do bezpośredniego insertu):', apiErr.message);
+      }
+
+      // 2. Fallback: Bezpośredni insert do Supabase
       let { data, error } = await supabase
         .from('return_requests')
         .insert([payload])
