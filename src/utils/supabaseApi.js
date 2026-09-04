@@ -2342,9 +2342,12 @@ export const returnsAPI = {
         });
 
         if (res.ok) {
-          const resData = await res.json();
-          if (resData && resData.data) {
-            return resData.data;
+          const contentType = res.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const resData = await res.json();
+            if (resData && resData.data) {
+              return resData.data;
+            }
           }
         }
       } catch (apiErr) {
