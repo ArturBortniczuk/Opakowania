@@ -41,23 +41,28 @@ export default async function handler(req, res) {
 
     // 2. Generowanie unikalnego numeru zgłoszenia w formacie ZO/XXXX/MM/RR
     const reqDate = payload.created_at ? new Date(payload.created_at) : new Date();
-    const yr = String(reqDate.getFullYear()).slice(2);
-    const mo = String(reqDate.getMonth() + 1).padStart(2, '0');
-    const ymPrefix = `${reqDate.getFullYear()}-${mo}`;
+    const year = reqDate.getFullYear();
+    const month = reqDate.getMonth(); // 0-11
+    const yr = String(year).slice(2);
+    const mo = String(month + 1).padStart(2, '0');
+
+    // Bezpieczne granice początku i końca danego miesiąca (dla dowolnej liczby dni: 28, 29, 30, 31)
+    const startOfMonth = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0)).toISOString();
+    const startOfNextMonth = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0, 0)).toISOString();
 
     // Pobierz wszystkie zgłoszenia z tego miesiąca bez ograniczeń RLS
     const { data: monthRequests, error: countErr } = await supabaseAdmin
       .from('return_requests')
       .select('request_number')
-      .gte('created_at', `${ymPrefix}-01T00:00:00.000Z`)
-      .lte('created_at', `${ymPrefix}-31T23:59:59.999Z`);
+      .gte('created_at', startOfMonth)
+      .lt('created_at', startOfNextMonth);
 
     let maxSeq = 0;
     if (monthRequests && monthRequests.length > 0) {
       monthRequests.forEach(r => {
         if (r.request_number && typeof r.request_number === 'string') {
           const parts = r.request_number.split('/');
-          if (parts.length === 4 && parts[0] === 'ZO') {
+          if (parts.length === 4 && parts[0] === 'ZO' && parts[2] === mo && parts[3] === yr) {
             const num = parseInt(parts[1], 10);
             if (!isNaN(num) && num > maxSeq) {
               maxSeq = num;

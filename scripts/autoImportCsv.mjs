@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
+import { TEST_DRUMS } from './testDrumsData.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,10 +24,9 @@ function loadEnvVariables() {
           let value = match[2] || '';
           if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
           else if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);
-          if (!process.env[key]) process.env[key] = value;
+          if (value) process.env[key] = value;
         }
       });
-      break;
     }
   }
 }
@@ -162,8 +162,18 @@ async function runLocalSync() {
       console.log(`✅ Zrobione!`);
     }
 
+    if (TEST_DRUMS && TEST_DRUMS.length > 0) {
+      console.log(`\n[5.1/5] 🧪 Dodawanie ${TEST_DRUMS.length} bębnów testowych dla konta "Firma Testowa Sp. z o.o." (NIP: 0000000000)...`);
+      const { error: testInsertErr } = await supabase.from('drums').insert(TEST_DRUMS);
+      if (testInsertErr) {
+        console.warn(`⚠️ Ostrzeżenie przy dodawaniu bębnów testowych: ${testInsertErr.message}`);
+      } else {
+        console.log(`✅ Pomyślnie dodano bębny testowe do bazy!`);
+      }
+    }
+
     console.log(`\n🎉 SUKCES! Bezpiecznie przetworzono na lokalnym komputerze i wstawiono do chmury!`);
-    console.log(`Zaimportowano łącznie: ${totalInserted} bębnów.`);
+    console.log(`Zaimportowano łącznie: ${totalInserted} bębnów ERP + ${TEST_DRUMS?.length || 0} bębnów testowych.`);
 
   } catch (error) {
     console.error('❌ WYSTĄPIŁ BŁĄD:', error.message);

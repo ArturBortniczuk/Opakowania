@@ -2351,10 +2351,22 @@ export const returnsAPI = {
           }
         }
       } catch (apiErr) {
-        console.warn('Endpoint /api/createReturnRequest niedostępny (fallback do bezpośredniego insertu):', apiErr.message);
+        // Fallback do bezpośredniej operacji w Supabase
       }
 
-      // 2. Fallback: Bezpośredni insert do Supabase
+      // 2. Próba pobrania kolejnego unikalnego numeru przez funkcję RPC SECURITY DEFINER (jeśli nie został podany)
+      if (!payload.request_number) {
+        try {
+          const { data: nextNum } = await supabase.rpc('get_next_return_request_number');
+          if (nextNum && typeof nextNum === 'string' && nextNum.startsWith('ZO/')) {
+            payload.request_number = nextNum;
+          }
+        } catch (rpcErr) {
+          // Jeśli funkcja RPC nie istnieje w DB, wyzwalacz DB BEFORE INSERT wygeneruje numer
+        }
+      }
+
+      // 3. Bezpośredni insert do Supabase
       let { data, error } = await supabase
         .from('return_requests')
         .insert([payload])
