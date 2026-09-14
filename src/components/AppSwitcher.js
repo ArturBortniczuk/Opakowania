@@ -11,7 +11,7 @@ const APPS = [
   {
     id: 'opakowania',
     name: 'Strona opakowaniowa',
-    url: 'https://opakowania.grupaeltron.pl',
+    url: 'https://www.opakowania.grupaeltron.pl',
     icon: Package,
     color: 'from-blue-600 to-indigo-600',
     iconBg: 'bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400',
@@ -20,7 +20,7 @@ const APPS = [
   {
     id: 'rury',
     name: 'Strona Rurowa',
-    url: 'https://rury.grupaeltron.pl',
+    url: 'https://www.rury.grupaeltron.pl',
     icon: Layers,
     color: 'from-cyan-500 to-blue-600',
     iconBg: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950 dark:text-cyan-400',
@@ -29,7 +29,7 @@ const APPS = [
   {
     id: 'portal',
     name: 'Pulpit narzędzi',
-    url: 'https://narzedzia.grupaeltron.pl',
+    url: 'https://www.narzedzia.grupaeltron.pl',
     icon: Boxes,
     color: 'from-emerald-500 to-teal-600',
     iconBg: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400',

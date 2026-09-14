@@ -36,7 +36,7 @@ VALUES
         'System Zwrotu Opakowań i Bębnów', 
         'Zarządzanie bębnami kablowymi, rozliczeniami kaucji, wyjątkami i zgłoszeniami odbioru.', 
         'PackageCheck', 
-        'https://opakowania.grupaeltron.pl', 
+        'https://www.opakowania.grupaeltron.pl', 
         'blue', 
         true, 
         1
@@ -46,7 +46,7 @@ VALUES
         'System Zarządzania Rurami & RFQ', 
         'Katalog rur osłonowych, zwojów RHDPE, konfigurator paletyzacji, awizacje dostaw i zapytania ofertowe.', 
         'Layers', 
-        'https://rury.grupaeltron.pl', 
+        'https://www.rury.grupaeltron.pl', 
         'cyan', 
         true, 
         2
