@@ -9,6 +9,7 @@ import {
 import { statsAPI } from '../utils/supabaseApi';
 import { chatAPI } from '../utils/chatApi';
 import AdminChatModal from './AdminChatModal';
+import AppSwitcher from './AppSwitcher';
 
 const AdminNavbar = ({
   user,
@@ -199,6 +200,9 @@ const AdminNavbar = ({
             </div>
           </div>
           <div className="flex items-center space-x-4">
+            {/* Przełącznik aplikacji Ekosystemu Eltron (Tylko Pracownicy) */}
+            <AppSwitcher />
+
             {/* Przycisk Czatu w nagłówku WYŁĄCZNIE dla Admina i Magazynu */}
             {canAccessChat && (
               <button
