@@ -30,7 +30,7 @@ const APPS = [
   {
     id: 'transport',
     name: 'Strona transportowa',
-    url: 'https://transport.grupaeltron.pl',
+    url: 'https://transport.grupaeltron.pl/kalendarz',
     icon: Truck,
     color: 'from-emerald-500 to-teal-600',
     iconBg: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400',
