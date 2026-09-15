@@ -3,6 +3,7 @@ import {
   Package, 
   Layers, 
   Boxes,
+  Truck,
   LayoutGrid,
   ExternalLink
 } from 'lucide-react';
@@ -27,12 +28,21 @@ const APPS = [
     isCurrent: false
   },
   {
+    id: 'transport',
+    name: 'Strona transportowa',
+    url: 'https://www.transport.grupaeltron.pl',
+    icon: Truck,
+    color: 'from-emerald-500 to-teal-600',
+    iconBg: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400',
+    isCurrent: false
+  },
+  {
     id: 'portal',
     name: 'Pulpit narzędzi',
     url: 'https://www.narzedzia.grupaeltron.pl',
     icon: Boxes,
-    color: 'from-emerald-500 to-teal-600',
-    iconBg: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400',
+    color: 'from-amber-500 to-orange-600',
+    iconBg: 'bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400',
     isCurrent: false
   }
 ];
