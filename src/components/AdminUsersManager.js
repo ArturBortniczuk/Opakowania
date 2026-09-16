@@ -111,6 +111,21 @@ const AdminUsersManager = ({ user: currentUser }) => {
         .eq('id', editForm.id);
 
       if (error) throw error;
+
+      // Synchronizacja uprawnienia do Opakowań w tabeli user_app_permissions
+      try {
+        await supabase
+          .from('user_app_permissions')
+          .upsert({
+            user_id: editForm.id,
+            app_id: 'opakowania',
+            role: editForm.role,
+            is_active: editForm.status === 'approved',
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id,app_id' });
+      } catch (permErr) {
+        console.warn('Nie udało się zaktualizować user_app_permissions:', permErr);
+      }
       
       // Jeśli status konta został zmieniony na zatwierdzony (approved), wysyłamy powiadomienie e-mail do klienta
       if (isNewlyApproved) {

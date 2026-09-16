@@ -6,7 +6,7 @@ import {
   UserCheck, ChevronRight, Shield, Settings, Crown, Pin, PinOff, Map, MapPin, HelpCircle, Calculator,
   MessageSquare
 } from 'lucide-react';
-import { statsAPI } from '../utils/supabaseApi';
+import { statsAPI, normalizeRole } from '../utils/supabaseApi';
 import { chatAPI } from '../utils/chatApi';
 import AdminChatModal from './AdminChatModal';
 import AppSwitcher from './AppSwitcher';
@@ -33,8 +33,8 @@ const AdminNavbar = ({
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   // Sprawdzanie uprawnień do czatu: TYLKO Admin, Koordynator (Supervisor) oraz Magazyn!
-  const userRoleLower = user?.role?.toLowerCase() || '';
-  const canAccessChat = ['admin', 'supervisor', 'magazyn'].includes(userRoleLower);
+  const canonicalRole = normalizeRole(user?.role);
+  const canAccessChat = ['admin', 'supervisor', 'magazyn'].includes(canonicalRole);
 
   // Pobieranie sumy nieprzeczytanych wiadomości dla uprawnionych ról
   const fetchUnreadChatCount = async () => {
@@ -107,8 +107,8 @@ const AdminNavbar = ({
     { path: '/help', label: 'Instrukcja obsługi', icon: HelpCircle, description: 'Podręcznik użytkownika' }
   ];
 
-  const isSalesperson = ['Dyrektor', 'Kierownik', 'Specjalista', 'Wsparcie'].includes(user.role) || ['dyrektor', 'kierownik', 'specjalista', 'wsparcie'].includes(user.role?.toLowerCase());
-  const isMagazyn = ['magazyn'].includes(user.role?.toLowerCase());
+  const isSalesperson = ['dyrektor', 'kierownik', 'specjalista', 'wsparcie'].includes(canonicalRole);
+  const isMagazyn = canonicalRole === 'magazyn';
 
   const filteredMenuItems = menuItems
     .filter(item => {
@@ -135,16 +135,17 @@ const AdminNavbar = ({
     });
 
   const getRoleBadge = (role) => {
+    const cRole = normalizeRole(role);
     const roleConfig = {
       admin: { label: 'Administrator', icon: Crown, gradient: 'from-purple-600 to-purple-800' },
       supervisor: { label: 'Koordynator', icon: Shield, gradient: 'from-blue-600 to-blue-800' },
-      Dyrektor: { label: 'Dyrektor', icon: Crown, gradient: 'from-red-600 to-red-800' },
-      Kierownik: { label: 'Kierownik Rynku', icon: Shield, gradient: 'from-blue-500 to-indigo-700' },
-      Wsparcie: { label: 'Wsparcie', icon: Shield, gradient: 'from-blue-500 to-indigo-700' },
-      Magazyn: { label: 'Magazyn', icon: Package, gradient: 'from-emerald-500 to-teal-700' },
-      Specjalista: { label: 'Specjalista', icon: UserCheck, gradient: 'from-indigo-500 to-purple-700' }
+      dyrektor: { label: 'Dyrektor', icon: Crown, gradient: 'from-red-600 to-red-800' },
+      kierownik: { label: 'Kierownik Rynku', icon: Shield, gradient: 'from-blue-500 to-indigo-700' },
+      wsparcie: { label: 'Wsparcie Sprzedaży', icon: Shield, gradient: 'from-blue-500 to-indigo-700' },
+      magazyn: { label: 'Magazyn', icon: Package, gradient: 'from-emerald-500 to-teal-700' },
+      specjalista: { label: 'Specjalista', icon: UserCheck, gradient: 'from-indigo-500 to-purple-700' }
     };
-    const config = roleConfig[role] || { label: role, icon: UserCheck, gradient: 'from-slate-600 to-slate-800' };
+    const config = roleConfig[cRole] || { label: role || 'Użytkownik', icon: UserCheck, gradient: 'from-slate-600 to-slate-800' };
     const Icon = config.icon;
     return (
       <div className={`inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-gradient-to-r ${config.gradient} text-white text-xs font-semibold shadow-lg`}>

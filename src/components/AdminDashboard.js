@@ -1,6 +1,6 @@
 // src/components/AdminDashboard.js - Zaktualizowany o prawdziwe dane
 import React, { useState, useEffect } from 'react';
-import { statsAPI, drumsAPI, returnsAPI } from '../utils/supabaseApi';
+import { statsAPI, drumsAPI, returnsAPI, normalizeRole } from '../utils/supabaseApi';
 import { parsePriceRaw, getClientPrice } from '../utils/priceHelpers';
 import InviteClientModal from './InviteClientModal';
 import {
@@ -24,8 +24,9 @@ import {
 } from 'lucide-react';
 
 const AdminDashboard = ({ user, onNavigate }) => {
-  const isSalesperson = user && ['dyrektor', 'kierownik', 'specjalista', 'wsparcie'].includes(user.role?.toLowerCase());
-  const isMagazyn = user && ['magazyn'].includes(user.role?.toLowerCase());
+  const canonicalRole = normalizeRole(user?.role);
+  const isSalesperson = ['dyrektor', 'kierownik', 'specjalista', 'wsparcie'].includes(canonicalRole);
+  const isMagazyn = canonicalRole === 'magazyn';
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   const [stats, setStats] = useState({

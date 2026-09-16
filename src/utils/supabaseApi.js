@@ -22,51 +22,94 @@ export function getCurrentUserFromCache() {
   return _currentUserCache;
 }
 
+/**
+ * Normalizuje rolę użytkownika do kanonicznych wartości:
+ * 'admin', 'supervisor', 'dyrektor', 'kierownik', 'wsparcie', 'magazyn', 'specjalista', 'client'
+ */
+export function normalizeRole(role) {
+  if (!role) return '';
+  const r = String(role).toLowerCase().trim();
+  if (r === 'admin' || r === 'administrator' || r.includes('admin')) return 'admin';
+  if (r === 'supervisor') return 'supervisor';
+  if (r.includes('dyrektor')) return 'dyrektor';
+  if (r.includes('kierownik')) return 'kierownik';
+  if (r.includes('specjalist') || r.includes('handlow')) return 'specjalista';
+  if (r.includes('wsparcie') || r.includes('ksiegow')) return 'wsparcie';
+  if (r.includes('magazyn') || r.includes('dyspozytor')) return 'magazyn';
+  if (r.includes('client') || r.includes('klient')) return 'client';
+  return r;
+}
+
 // Pomocnicza funkcja pobierająca listę NIP-ów, do których zalogowany użytkownik ma dostęp
 export async function getAllowedNips(user) {
   if (!user) return [];
-  const roleLower = user.role?.toLowerCase() || '';
-  if (roleLower === 'admin' || roleLower === 'supervisor' || roleLower === 'magazyn') return null;
-  if (roleLower === 'client') return [user.nip];
+  const canonicalRole = normalizeRole(user.role);
+  if (canonicalRole === 'admin' || canonicalRole === 'supervisor' || canonicalRole === 'magazyn') return null;
+  if (canonicalRole === 'client') return user.nip ? [user.nip] : [];
   
-  if (['dyrektor', 'kierownik', 'wsparcie', 'magazyn', 'specjalista'].includes(roleLower)) {
-    // Pobierz aktualny rynek i region pracownika z tabeli salespeople
-    const { data: myData } = await supabase
-      .from('salespeople')
-      .select('market, region')
-      .eq('email', user.email)
-      .single();
-      
-    const myMarket = myData?.market || user.market;
-    const myRegion = myData?.region || user.region;
+  if (['dyrektor', 'kierownik', 'wsparcie', 'specjalista'].includes(canonicalRole)) {
+    // Pobierz aktualny rynek i region pracownika z tabeli salespeople (najpierw po e-mail, w razie braku po nazwisku)
+    let myMarket = user.market;
+    let myRegion = user.region;
 
-    if (roleLower === 'dyrektor' && myRegion === 'Wszystkie') {
+    try {
+      let spQuery = supabase
+        .from('salespeople')
+        .select('market, region, name');
+        
+      if (user.email) {
+        spQuery = spQuery.eq('email', user.email);
+      } else if (user.name) {
+        spQuery = spQuery.eq('name', user.name);
+      }
+      
+      const { data: myData } = await spQuery.maybeSingle();
+      if (myData) {
+        myMarket = myData.market || myMarket;
+        myRegion = myData.region || myRegion;
+      }
+    } catch (e) {
+      console.warn('Błąd pobierania danych handlowca z bazy:', e);
+    }
+
+    // Dyrektor z regionem 'Wszystkie' (lub bez ograniczenia regionu) widzi wszystkich klientów w całej Polsce
+    if (canonicalRole === 'dyrektor' && (!myRegion || myRegion === 'Wszystkie')) {
       return null;
     }
     
     let q = supabase.from('companies').select('nip').limit(50000);
     
-    if (roleLower === 'specjalista') {
-      q = q.eq('salesperson_name', user.name);
-    } else if (roleLower === 'kierownik' || roleLower === 'wsparcie') {
+    if (canonicalRole === 'specjalista') {
+      const targetName = user.name ? user.name.trim() : '';
+      if (!targetName) return [];
+      q = q.eq('salesperson_name', targetName);
+    } else if (canonicalRole === 'kierownik' || canonicalRole === 'wsparcie') {
       // Pobierz wszystkich handlowców z tego samego rynku
-      const { data: sps } = await supabase
-        .from('salespeople')
-        .select('name')
-        .eq('market', myMarket)
-        .limit(10000);
-      const spNames = sps ? sps.map(s => s.name) : [];
+      let spQuery = supabase.from('salespeople').select('name');
+      if (myMarket && myMarket !== 'Wszystkie') {
+        spQuery = spQuery.eq('market', myMarket);
+      }
+      const { data: sps } = await spQuery.limit(10000);
+      const spNames = sps ? sps.map(s => s.name).filter(Boolean) : [];
+      
+      if (user.name && !spNames.includes(user.name)) {
+        spNames.push(user.name);
+      }
       
       if (spNames.length === 0) return [];
       q = q.in('salesperson_name', spNames);
-    } else if (roleLower === 'dyrektor') {
+    } else if (canonicalRole === 'dyrektor') {
       // Pobierz wszystkich handlowców z tego samego regionu
       let spQuery = supabase.from('salespeople').select('name').limit(10000);
       if (myRegion && myRegion !== 'Wszystkie') {
         spQuery = spQuery.eq('region', myRegion);
       }
       const { data: sps } = await spQuery;
-      const spNames = sps ? sps.map(s => s.name) : [];
+      const spNames = sps ? sps.map(s => s.name).filter(Boolean) : [];
+      
+      if (user.name && !spNames.includes(user.name)) {
+        spNames.push(user.name);
+      }
       
       if (spNames.length === 0) return [];
       q = q.in('salesperson_name', spNames);
@@ -77,7 +120,7 @@ export async function getAllowedNips(user) {
       console.error('Błąd pobierania przypisanych NIP-ów:', error);
       return [];
     }
-    return data ? data.map(c => c.nip) : [];
+    return data ? data.map(c => c.nip).filter(Boolean) : [];
   }
   
   return [];
@@ -90,27 +133,27 @@ export async function getAllowedNips(user) {
  */
 export function canUserSeeSalespersonFilter(user) {
   if (!user || !user.role) return false;
-  const roleLower = user.role.toLowerCase();
-  return ['admin', 'supervisor', 'dyrektor', 'kierownik', 'wsparcie', 'magazyn'].includes(roleLower);
+  const canonicalRole = normalizeRole(user.role);
+  return ['admin', 'supervisor', 'dyrektor', 'kierownik', 'wsparcie', 'magazyn'].includes(canonicalRole);
 }
 
 /**
  * Pobiera listę handlowców dostępnych dla danego użytkownika w filtrze.
- * - Administrator / Supervisor: ma do wyboru wszystkich handlowców.
- * - Wsparcie / Kierownik (np. Wsparcie rynku podlaskiego): widzi tylko handlowców ze swojego rynku.
- * - Dyrektor: widzi handlowców ze swojego regionu (lub wszystkich jeśli region 'Wszystkie').
+ * - Administrator / Supervisor / Dyrektor (Wszystkie): ma do wyboru wszystkich handlowców.
+ * - Wsparcie / Kierownik: widzi tylko handlowców ze swojego rynku.
+ * - Dyrektor (konkretny region): widzi handlowców ze swojego regionu.
  * - Specjalista / Klient: pusta tablica.
  */
 export async function getAvailableSalespeopleForUser(user) {
   if (!user) return [];
-  const roleLower = user.role?.toLowerCase() || '';
+  const canonicalRole = normalizeRole(user.role);
 
   if (!canUserSeeSalespersonFilter(user)) {
     return [];
   }
 
   // Administratorzy i Supervisorzy widzą wszystkich handlowców
-  if (roleLower === 'admin' || roleLower === 'supervisor') {
+  if (canonicalRole === 'admin' || canonicalRole === 'supervisor') {
     const { data } = await supabase
       .from('salespeople')
       .select('name')
@@ -120,17 +163,29 @@ export async function getAvailableSalespeopleForUser(user) {
 
   try {
     // Sprawdzamy rynek/region dla danego pracownika w tabeli salespeople
-    const { data: myData } = await supabase
-      .from('salespeople')
-      .select('market, region')
-      .eq('email', user.email)
-      .maybeSingle();
+    let myData = null;
+    if (user.email) {
+      const { data } = await supabase
+        .from('salespeople')
+        .select('market, region')
+        .eq('email', user.email)
+        .maybeSingle();
+      myData = data;
+    }
+    if (!myData && user.name) {
+      const { data } = await supabase
+        .from('salespeople')
+        .select('market, region')
+        .eq('name', user.name)
+        .maybeSingle();
+      myData = data;
+    }
 
     const myMarket = myData?.market || user.market;
     const myRegion = myData?.region || user.region;
 
-    if (roleLower === 'wsparcie' || roleLower === 'kierownik') {
-      if (myMarket) {
+    if (canonicalRole === 'wsparcie' || canonicalRole === 'kierownik') {
+      if (myMarket && myMarket !== 'Wszystkie') {
         const { data: sps } = await supabase
           .from('salespeople')
           .select('name')
@@ -140,7 +195,7 @@ export async function getAvailableSalespeopleForUser(user) {
           return sps.map(s => s.name).filter(Boolean);
         }
       }
-    } else if (roleLower === 'dyrektor') {
+    } else if (canonicalRole === 'dyrektor') {
       if (myRegion && myRegion !== 'Wszystkie') {
         const { data: sps } = await supabase
           .from('salespeople')
@@ -250,6 +305,46 @@ export const authAPI = {
     if (error) {
       throw new Error('Nie udało się załadować profilu użytkownika.');
     }
+
+    // 1. Sprawdź czy użytkownik ma uprawnienia z tabeli user_app_permissions dla 'opakowania'
+    try {
+      const { data: perm } = await supabase
+        .from('user_app_permissions')
+        .select('role, is_active')
+        .eq('user_id', userId)
+        .eq('app_id', 'opakowania')
+        .maybeSingle();
+
+      if (perm && perm.is_active && perm.role && perm.role !== 'none') {
+        data.app_role = perm.role;
+        if (!data.role || ['client', 'klient', 'pracownik', 'user'].includes(String(data.role).toLowerCase())) {
+          data.role = perm.role;
+        }
+      }
+    } catch (e) {
+      // Ignoruj jeśli tabela jeszcze nie istnieje
+    }
+
+    // 2. Pobierz rynek i region z tabeli salespeople (jeśli pracownik jest w kartotece handlowców)
+    try {
+      if (data.email) {
+        const { data: sp } = await supabase
+          .from('salespeople')
+          .select('market, region, role')
+          .eq('email', data.email)
+          .maybeSingle();
+        if (sp) {
+          data.market = sp.market || data.market;
+          data.region = sp.region || data.region;
+          if (!data.role || ['client', 'klient', 'pracownik', 'user'].includes(String(data.role).toLowerCase())) {
+            data.role = sp.role || data.role;
+          }
+        }
+      }
+    } catch (e) {
+      // Ignoruj błąd pobierania danych salespeople
+    }
+
     return data;
   },
 

@@ -28,7 +28,7 @@ import ChatWidget from './components/ChatWidget';
 import './App.css';
 
 import { supabase } from './lib/supabase';
-import { authAPI, setCurrentUserCache } from './utils/supabaseApi';
+import { authAPI, setCurrentUserCache, normalizeRole } from './utils/supabaseApi';
 import { Clock, LogOut } from 'lucide-react';
 
 const ProtectedRoute = ({ children, currentUser, isUserStaff, adminOnly = false, allowedRoles = null }) => {
@@ -39,8 +39,8 @@ const ProtectedRoute = ({ children, currentUser, isUserStaff, adminOnly = false,
     return <Navigate to="/dashboard" replace />;
   }
   if (allowedRoles && currentUser.role) {
-    const roleLower = currentUser.role.toLowerCase();
-    const hasRole = allowedRoles.some(r => r.toLowerCase() === roleLower);
+    const userCanonicalRole = normalizeRole(currentUser.role);
+    const hasRole = allowedRoles.some(r => normalizeRole(r) === userCanonicalRole);
     if (!hasRole) {
       return <Navigate to={isUserStaff ? "/admin" : "/dashboard"} replace />;
     }
@@ -60,7 +60,8 @@ const App = () => {
 
   const isStaff = (role) => {
     if (!role) return false;
-    return ['admin', 'supervisor', 'dyrektor', 'kierownik', 'wsparcie', 'magazyn', 'specjalista'].includes(role.toLowerCase());
+    const cRole = normalizeRole(role);
+    return ['admin', 'supervisor', 'dyrektor', 'kierownik', 'wsparcie', 'magazyn', 'specjalista'].includes(cRole);
   };
 
   useEffect(() => {
@@ -103,6 +104,8 @@ const App = () => {
             role: profile.role,
             status: profile.status,
             companyName: profile.company_name || profile.name,
+            market: profile.market,
+            region: profile.region,
           };
 
           setCurrentUser(finalUser);
@@ -177,6 +180,8 @@ const App = () => {
                         role: profile.role,
                         status: profile.status,
                         companyName: profile.company_name || profile.name,
+                        market: profile.market,
+                        region: profile.region,
                       };
 
                       setCurrentUser(finalUser);
