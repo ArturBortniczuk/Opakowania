@@ -98,13 +98,30 @@ const AdminUsersManager = ({ user: currentUser }) => {
       const originalUser = users.find(u => u.id === editForm.id);
       const isNewlyApproved = originalUser && originalUser.status !== 'approved' && editForm.status === 'approved';
 
+      // Zapewnienie istnienia firmy w tabeli companies dla konta klienta
+      if (editForm.nip && editForm.role === 'client' && editForm.status === 'approved') {
+        const cleanNip = String(editForm.nip).replace(/\D/g, '').substring(0, 10);
+        if (cleanNip) {
+          try {
+            await supabase.from('companies').upsert({
+              nip: cleanNip,
+              name: editForm.companyName || `Firma ${cleanNip}`,
+              email: editForm.email || undefined,
+              phone: editForm.phone || undefined
+            }, { onConflict: 'nip' });
+          } catch (compErr) {
+            console.warn('Nie udało się utworzyć/zaktualizować firmy w companies:', compErr);
+          }
+        }
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({
           name: editForm.name,
           role: editForm.role,
           status: editForm.status,
-          nip: editForm.nip,
+          nip: editForm.nip ? String(editForm.nip).replace(/\D/g, '').substring(0, 10) : editForm.nip,
           company_name: editForm.companyName,
           phone: editForm.phone
         })

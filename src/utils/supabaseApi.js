@@ -366,11 +366,27 @@ export const authAPI = {
    * Akceptuje i aktywuje konto klienta przypisując mu NIP.
    */
   async approveRegistration(profileId, nip, companyName) {
+    const cleanNip = nip ? String(nip).replace(/\D/g, '').substring(0, 10) : '';
+
+    // Upewniamy się, że firma istnieje w tabeli companies (wymagane przez klucze obce w client_profiles itp.)
+    if (cleanNip) {
+      try {
+        await supabase
+          .from('companies')
+          .upsert({
+            nip: cleanNip,
+            name: companyName || `Firma ${cleanNip}`
+          }, { onConflict: 'nip' });
+      } catch (cErr) {
+        console.warn('Nie udało się utworzyć/zaktualizować firmy w companies:', cErr);
+      }
+    }
+
     const { data, error } = await supabase
       .from('profiles')
       .update({
         status: 'approved',
-        nip: nip,
+        nip: cleanNip || nip,
         company_name: companyName,
         updated_at: new Date().toISOString()
       })

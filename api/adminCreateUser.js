@@ -78,6 +78,23 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Błąd podczas tworzenia konta: ' + createError.message });
     }
 
+    // Upewnij się, że firma istnieje w tabeli companies
+    if (role === 'client' && nip) {
+      const cleanNip = String(nip).replace(/\D/g, '').substring(0, 10);
+      if (cleanNip) {
+        try {
+          await supabaseAdmin.from('companies').upsert({
+            nip: cleanNip,
+            name: companyName || `Firma ${cleanNip}`,
+            email,
+            phone
+          }, { onConflict: 'nip' });
+        } catch (compErr) {
+          console.warn('Nie udało się utworzyć wpisu w companies:', compErr);
+        }
+      }
+    }
+
     return res.status(200).json({ success: true, message: 'Konto zostało utworzone.', user: newAuthUser.user });
   } catch (error) {
     console.error('Krytyczny błąd podczas tworzenia konta:', error);
