@@ -51,9 +51,12 @@ const DrumCalculator = () => {
   // Wyprowadzenie przekrojów dla wybranego kabla
   const availableCrossSections = useMemo(() => {
     if (!selectedCableName) return [];
-    return cables
-      .filter(c => c.name === selectedCableName)
-      .map(c => c.cross_section)
+    const sections = new Set(
+      cables
+        .filter(c => c.name === selectedCableName)
+        .map(c => c.cross_section)
+    );
+    return Array.from(sections)
       .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   }, [cables, selectedCableName]);
 
