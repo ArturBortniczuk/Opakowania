@@ -2518,7 +2518,7 @@ export const returnsAPI = {
       return String(request.phone).trim();
     }
     if (request.notes) {
-      const match = String(request.notes).match(/(?:tel|telefon|kontakt|telefon kontaktowy):\s*([\d\s\+\-]{8,25})/i);
+      const match = String(request.notes).match(/(?:tel|telefon|kontakt|telefon kontaktowy):\s*([\d\s+-]{8,25})/i);
       if (match) return match[1].trim();
     }
     return '';
@@ -2537,8 +2537,8 @@ export const returnsAPI = {
       .replace(/\[Połączono ze zgłoszeń:[^\]]*\]/gi, '')
       .replace(/\[Wydzielono\s+\d+\s+bębnów\s+do\s+zgłoszenia\s+[^\]]+\]/gi, '')
       .replace(/\[Zgłoszenie wydzielone ze zgłoszenia\s+[^\]]+\]/gi, '')
-      .replace(/Telefon kontaktowy:\s*[\d\s\+\-]+(\n|$)/gi, '')
-      .replace(/Sugerowany termin zwrotu:\s*od\s+[\d\-]+\s+do\s+[\d\-]+(\n|$)/gi, '')
+      .replace(/Telefon kontaktowy:\s*[\d\s+-]+(\n|$)/gi, '')
+      .replace(/Sugerowany termin zwrotu:\s*od\s+[\d-]+\s+do\s+[\d-]+(\n|$)/gi, '')
       .replace(/Brak dodatkowych uwag/gi, '')
       .trim();
   },

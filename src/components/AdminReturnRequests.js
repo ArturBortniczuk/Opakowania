@@ -2495,7 +2495,6 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
             </div>
           </div>
         )}
-          </div>
         </div>
       </div>
     );

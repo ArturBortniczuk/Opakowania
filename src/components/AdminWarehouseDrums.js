@@ -17,16 +17,12 @@ import {
   ChevronsRight,
   Filter,
   Download,
-  Check,
   BarChart3,
   X,
   Plus,
   Layers,
-  Building2,
-  Sparkles,
   ChevronDown,
-  ChevronUp,
-  Tag
+  ChevronUp
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
