@@ -624,6 +624,164 @@ export const drumsAPI = {
   },
 
   /**
+   * Pobiera unikalne lokalizacje WMS bębnów na magazynie wraz z liczbą bębnów.
+   */
+  async getWarehouseDrumWmsLocations() {
+    try {
+      const { data, error } = await supabase
+        .from('drums')
+        .select('lokalizacja_wms')
+        .in('status', ['pusty na magazynie', 'na magazynie z towarem'])
+        .eq('typ_opakowania', 'Bęben')
+        .not('lokalizacja_wms', 'is', null)
+        .neq('lokalizacja_wms', '');
+      
+      if (error) throw error;
+      
+      const countMap = {};
+      data.forEach(d => {
+        const loc = (d.lokalizacja_wms || '').trim();
+        if (loc) {
+          countMap[loc] = (countMap[loc] || 0) + 1;
+        }
+      });
+      
+      return Object.entries(countMap)
+        .map(([location, count]) => ({ location, count }))
+        .sort((a, b) => a.location.localeCompare(b.location, undefined, { numeric: true }));
+    } catch (error) {
+      console.error('Błąd getWarehouseDrumWmsLocations:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Zwraca statystyki i rozkłady bębnów dla wybranych adresów WMS (lub całego magazynu).
+   */
+  async getWarehouseWmsAnalytics(options = {}) {
+    try {
+      const {
+        selectedWms = [],
+        statusFilter = 'all',
+        urgentOnly = false,
+        selectedSizes = [],
+        selectedMagazyny = []
+      } = options;
+
+      let query = supabase
+        .from('drums')
+        .select('id, cecha, rozmiar_bebna, nazwa, kon_dostawca, status, lokalizacja_wms, data_zwrotu_do_dostawcy, magazyn')
+        .eq('typ_opakowania', 'Bęben');
+
+      if (statusFilter === 'empty') {
+        query = query.eq('status', 'pusty na magazynie');
+      } else if (statusFilter === 'full') {
+        query = query.eq('status', 'na magazynie z towarem');
+      } else {
+        query = query.in('status', ['pusty na magazynie', 'na magazynie z towarem']);
+      }
+
+      if (selectedSizes && selectedSizes.length > 0) {
+        query = query.in('rozmiar_bebna', selectedSizes);
+      }
+
+      if (selectedMagazyny && selectedMagazyny.length > 0) {
+        query = query.in('magazyn', selectedMagazyny);
+      }
+
+      if (urgentOnly) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const nextMonth = new Date(today);
+        nextMonth.setDate(today.getDate() + 30);
+        query = query.gte('data_zwrotu_do_dostawcy', today.toISOString().split('T')[0])
+                     .lte('data_zwrotu_do_dostawcy', nextMonth.toISOString().split('T')[0]);
+      }
+
+      const trimmedWms = (selectedWms || []).map(w => w.trim()).filter(Boolean);
+      if (trimmedWms.length > 0) {
+        const orFilter = trimmedWms.map(w => `lokalizacja_wms.ilike.%${w}%`).join(',');
+        query = query.or(orFilter);
+      }
+
+      query = query.limit(5000);
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const drums = data || [];
+      const total = drums.length;
+
+      const sizeCounts = {};
+      const supplierCounts = {};
+      const statusCounts = { empty: 0, full: 0 };
+      const addressCounts = {};
+      let urgentCount = 0;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      drums.forEach(d => {
+        const rawSize = d.rozmiar_bebna || (d.nazwa ? d.nazwa.replace(/^BĘBEN\s+/i, '').trim() : 'Inny');
+        const size = rawSize.length > 22 ? rawSize.slice(0, 22) + '...' : rawSize;
+        sizeCounts[size] = (sizeCounts[size] || 0) + 1;
+
+        const rawSupplier = d.kon_dostawca || 'Nieznany';
+        const supplier = rawSupplier.length > 25 ? rawSupplier.slice(0, 25) + '...' : rawSupplier;
+        supplierCounts[supplier] = (supplierCounts[supplier] || 0) + 1;
+
+        if (d.status === 'pusty na magazynie') statusCounts.empty++;
+        else if (d.status === 'na magazynie z towarem') statusCounts.full++;
+
+        if (d.data_zwrotu_do_dostawcy) {
+          const retDate = new Date(d.data_zwrotu_do_dostawcy);
+          const diffDays = Math.ceil((retDate - today) / (1000 * 60 * 60 * 24));
+          if (diffDays >= 0 && diffDays <= 30) urgentCount++;
+        }
+
+        const addr = d.lokalizacja_wms || '(Brak WMS)';
+        if (!addressCounts[addr]) {
+          addressCounts[addr] = { total: 0, sizes: {}, suppliers: {} };
+        }
+        addressCounts[addr].total++;
+        addressCounts[addr].sizes[size] = (addressCounts[addr].sizes[size] || 0) + 1;
+        addressCounts[addr].suppliers[supplier] = (addressCounts[addr].suppliers[supplier] || 0) + 1;
+      });
+
+      const sizesArray = Object.entries(sizeCounts)
+        .map(([name, count]) => ({ name, count, percentage: total > 0 ? Math.round((count / total) * 100) : 0 }))
+        .sort((a, b) => b.count - a.count);
+
+      const suppliersArray = Object.entries(supplierCounts)
+        .map(([name, count]) => ({ name, count, percentage: total > 0 ? Math.round((count / total) * 100) : 0 }))
+        .sort((a, b) => b.count - a.count);
+
+      const addressesArray = Object.entries(addressCounts)
+        .map(([location, stats]) => ({
+          location,
+          count: stats.total,
+          percentage: total > 0 ? Math.round((stats.total / total) * 100) : 0,
+          topSizes: Object.entries(stats.sizes).sort((a, b) => b[1] - a[1]).slice(0, 4),
+          topSuppliers: Object.entries(stats.suppliers).sort((a, b) => b[1] - a[1]).slice(0, 3)
+        }))
+        .sort((a, b) => b.count - a.count);
+
+      return {
+        total,
+        urgentCount,
+        statusCounts,
+        sizes: sizesArray,
+        suppliers: suppliersArray,
+        addresses: addressesArray,
+        appliedWms: trimmedWms
+      };
+    } catch (error) {
+      console.error('Błąd getWarehouseWmsAnalytics:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Pobiera bębny znajdujące się na magazynie (na podstawie statusu).
    * Zoptymalizowane do wyświetlania w nowym module Magazynu.
    */
@@ -639,7 +797,8 @@ export const drumsAPI = {
         urgentOnly = false,
         withLocationOnly = false,
         selectedSizes = [],
-        selectedMagazyny = []
+        selectedMagazyny = [],
+        selectedWms = []
       } = options;
 
       let query = supabase
@@ -678,6 +837,14 @@ export const drumsAPI = {
 
       if (selectedMagazyny && selectedMagazyny.length > 0) {
         query = query.in('magazyn', selectedMagazyny);
+      }
+
+      if (selectedWms && selectedWms.length > 0) {
+        const trimmedWms = selectedWms.map(w => w.trim()).filter(Boolean);
+        if (trimmedWms.length > 0) {
+          const orFilter = trimmedWms.map(w => `lokalizacja_wms.ilike.%${w}%`).join(',');
+          query = query.or(orFilter);
+        }
       }
 
       if (search) {
