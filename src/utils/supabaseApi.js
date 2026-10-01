@@ -48,9 +48,10 @@ export async function getAllowedNips(user) {
   if (canonicalRole === 'client') return user.nip ? [user.nip] : [];
   
   if (['dyrektor', 'kierownik', 'wsparcie', 'specjalista'].includes(canonicalRole)) {
-    // Pobierz aktualny rynek i region pracownika z tabeli salespeople (najpierw po e-mail, w razie braku po nazwisku)
+    // Pobierz aktualny rynek, region i oficjalne nazwisko pracownika z tabeli salespeople (najpierw po e-mail, w razie braku po nazwisku)
     let myMarket = user.market;
     let myRegion = user.region;
+    let spName = user.salesperson_name || null;
 
     try {
       let spQuery = supabase
@@ -67,6 +68,9 @@ export async function getAllowedNips(user) {
       if (myData) {
         myMarket = myData.market || myMarket;
         myRegion = myData.region || myRegion;
+        if (myData.name) {
+          spName = myData.name;
+        }
       }
     } catch (e) {
       console.warn('Błąd pobierania danych handlowca z bazy:', e);
@@ -80,9 +84,28 @@ export async function getAllowedNips(user) {
     let q = supabase.from('companies').select('nip').limit(50000);
     
     if (canonicalRole === 'specjalista') {
-      const targetName = user.name ? user.name.trim() : '';
-      if (!targetName) return [];
-      q = q.eq('salesperson_name', targetName);
+      const candidateNames = new Set();
+      if (spName) candidateNames.add(spName.trim());
+      if (user.salesperson_name) candidateNames.add(user.salesperson_name.trim());
+      if (user.name) candidateNames.add(user.name.trim());
+
+      // Obsługa zamiany kolejności "Imię Nazwisko" <-> "Nazwisko Imię"
+      const currentCandidates = [...candidateNames];
+      for (const name of currentCandidates) {
+        const parts = name.split(/\s+/).filter(Boolean);
+        if (parts.length === 2) {
+          candidateNames.add(`${parts[1]} ${parts[0]}`);
+        }
+      }
+
+      const validNames = Array.from(candidateNames).filter(Boolean);
+      if (validNames.length === 0) return [];
+
+      if (validNames.length === 1) {
+        q = q.eq('salesperson_name', validNames[0]);
+      } else {
+        q = q.in('salesperson_name', validNames);
+      }
     } else if (canonicalRole === 'kierownik' || canonicalRole === 'wsparcie') {
       // Pobierz wszystkich handlowców z tego samego rynku
       let spQuery = supabase.from('salespeople').select('name');
@@ -92,6 +115,9 @@ export async function getAllowedNips(user) {
       const { data: sps } = await spQuery.limit(10000);
       const spNames = sps ? sps.map(s => s.name).filter(Boolean) : [];
       
+      if (spName && !spNames.includes(spName)) {
+        spNames.push(spName);
+      }
       if (user.name && !spNames.includes(user.name)) {
         spNames.push(user.name);
       }
@@ -107,6 +133,9 @@ export async function getAllowedNips(user) {
       const { data: sps } = await spQuery;
       const spNames = sps ? sps.map(s => s.name).filter(Boolean) : [];
       
+      if (spName && !spNames.includes(spName)) {
+        spNames.push(spName);
+      }
       if (user.name && !spNames.includes(user.name)) {
         spNames.push(user.name);
       }
@@ -285,6 +314,9 @@ export const authAPI = {
       role: profile.role,
       status: profile.status,
       companyName: profile.company_name || profile.name,
+      market: profile.market,
+      region: profile.region,
+      salesperson_name: profile.salesperson_name || profile.name,
     };
 
     localStorage.setItem('currentUser', JSON.stringify(finalUser));
@@ -330,12 +362,15 @@ export const authAPI = {
       if (data.email) {
         const { data: sp } = await supabase
           .from('salespeople')
-          .select('market, region, role')
+          .select('market, region, role, name')
           .eq('email', data.email)
           .maybeSingle();
         if (sp) {
           data.market = sp.market || data.market;
           data.region = sp.region || data.region;
+          if (sp.name) {
+            data.salesperson_name = sp.name;
+          }
           if (!data.role || ['client', 'klient', 'pracownik', 'user'].includes(String(data.role).toLowerCase())) {
             data.role = sp.role || data.role;
           }

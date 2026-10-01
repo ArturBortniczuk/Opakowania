@@ -106,6 +106,7 @@ const App = () => {
             companyName: profile.company_name || profile.name,
             market: profile.market,
             region: profile.region,
+            salesperson_name: profile.salesperson_name || profile.name,
           };
 
           setCurrentUser(finalUser);
@@ -182,6 +183,7 @@ const App = () => {
                         companyName: profile.company_name || profile.name,
                         market: profile.market,
                         region: profile.region,
+                        salesperson_name: profile.salesperson_name || profile.name,
                       };
 
                       setCurrentUser(finalUser);
