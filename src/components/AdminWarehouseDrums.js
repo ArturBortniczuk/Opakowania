@@ -22,7 +22,9 @@ import {
   Plus,
   Layers,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Zap,
+  Building
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -68,6 +70,43 @@ const AdminWarehouseDrums = () => {
     addresses: [],
     appliedWms: []
   });
+
+  const WMS_PRESETS = [
+    {
+      id: 'bialystok',
+      title: 'Puste w Białymstoku',
+      shortCode: 'PKB',
+      city: 'Białystok',
+      wms: ['PKB-000-000-097', 'PKB-000-000-098', 'PKB-000-000-099', 'PKB-000-000-100'],
+      magazynMatcher: (m) => m.toLowerCase().includes('białystok')
+    },
+    {
+      id: 'zielonka',
+      title: 'Puste w Zielonce',
+      shortCode: 'PKZ',
+      city: 'Zielonka',
+      wms: ['PKZ-000-000-097', 'PKZ-000-000-098', 'PKZ-000-000-099', 'PKZ-000-000-100'],
+      magazynMatcher: (m) => m.toLowerCase().includes('zielonka')
+    },
+    {
+      id: 'lublin',
+      title: 'Puste w Lublinie',
+      shortCode: 'PKL',
+      city: 'Lublin',
+      wms: ['PKL-000-000-097', 'PKL-000-000-098', 'PKL-000-000-099', 'PKL-000-000-100'],
+      magazynMatcher: (m) => m.toLowerCase().includes('lublin')
+    },
+    {
+      id: 'wroclaw',
+      title: 'Puste we Wrocławiu',
+      shortCode: 'PKW',
+      city: 'Wrocław',
+      wms: ['PKW-000-000-097', 'PKW-000-000-098', 'PKW-000-000-099', 'PKW-000-000-100'],
+      magazynMatcher: (m) => m.toLowerCase().includes('wrocław') || m.toLowerCase().includes('wroclaw')
+    }
+  ];
+
+  const [activePresetId, setActivePresetId] = useState(null);
   
   const [exporting, setExporting] = useState(false);
 
@@ -304,13 +343,40 @@ const AdminWarehouseDrums = () => {
     setWmsInputValue('');
   };
 
+  const handleApplyPreset = (preset) => {
+    if (activePresetId === preset.id) {
+      setActivePresetId(null);
+      setStatusFilter('all');
+      setSelectedWms([]);
+      setSelectedMagazyny([]);
+      return;
+    }
+
+    setActivePresetId(preset.id);
+    setStatusFilter('empty');
+    setSelectedWms(preset.wms);
+
+    const matchingMags = availableMagazyny.filter(preset.magazynMatcher);
+    setSelectedMagazyny(matchingMags);
+    setShowAnalytics(true);
+  };
+
+  const handleClearPreset = () => {
+    setActivePresetId(null);
+    setStatusFilter('all');
+    setSelectedWms([]);
+    setSelectedMagazyny([]);
+  };
+
   const removeWms = (loc) => {
     setSelectedWms(prev => prev.filter(item => item !== loc));
+    setActivePresetId(null);
   };
 
   const clearAllWms = () => {
     setSelectedWms([]);
     setWmsInputValue('');
+    setActivePresetId(null);
   };
 
   const toggleWmsLocation = (loc) => {
@@ -877,6 +943,66 @@ const AdminWarehouseDrums = () => {
 
           {/* Search and Filters */}
           <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-emerald-100 mb-6 relative z-50">
+            {/* Szybkie stałe filtry magazynów (Białystok, Zielonka, Lublin, Wrocław) */}
+            <div className="mb-6 pb-5 border-b border-gray-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  <Zap className="w-4 h-4 text-amber-500" />
+                  <span>Szybkie filtry stałe:</span>
+                </div>
+                {activePresetId && (
+                  <button
+                    type="button"
+                    onClick={handleClearPreset}
+                    className="text-xs text-red-600 hover:text-red-700 font-bold flex items-center gap-1 self-start sm:self-auto cursor-pointer hover:underline"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Wyłącz filtr stały</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {WMS_PRESETS.map((preset) => {
+                  const isActive = activePresetId === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handleApplyPreset(preset)}
+                      className={`relative p-3.5 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer ${
+                        isActive
+                          ? 'bg-gradient-to-br from-emerald-600 to-teal-700 text-white border-emerald-600 shadow-md ring-2 ring-emerald-300 transform scale-[1.02]'
+                          : 'bg-white hover:bg-emerald-50/60 text-gray-800 border-gray-200 hover:border-emerald-300 shadow-2xs hover:shadow-xs'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-2">
+                        <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded font-mono ${
+                          isActive ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {preset.shortCode}
+                        </span>
+                        {isActive ? (
+                          <CheckCircle className="w-4 h-4 text-emerald-200" />
+                        ) : (
+                          <Building className="w-3.5 h-3.5 text-gray-400" />
+                        )}
+                      </div>
+
+                      <div className={`font-bold text-xs sm:text-sm leading-snug ${isActive ? 'text-white' : 'text-gray-900'}`}>
+                        {preset.title}
+                      </div>
+
+                      <div className={`text-[11px] mt-1.5 font-mono flex items-center justify-between ${isActive ? 'text-emerald-100' : 'text-gray-500'}`}>
+                        <span>WMS: 97, 98, 99, 100</span>
+                        {isActive && <span className="text-[10px] font-bold bg-white text-emerald-800 px-1.5 py-0.2 rounded">Aktywny</span>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
