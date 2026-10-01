@@ -275,8 +275,10 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
     setLoading(true);
     try {
       // Przygotuj dane do wysłania
-      const notesWithPhoneAndDates = `Sugerowany termin zwrotu: od ${formData.collectionDateStart} do ${formData.collectionDateEnd}\nTelefon kontaktowy: ${formData.phoneNumber}\n\n${formData.notes || ''}`;
       const loadingHoursStr = `${formData.loadingHoursStart} - ${formData.loadingHoursEnd}`;
+      const contactPhone = (formData.phoneNumber || profile?.phone || '').trim();
+      const pureNotes = (formData.notes || '').trim();
+      const nowIso = new Date().toISOString();
 
       const returnData = {
         user_nip: user.nip,
@@ -288,27 +290,38 @@ const ReturnForm = ({ user, selectedDrum, profile, onNavigate, onSubmit }) => {
         email: formData.email,
         loading_hours: loadingHoursStr,
         available_equipment: formData.availableEquipment,
-        notes: notesWithPhoneAndDates,
+        notes: pureNotes,
         pickup_type: formData.pickupType || 'spedycja',
         selected_drums: (formData.selectedDrums || []).map(item => {
           if (typeof item === 'object' && item !== null) {
             return {
               ...item,
-              reported_at: item.reported_at || new Date().toISOString()
+              reported_at: item.reported_at || nowIso
             };
           }
           return {
             cecha: item,
             type: 'drum',
-            reported_at: new Date().toISOString()
+            reported_at: nowIso
           };
         }),
         
-        // Dane profilu pracownika
+        // Dane profilu i osoby odpowiedzialnej
         profile_id: profile?.id || null,
         profile_name: profile?.name || null,
         profile_email: profile?.email || null,
-        profile_phone: profile?.phone || null
+        profile_phone: contactPhone || null,
+        status_history: [
+          {
+            action: 'created',
+            status: 'Pending',
+            timestamp: nowIso,
+            updated_by: profile?.name || formData.companyName || 'Klient',
+            note: (formData.collectionDateStart && formData.collectionDateEnd)
+              ? `Sugerowany termin zwrotu: od ${formData.collectionDateStart} do ${formData.collectionDateEnd}`
+              : 'Utworzono zgłoszenie zwrotu'
+          }
+        ]
       };
 
       // Wyślij zgłoszenie

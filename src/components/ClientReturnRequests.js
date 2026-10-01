@@ -307,7 +307,7 @@ const ClientReturnRequests = ({ user }) => {
                           <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1">Kontakt do załadunku</span>
                           <div className="text-xs text-gray-700 space-y-1">
                             {req.email && <p className="truncate"><strong>Email:</strong> {req.email}</p>}
-                            {(req.profile_phone || req.phoneNumber) && <p><strong>Tel:</strong> {req.profile_phone || req.phoneNumber}</p>}
+                            {returnsAPI.getContactPhone(req) && <p><strong>Tel:</strong> {returnsAPI.getContactPhone(req)}</p>}
                           </div>
                         </div>
                       </div>
@@ -341,10 +341,10 @@ const ClientReturnRequests = ({ user }) => {
                         </div>
                       )}
 
-                      {req.notes && (
+                      {returnsAPI.getCleanNotes(req.notes) && (
                         <div className="bg-amber-50/40 p-3 rounded-xl border border-amber-100/50">
                           <span className="text-[9px] font-extrabold text-amber-800 uppercase block mb-1">Uwagi do odbioru:</span>
-                          <p className="text-gray-750 text-xs italic leading-relaxed">"{req.notes}"</p>
+                          <p className="text-gray-750 text-xs italic leading-relaxed">"{returnsAPI.getCleanNotes(req.notes)}"</p>
                         </div>
                       )}
 

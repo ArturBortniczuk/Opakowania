@@ -368,10 +368,7 @@ const LogisticsMap = ({ user }) => {
                 pickups: []
               };
             }
-            
-            const notesStr = r.notes || '';
-            const matchPhone = notesStr.match(/Telefon kontaktowy:\s*([\d\s\+\-]{8,20})/);
-            const extractedPhone = matchPhone ? matchPhone[1].trim() : '';
+            const contactPhone = returnsAPI.getContactPhone(r);
 
             pickupsByLoc[locKey].pickups.push({
               id: `ret_${r.id}`,
@@ -412,7 +409,7 @@ const LogisticsMap = ({ user }) => {
               priority: r.priority,
               date: r.collection_date,
               profileEmail: r.email || r.profile_email || '',
-              profilePhone: r.profile_phone || extractedPhone || '',
+              profilePhone: contactPhone || '',
               profileName: r.profile_name || '',
               mpk: r.mpk || '',
               originalRequest: r
@@ -946,10 +943,10 @@ const LogisticsMap = ({ user }) => {
             street: requestForTransport.street
           },
           delivery: transportData.deliveryAddress,
-          loadingContact: ((requestForTransport.notes || '').match(/Telefon kontaktowy:\s*([\d\s\+\-]{8,20})/)?.[1]?.trim()) || requestForTransport.profile_phone || 'Brak telefonu',
+          loadingContact: returnsAPI.getContactPhone(requestForTransport) || 'Brak telefonu',
           unloadingContact: transportData.unloadingContact || '',
           deliveryDate: transportData.transportDate,
-          notes: `Zgłoszenie z Opakowań ${returnsAPI.getRequestDisplayId(requestForTransport)}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}\n${requestForTransport.notes || ''}`,
+          notes: `Zgłoszenie z Opakowań ${returnsAPI.getRequestDisplayId(requestForTransport)}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}${returnsAPI.getCleanNotes(requestForTransport.notes) ? `\nUwagi: ${returnsAPI.getCleanNotes(requestForTransport.notes)}` : ''}`,
           clientName: transportData.deliveryName || (typeof transportData.deliveryAddress === 'object' ? transportData.deliveryAddress.name : null) || requestForTransport.company_name,
           sourceClientName: requestForTransport.company_name,
           distanceKm: transportData.distanceKm || 0,

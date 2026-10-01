@@ -2334,6 +2334,168 @@ export const returnsAPI = {
   getPickupTypeInfo,
 
   /**
+   * Pobiera numer telefonu do osoby odpowiedzialnej / zgłaszającej ze zgłoszenia.
+   * Szuka najpierw w dedykowanych polach, a w razie starszych rekordów wyciąga go z uwag.
+   * @param {object} request 
+   * @returns {string}
+   */
+  getContactPhone(request) {
+    if (!request) return '';
+    if (request.profile_phone && String(request.profile_phone).trim()) {
+      return String(request.profile_phone).trim();
+    }
+    if (request.phoneNumber && String(request.phoneNumber).trim()) {
+      return String(request.phoneNumber).trim();
+    }
+    if (request.phone && String(request.phone).trim()) {
+      return String(request.phone).trim();
+    }
+    if (request.notes) {
+      const match = String(request.notes).match(/(?:tel|telefon|kontakt|telefon kontaktowy):\s*([\d\s\+\-]{8,25})/i);
+      if (match) return match[1].trim();
+    }
+    return '';
+  },
+
+  /**
+   * Oczyszcza uwagi zgłoszenia z automatycznie doklejanych logów operacji oraz numerów telefonów,
+   * pozostawiając wyłącznie faktyczne uwagi wpisane przez klienta / użytkownika.
+   * @param {string} notes 
+   * @returns {string}
+   */
+  getCleanNotes(notes) {
+    if (!notes) return '';
+    return String(notes)
+      .replace(/\[Zgłoszenie\s+[^\]]+\]:\s*/gi, '')
+      .replace(/\[Połączono ze zgłoszeń:[^\]]*\]/gi, '')
+      .replace(/\[Wydzielono\s+\d+\s+bębnów\s+do\s+zgłoszenia\s+[^\]]+\]/gi, '')
+      .replace(/\[Zgłoszenie wydzielone ze zgłoszenia\s+[^\]]+\]/gi, '')
+      .replace(/Telefon kontaktowy:\s*[\d\s\+\-]+(\n|$)/gi, '')
+      .replace(/Sugerowany termin zwrotu:\s*od\s+[\d\-]+\s+do\s+[\d\-]+(\n|$)/gi, '')
+      .replace(/Brak dodatkowych uwag/gi, '')
+      .trim();
+  },
+
+  /**
+   * Generuje ustrukturyzowaną listę operacji i zdarzeń (historię operacji) dla danego zgłoszenia.
+   * Łączy wpisy z status_history, wyodrębnia operacje archiwalne ze starych notatek, zlecenia transportu oraz korekty.
+   * @param {object} request 
+   * @returns {Array<object>}
+   */
+  getOperationsHistory(request) {
+    if (!request) return [];
+    const events = [];
+
+    // 1. Zdarzenia z kolumny status_history
+    if (Array.isArray(request.status_history)) {
+      request.status_history.forEach(item => {
+        let actionType = item.action || 'status_change';
+        let title = 'Zmiana statusu';
+        if (item.status === 'Pending') title = 'Zgłoszenie oczekujące';
+        if (item.status === 'Approved') title = 'Zgłoszenie zaakceptowane';
+        if (item.status === 'InTransit') title = 'W transporcie';
+        if (item.status === 'Completed') title = 'Zgłoszenie zakończone';
+        if (item.status === 'Rejected') title = 'Zgłoszenie odrzucone';
+        if (item.action === 'split' || item.action === 'split_from') title = 'Wydzielenie bębnów';
+        if (item.action === 'split_created') title = 'Utworzono przez wydzielenie';
+        if (item.action === 'merge' || item.action === 'merge_created') title = 'Połączenie zgłoszeń';
+        if (item.action === 'created') title = 'Utworzono zgłoszenie zwrotu';
+
+        events.push({
+          type: actionType,
+          title,
+          status: item.status,
+          note: item.note || '',
+          updated_by: item.updated_by || 'System',
+          timestamp: item.timestamp || request.created_at
+        });
+      });
+    }
+
+    // 2. Starsze/archiwalne operacje wyodrębniane z uwag (dla wstecznej kompatybilności)
+    const notes = request.notes || '';
+    const mergeMatches = [...notes.matchAll(/\[Połączono ze zgłoszeń:\s*([^\]]*)\]/gi)];
+    mergeMatches.forEach(m => {
+      const list = m[1].trim();
+      const noteText = list ? `Połączono ze zgłoszeń: ${list}` : 'Połączono zgłoszenia';
+      if (!events.some(e => e.note && e.note.includes(list || 'Połączono ze zgłoszeń'))) {
+        events.push({
+          type: 'merge',
+          title: 'Połączenie zgłoszeń',
+          status: request.status,
+          note: noteText,
+          updated_by: 'System (archiwalne)',
+          timestamp: request.created_at
+        });
+      }
+    });
+
+    const splitMatches = [...notes.matchAll(/\[Wydzielono\s+(\d+)\s+bębnów\s+do\s+zgłoszenia\s+([^\]]+)\]/gi)];
+    splitMatches.forEach(m => {
+      const noteText = `Wydzielono ${m[1]} bębnów do zgłoszenia ${m[2]}`;
+      if (!events.some(e => e.note && e.note.includes(m[2]))) {
+        events.push({
+          type: 'split_from',
+          title: 'Wydzielenie bębnów',
+          status: request.status,
+          note: noteText,
+          updated_by: 'System (archiwalne)',
+          timestamp: request.created_at
+        });
+      }
+    });
+
+    const splitCreatedMatches = [...notes.matchAll(/\[Zgłoszenie wydzielone ze zgłoszenia\s+([^\]]+)\]/gi)];
+    splitCreatedMatches.forEach(m => {
+      const noteText = `Zgłoszenie wydzielone ze zgłoszenia ${m[1]}`;
+      if (!events.some(e => e.note && e.note.includes(m[1]))) {
+        events.push({
+          type: 'split_created',
+          title: 'Utworzono przez wydzielenie',
+          status: request.status,
+          note: noteText,
+          updated_by: 'System (archiwalne)',
+          timestamp: request.created_at
+        });
+      }
+    });
+
+    // 3. Dodatkowe zdarzenia z pól zgłoszenia (np. zlecenia transportu, faktury korygujące)
+    if (request.transport_date) {
+      const transportNote = `Zaplanowano realizację transportu na dzień ${new Date(request.transport_date).toLocaleDateString('pl-PL')}`;
+      if (!events.some(e => e.note && e.note.includes('transportu'))) {
+        events.push({
+          type: 'transport',
+          title: 'Zlecenie transportu',
+          status: request.status,
+          note: transportNote,
+          updated_by: 'Spedycja',
+          timestamp: request.updated_at || request.transport_date
+        });
+      }
+    }
+
+    if (request.correction_number) {
+      const corrNote = `Wystawiono numer korekty: ${request.correction_number}`;
+      if (!events.some(e => (e.note && e.note.includes('korekty')) || e.note?.includes(request.correction_number))) {
+        events.push({
+          type: 'correction',
+          title: 'Faktura korygująca',
+          status: request.status,
+          note: corrNote,
+          updated_by: 'Księgowość',
+          timestamp: request.updated_at || request.created_at
+        });
+      }
+    }
+
+    // Sortowanie chronologiczne od najnowszego do najstarszego
+    events.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+    return events;
+  },
+
+  /**
    * Pobiera listę zgłoszeń zwrotu.
    * @param {string|null} nip - NIP klienta do filtrowania.
    * @returns {Promise<Array>} Lista zgłoszeń.
@@ -2465,6 +2627,7 @@ export const returnsAPI = {
 
       const payload = {
         ...returnData,
+        profile_phone: returnData.profile_phone || returnData.phoneNumber || returnData.phone || null,
         user_nip: safeNip,
         status: initialStatus,
         priority: returnData.priority || 'Normal',
@@ -2563,8 +2726,8 @@ export const returnsAPI = {
         updatePayload.collection_date = parseToIsoDate(updatePayload.collection_date);
       }
 
-      // Jeśli następuje zmiana statusu, pobieramy obecny stan zgłoszenia i archiwizujemy historię
-      if (updatePayload.status) {
+      // Jeśli następuje zmiana statusu i nie podano przygotowanej historii, pobieramy obecny stan zgłoszenia i archiwizujemy historię
+      if (updatePayload.status && !updatePayload.status_history) {
         try {
           const { data: currentReq } = await supabase
             .from('return_requests')

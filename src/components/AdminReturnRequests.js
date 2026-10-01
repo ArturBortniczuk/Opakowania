@@ -26,7 +26,10 @@ import {
   ArrowUpRight,
   LayoutGrid,
   User,
-  Phone
+  Phone,
+  FileText,
+  Mail,
+  MessageSquare
 } from 'lucide-react';
 
 const formatPalletName = (size) => {
@@ -46,7 +49,8 @@ const MergeRequestsModal = ({
   setMergeMode,
   requests,
   handleRefresh,
-  returnsAPI
+  returnsAPI,
+  user
 }) => {
   const selectedRequests = requests.filter(r => selectedMergeIds.includes(r.id));
 
@@ -104,8 +108,10 @@ const MergeRequestsModal = ({
   const initialPriority = hasHighPriority ? 'High' : 'Normal';
 
   const combinedNotes = selectedRequests
-    .map(r => `[Zgłoszenie ${returnsAPI.getRequestDisplayId(r, requests)}]: ${r.notes ? r.notes.trim() : 'Brak dodatkowych uwag'}`)
-    .join('\n\n') + `\n\n[Połączono ze zgłoszeń: ${selectedRequests.map(r => returnsAPI.getRequestDisplayId(r, requests)).join(', ')}]`;
+    .map(r => returnsAPI.getCleanNotes(r.notes))
+    .filter(Boolean)
+    .filter((n, idx, arr) => arr.indexOf(n) === idx)
+    .join('\n\n');
 
   const defaultCollectionDate = dateOptions[0] || new Date().toISOString().split('T')[0];
 
@@ -144,8 +150,10 @@ const MergeRequestsModal = ({
       const initialPriority = hasHighPriority ? 'High' : 'Normal';
 
       const combinedNotes = selectedRequests
-        .map(r => `[Zgłoszenie ${returnsAPI.getRequestDisplayId(r, requests)}]: ${r.notes ? r.notes.trim() : 'Brak dodatkowych uwag'}`)
-        .join('\n\n') + `\n\n[Połączono ze zgłoszeń: ${selectedRequests.map(r => returnsAPI.getRequestDisplayId(r, requests)).join(', ')}]`;
+        .map(r => returnsAPI.getCleanNotes(r.notes))
+        .filter(Boolean)
+        .filter((n, idx, arr) => arr.indexOf(n) === idx)
+        .join('\n\n');
 
       const defaultCollectionDate = dateOptions[0] || parseToIsoDate(firstReq.collection_date) || new Date().toISOString().split('T')[0];
 
@@ -229,6 +237,14 @@ const MergeRequestsModal = ({
       const firstReq = selectedRequests[0] || {};
       const selectedProf = profileOptions[formData.profileIndex] || null;
 
+      const mergeHistoryEntry = {
+        action: 'merge_created',
+        status: formData.status || 'Pending',
+        timestamp: new Date().toISOString(),
+        updated_by: user?.name || user?.email || 'Administrator',
+        note: `Połączono ze zgłoszeń: ${selectedRequests.map(r => returnsAPI.getRequestDisplayId(r, requests)).join(', ')}`
+      };
+
       const payload = {
         user_nip: formData.user_nip || firstReq.user_nip || '',
         company_name: formData.company_name || firstReq.company_name || '',
@@ -242,11 +258,12 @@ const MergeRequestsModal = ({
         profile_id: selectedProf?.profile_id || firstReq.profile_id || null,
         profile_name: selectedProf?.profile_name || firstReq.profile_name || null,
         profile_email: selectedProf?.profile_email || firstReq.profile_email || null,
-        profile_phone: selectedProf?.profile_phone || firstReq.profile_phone || null,
+        profile_phone: selectedProf?.profile_phone || firstReq.profile_phone || returnsAPI.getContactPhone(firstReq) || null,
         status: formData.status || 'Pending',
         priority: formData.priority || 'Normal',
-        notes: formData.notes,
-        selected_drums: mergedDrumsAndPallets
+        notes: (formData.notes || '').trim(),
+        selected_drums: mergedDrumsAndPallets,
+        status_history: [mergeHistoryEntry]
       };
 
       const newReturn = await returnsAPI.createReturn(payload);
@@ -487,11 +504,12 @@ const MergeRequestsModal = ({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">Uwagi połączone (możesz edytować)</label>
+            <label className="block text-xs font-bold text-gray-700 mb-1">Uwagi połączone klienta (opcjonalne)</label>
             <textarea
-              rows={4}
+              rows={3}
               value={formData.notes}
               onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+              placeholder="Brak uwag klienta lub wpisz dodatkowe uwagi..."
               className="w-full text-xs font-medium p-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
@@ -557,6 +575,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [detailsModalTab, setDetailsModalTab] = useState('details'); // 'details' | 'history'
   const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'schedule'
   const [showRequestDetails, setShowRequestDetails] = useState(false);
   const [enriching, setEnriching] = useState(false);
@@ -696,10 +715,10 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
             street: requestForTransport.street
           },
           delivery: transportData.deliveryAddress,
-          loadingContact: ((requestForTransport.notes || '').match(/Telefon kontaktowy:\s*([\d\s\+\-]{8,20})/)?.[1]?.trim()) || requestForTransport.profile_phone || 'Brak telefonu',
+          loadingContact: returnsAPI.getContactPhone(requestForTransport) || 'Brak telefonu',
           unloadingContact: transportData.unloadingContact || '',
           deliveryDate: transportData.transportDate,
-          notes: `Zgłoszenie z Opakowań ${returnsAPI.getRequestDisplayId(requestForTransport, requests)}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}\n${requestForTransport.notes || ''}`,
+          notes: `Zgłoszenie z Opakowań ${returnsAPI.getRequestDisplayId(requestForTransport, requests)}\nGodziny załadunku: ${requestForTransport.loading_hours || 'Brak'}\nSprzęt: ${requestForTransport.available_equipment || 'Brak'}${returnsAPI.getCleanNotes(requestForTransport.notes) ? `\nUwagi: ${returnsAPI.getCleanNotes(requestForTransport.notes)}` : ''}`,
           clientName: transportData.deliveryName || (typeof transportData.deliveryAddress === 'object' ? transportData.deliveryAddress.name : null) || requestForTransport.company_name,
           sourceClientName: requestForTransport.company_name,
           distanceKm: transportData.distanceKm || 0,
@@ -810,6 +829,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
       lastScrollYRef.current = window.scrollY || window.pageYOffset || 0;
     }
     setSelectedRequest(request);
+    setDetailsModalTab('details');
     setShowRequestDetails(true);
     setEnriching(true);
 
@@ -856,6 +876,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
     setSelectedRequest(null);
     setSplitMode(false);
     setSplitSelectedDrums([]);
+    setDetailsModalTab('details');
 
     if (typeof window !== 'undefined') {
       requestAnimationFrame(() => {
@@ -894,6 +915,12 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
         };
       });
 
+      const cleanOriginalNotes = returnsAPI.getCleanNotes(selectedRequest.notes);
+      const currentDisplayId = returnsAPI.getRequestDisplayId(selectedRequest, requests);
+      const nowIso = new Date().toISOString();
+      const currentUserName = user?.name || user?.email || 'Administrator';
+      const contactPhone = selectedRequest.profile_phone || returnsAPI.getContactPhone(selectedRequest) || null;
+
       const newReturnData = {
         user_nip: selectedRequest.user_nip || '8852434220',
         company_name: selectedRequest.company_name || 'Mixel firma elektryczna Kowalski Tomasz',
@@ -904,7 +931,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
         email: selectedRequest.email || 'magazyn@mixel.com.pl',
         loading_hours: selectedRequest.loading_hours || '06:00 - 14:00',
         available_equipment: selectedRequest.available_equipment || 'Wózek widłowy.',
-        notes: (selectedRequest.notes || '') + '\n\n[Zgłoszenie wydzielone ze zgłoszenia ' + returnsAPI.getRequestDisplayId(selectedRequest, requests) + ']',
+        notes: cleanOriginalNotes,
         selected_drums: enrichedDrumsToMove,
         created_at: selectedRequest.created_at,
         status: selectedRequest.status || 'Pending',
@@ -912,17 +939,38 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
         profile_id: selectedRequest.profile_id || null,
         profile_name: selectedRequest.profile_name || null,
         profile_email: selectedRequest.profile_email || null,
-        profile_phone: selectedRequest.profile_phone || null
+        profile_phone: contactPhone,
+        status_history: [
+          {
+            action: 'split_created',
+            status: selectedRequest.status || 'Pending',
+            timestamp: nowIso,
+            updated_by: currentUserName,
+            note: `Zgłoszenie utworzone poprzez wydzielenie ze zgłoszenia ${currentDisplayId}`
+          }
+        ]
       };
 
       const createdNewReturn = await returnsAPI.createReturn(newReturnData);
 
       const newDisplayId = returnsAPI.getRequestDisplayId(createdNewReturn, requests);
-      const updatedOriginalNotes = (selectedRequest.notes || '') + `\n\n[Wydzielono ${enrichedDrumsToMove.length} bębnów do zgłoszenia ${newDisplayId}]`;
+      
+      const splitHistoryEntry = {
+        action: 'split_from',
+        status: selectedRequest.status || 'Pending',
+        timestamp: nowIso,
+        updated_by: currentUserName,
+        note: `Wydzielono ${enrichedDrumsToMove.length} bębnów do zgłoszenia ${newDisplayId}`
+      };
+
+      const updatedOriginalHistory = Array.isArray(selectedRequest.status_history)
+        ? [...selectedRequest.status_history, splitHistoryEntry]
+        : [splitHistoryEntry];
 
       await returnsAPI.updateReturnStatus(selectedRequest.id, {
         selected_drums: drumsToKeep,
-        notes: updatedOriginalNotes
+        notes: cleanOriginalNotes,
+        status_history: updatedOriginalHistory
       });
 
       setSplitMode(false);
@@ -1429,11 +1477,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
 
         // Dane osoby zgłaszającej i telefon
         const submitterName = req.profile_name || (req.email ? req.email.split('@')[0] : 'Klient');
-        let submitterPhone = req.profile_phone || '';
-        if (!submitterPhone && req.notes) {
-          const phoneMatch = req.notes.match(/(?:tel|telefon|kontakt)?:\s*([\d\s\+\-]{8,20})/i);
-          if (phoneMatch) submitterPhone = phoneMatch[1].trim();
-        }
+        const submitterPhone = returnsAPI.getContactPhone(req) || 'Brak tel.';
 
         return {
           ...req,
@@ -1604,6 +1648,10 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
   const renderRequestDetailsModal = () => {
     if (!showRequestDetails || !selectedRequest) return null;
 
+    const operationsList = returnsAPI.getOperationsHistory(selectedRequest);
+    const responsiblePhone = returnsAPI.getContactPhone(selectedRequest);
+    const cleanNotes = returnsAPI.getCleanNotes(selectedRequest.notes);
+
     return (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
@@ -1655,33 +1703,100 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
             </div>
           </div>
 
-          <div className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacje o firmie</h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Nazwa firmy</label>
-                    <p className="text-gray-900">{selectedRequest.company_name}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">NIP</label>
-                    <p className="text-gray-900">{selectedRequest.user_nip}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Email kontaktowy</label>
-                    <p className="text-gray-900">{selectedRequest.email}</p>
-                  </div>
-                  {selectedRequest.profile_name && (
-                    <div className="pt-2 border-t border-gray-155">
-                      <label className="text-xs font-bold text-blue-600 uppercase tracking-wider block mb-1">Osoba zgłaszająca (profil)</label>
-                      <p className="text-sm font-extrabold text-slate-800">{selectedRequest.profile_name}</p>
-                      {selectedRequest.profile_email && <p className="text-xs text-slate-500 font-medium mt-0.5">{selectedRequest.profile_email}</p>}
-                      {selectedRequest.profile_phone && <p className="text-xs text-slate-500 font-semibold mt-0.5">Tel: {selectedRequest.profile_phone}</p>}
+          {/* Zakładki widoku szczegółów */}
+          <div className="flex border-b border-gray-200 px-6 bg-slate-50/70">
+            <button
+              type="button"
+              onClick={() => setDetailsModalTab('details')}
+              className={`py-3.5 px-4 font-bold text-sm border-b-2 flex items-center gap-2 transition-all ${
+                detailsModalTab === 'details'
+                  ? 'border-indigo-600 text-indigo-700 bg-white shadow-xs rounded-t-xl -mb-px'
+                  : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Szczegóły zgłoszenia
+            </button>
+            <button
+              type="button"
+              onClick={() => setDetailsModalTab('history')}
+              className={`py-3.5 px-4 font-bold text-sm border-b-2 flex items-center gap-2 transition-all ${
+                detailsModalTab === 'history'
+                  ? 'border-indigo-600 text-indigo-700 bg-white shadow-xs rounded-t-xl -mb-px'
+                  : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
+              }`}
+            >
+              <Clock className="w-4 h-4" />
+              Historia operacji
+              {operationsList.length > 0 && (
+                <span className="px-2 py-0.5 text-xs font-extrabold rounded-full bg-indigo-100 text-indigo-800">
+                  {operationsList.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {detailsModalTab === 'details' && (
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacje o firmie</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Nazwa firmy</label>
+                      <p className="text-gray-900 font-medium">{selectedRequest.company_name}</p>
                     </div>
-                  )}
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">NIP</label>
+                      <p className="text-gray-900 font-mono text-sm">{selectedRequest.user_nip}</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+                      <div>
+                        <label className="text-sm font-medium text-gray-500 flex items-center gap-1.5">
+                          <Mail className="w-3.5 h-3.5 text-gray-400" />
+                          Email kontaktowy
+                        </label>
+                        <p className="text-gray-900 font-medium text-sm break-all">
+                          {selectedRequest.email ? (
+                            <a href={`mailto:${selectedRequest.email}`} className="text-blue-600 hover:underline">
+                              {selectedRequest.email}
+                            </a>
+                          ) : (
+                            <span className="text-gray-400 font-normal">Brak</span>
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-500 flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-blue-600" />
+                          Telefon kontaktowy
+                        </label>
+                        <p className="text-gray-900 font-semibold text-sm">
+                          {responsiblePhone ? (
+                            <a href={`tel:${responsiblePhone.replace(/\s+/g, '')}`} className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                              {responsiblePhone}
+                            </a>
+                          ) : (
+                            <span className="text-gray-400 font-normal">Brak telefonu</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    {selectedRequest.profile_name && (
+                      <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-xs">
+                        <div>
+                          <span className="text-gray-400 block font-semibold uppercase">Osoba zgłaszająca (profil):</span>
+                          <span className="font-extrabold text-slate-800">{selectedRequest.profile_name}</span>
+                        </div>
+                        {selectedRequest.profile_email && selectedRequest.profile_email !== selectedRequest.email && (
+                          <span className="text-slate-500 font-medium">{selectedRequest.profile_email}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Adres odbioru</h3>
@@ -2139,46 +2254,25 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
               )}
             </div>
 
-            {selectedRequest.notes && (
+            {cleanNotes ? (
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Uwagi do odbioru</h3>
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-gray-700 whitespace-pre-line">{selectedRequest.notes}</p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-amber-600" />
+                  Uwagi do odbioru
+                </h3>
+                <div className="p-4 bg-amber-50/60 rounded-xl border border-amber-200">
+                  <p className="text-gray-800 whitespace-pre-line leading-relaxed text-sm font-medium">{cleanNotes}</p>
                 </div>
               </div>
-            )}
-
-            {/* HISTORIA ZMIAN STATUSÓW (ARCHIWUM) */}
-            {Array.isArray(selectedRequest.status_history) && selectedRequest.status_history.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-sm font-extrabold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-indigo-600" />
-                  Historia zmian statusu zgłoszenia
-                </h3>
-                <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-4 space-y-3">
-                  {selectedRequest.status_history.map((hist, idx) => (
-                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200/60 pb-2.5 last:border-b-0 last:pb-0 text-xs gap-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0"></span>
-                        <div>
-                          <span className="font-extrabold text-gray-900">{hist.status}</span>
-                          {hist.note && <span className="text-gray-600 ml-2 italic">({hist.note})</span>}
-                        </div>
-                      </div>
-                      <div className="text-left sm:text-right text-[11px] text-gray-500 pl-4 sm:pl-0">
-                        <span className="font-semibold text-gray-700">{hist.updated_by || 'System'}</span>
-                        <span className="ml-2 text-gray-400">
-                          {hist.timestamp ? `${new Date(hist.timestamp).toLocaleDateString('pl-PL')} ${new Date(hist.timestamp).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}` : ''}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            ) : (
+              <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center gap-2 text-xs text-gray-500 italic">
+                <MessageSquare className="w-4 h-4 text-gray-400" />
+                <span>Brak dodatkowych uwag klienta do tego zgłoszenia.</span>
               </div>
             )}
 
             {canChangeStatus && (
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mt-6 mb-4">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mt-6 mb-2">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                     <RefreshCw className="w-4 h-4 text-indigo-600" />
@@ -2217,73 +2311,190 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
                 </div>
               </div>
             )}
+          </div>
+        )}
 
-            {canChangeStatus && (
-              <div className="flex flex-col sm:flex-row gap-4 mt-4">
-                {selectedRequest.status === 'Pending' && (
-                  <>
-                    <button
-                      onClick={() => {
-                        handleStatusChange(selectedRequest.id, 'Approved');
-                        handleCloseModal();
-                      }}
-                      className="flex-1 bg-emerald-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <CheckCircle className="w-5 h-5" />
-                      <span>Zatwierdź zgłoszenie</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleStatusChange(selectedRequest.id, 'Rejected');
-                        handleCloseModal();
-                      }}
-                      className="bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-bold hover:bg-red-50 hover:text-red-600 transition-all flex items-center justify-center gap-2"
-                    >
-                      <XCircle className="w-5 h-5" />
-                      <span>Odrzuć</span>
-                    </button>
-                  </>
-                )}
+        {/* ZAKŁADKA: HISTORIA OPERACJI */}
+        {detailsModalTab === 'history' && (
+          <div className="p-6 space-y-6">
+            <div className="bg-gradient-to-r from-slate-50 via-indigo-50/40 to-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-indigo-600" />
+                  Historia operacji i zdarzeń na zgłoszeniu
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Kompletny dziennik akcji: zmiany statusów, wydzielanie i łączenie bębnów oraz realizacja transportu.
+                </p>
+              </div>
+              <span className="self-start sm:self-auto px-3.5 py-1.5 bg-white text-indigo-700 text-xs font-extrabold rounded-xl border border-indigo-100 shadow-xs flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                Łącznie zdarzeń: {operationsList.length}
+              </span>
+            </div>
 
-                {(selectedRequest.status === 'Approved' || (selectedRequest.status === 'InTransit' && selectedRequest.selected_drums?.some(d => typeof d === 'object' && d.transported === false))) && (
+            {operationsList.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50/50 rounded-2xl border border-gray-200">
+                <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-sm font-bold text-gray-700">Brak zarejestrowanych operacji</p>
+                <p className="text-xs text-gray-400 mt-1">Wszystkie przyszłe akcje pojawią się w tym miejscu.</p>
+              </div>
+            ) : (
+              <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-indigo-100">
+                {operationsList.map((op, idx) => {
+                  let badgeBg = 'bg-slate-100 text-slate-800 border-slate-200';
+                  let dotBg = 'bg-slate-400 ring-slate-100';
+                  let icon = <Clock className="w-3.5 h-3.5" />;
+
+                  if (op.type?.includes('split')) {
+                    badgeBg = 'bg-purple-50 text-purple-800 border-purple-200';
+                    dotBg = 'bg-purple-600 ring-purple-100';
+                    icon = <ArrowUpDown className="w-3.5 h-3.5 text-purple-600" />;
+                  } else if (op.type?.includes('merge')) {
+                    badgeBg = 'bg-blue-50 text-blue-800 border-blue-200';
+                    dotBg = 'bg-blue-600 ring-blue-100';
+                    icon = <GitMerge className="w-3.5 h-3.5 text-blue-600" />;
+                  } else if (op.status === 'Approved') {
+                    badgeBg = 'bg-sky-50 text-sky-800 border-sky-200';
+                    dotBg = 'bg-sky-500 ring-sky-100';
+                    icon = <CheckCircle className="w-3.5 h-3.5 text-sky-600" />;
+                  } else if (op.status === 'Completed') {
+                    badgeBg = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+                    dotBg = 'bg-emerald-500 ring-emerald-100';
+                    icon = <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />;
+                  } else if (op.status === 'InTransit' || op.type === 'transport') {
+                    badgeBg = 'bg-indigo-50 text-indigo-800 border-indigo-200';
+                    dotBg = 'bg-indigo-600 ring-indigo-100';
+                    icon = <Truck className="w-3.5 h-3.5 text-indigo-600" />;
+                  } else if (op.status === 'Rejected') {
+                    badgeBg = 'bg-rose-50 text-rose-800 border-rose-200';
+                    dotBg = 'bg-rose-500 ring-rose-100';
+                    icon = <XCircle className="w-3.5 h-3.5 text-rose-600" />;
+                  } else if (op.type === 'correction') {
+                    badgeBg = 'bg-amber-50 text-amber-800 border-amber-200';
+                    dotBg = 'bg-amber-500 ring-amber-100';
+                    icon = <FileText className="w-3.5 h-3.5 text-amber-600" />;
+                  }
+
+                  const dateObj = op.timestamp ? new Date(op.timestamp) : null;
+                  const dateFormatted = dateObj && !isNaN(dateObj.getTime())
+                    ? `${dateObj.toLocaleDateString('pl-PL')} ${dateObj.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}`
+                    : 'Data nieznana';
+
+                  return (
+                    <div key={idx} className="relative group">
+                      {/* Węzeł na osi czasu */}
+                      <div className={`absolute -left-6 top-3.5 w-5 h-5 rounded-full ${dotBg} ring-4 flex items-center justify-center -translate-x-1/2 transition-transform group-hover:scale-110 shadow-xs`}>
+                        <span className="w-2 h-2 rounded-full bg-white"></span>
+                      </div>
+
+                      {/* Karta zdarzenia */}
+                      <div className="bg-white rounded-xl border border-gray-200/80 p-4 shadow-xs hover:shadow-md transition-shadow">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-2 border-b border-gray-100">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-extrabold px-2.5 py-1 rounded-lg border flex items-center gap-1.5 ${badgeBg}`}>
+                              {icon}
+                              {op.title}
+                            </span>
+                            {op.status && op.status !== 'Archived' && (
+                              <span className="text-[11px] font-bold text-gray-500">
+                                ({op.status})
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-gray-500">
+                            <span className="font-semibold text-gray-700 flex items-center gap-1">
+                              <User className="w-3.5 h-3.5 text-gray-400" />
+                              {op.updated_by || 'System'}
+                            </span>
+                            <span className="text-gray-400 font-mono text-[11px]">
+                              {dateFormatted}
+                            </span>
+                          </div>
+                        </div>
+
+                        {op.note && (
+                          <p className="mt-2.5 text-xs text-gray-700 leading-relaxed font-medium bg-gray-50/70 p-2.5 rounded-lg border border-gray-100 whitespace-pre-line">
+                            {op.note}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {canChangeStatus && (
+          <div className="px-6 pb-6 pt-2">
+            <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-gray-100">
+              {selectedRequest.status === 'Pending' && (
+                <>
                   <button
                     onClick={() => {
-                      setRequestForTransport(selectedRequest);
-                      setShowTransportModal(true);
-                    }}
-                    className="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Truck className="w-5 h-5" />
-                    <span>{selectedRequest.status === 'InTransit' ? 'Zleć kolejny transport' : 'Rozpocznij transport'}</span>
-                  </button>
-                )}
-
-                {selectedRequest.status === 'InTransit' && (
-                  <button
-                    onClick={() => {
-                      handleStatusChange(selectedRequest.id, 'Completed');
+                      handleStatusChange(selectedRequest.id, 'Approved');
                       handleCloseModal();
                     }}
                     className="flex-1 bg-emerald-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
                   >
                     <CheckCircle className="w-5 h-5" />
-                    <span>Zakończ transport</span>
+                    <span>Zatwierdź zgłoszenie</span>
                   </button>
-                )}
-
-                {canChangeStatus && (
                   <button
                     onClick={() => {
-                      handleAddCorrectionNumber(selectedRequest.id);
+                      handleStatusChange(selectedRequest.id, 'Rejected');
+                      handleCloseModal();
                     }}
-                    className="flex-1 bg-indigo-50 text-indigo-700 py-3 px-4 rounded-xl font-bold hover:bg-indigo-100 border border-indigo-100 transition-colors flex items-center justify-center gap-2"
+                    className="bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-bold hover:bg-red-50 hover:text-red-600 transition-all flex items-center justify-center gap-2"
                   >
-                    <Edit className="w-5 h-5" />
-                    <span>{selectedRequest.correction_number ? 'Edytuj numer korekty' : 'Dodaj numer korekty'}</span>
+                    <XCircle className="w-5 h-5" />
+                    <span>Odrzuć</span>
                   </button>
-                )}
-              </div>
-            )}
+                </>
+              )}
+
+              {(selectedRequest.status === 'Approved' || (selectedRequest.status === 'InTransit' && selectedRequest.selected_drums?.some(d => typeof d === 'object' && d.transported === false))) && (
+                <button
+                  onClick={() => {
+                    setRequestForTransport(selectedRequest);
+                    setShowTransportModal(true);
+                  }}
+                  className="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Truck className="w-5 h-5" />
+                  <span>{selectedRequest.status === 'InTransit' ? 'Zleć kolejny transport' : 'Rozpocznij transport'}</span>
+                </button>
+              )}
+
+              {selectedRequest.status === 'InTransit' && (
+                <button
+                  onClick={() => {
+                    handleStatusChange(selectedRequest.id, 'Completed');
+                    handleCloseModal();
+                  }}
+                  className="flex-1 bg-emerald-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <CheckCircle className="w-5 h-5" />
+                  <span>Zakończ transport</span>
+                </button>
+              )}
+
+              {canChangeStatus && (
+                <button
+                  onClick={() => {
+                    handleAddCorrectionNumber(selectedRequest.id);
+                  }}
+                  className="flex-1 bg-indigo-50 text-indigo-700 py-3 px-4 rounded-xl font-bold hover:bg-indigo-100 border border-indigo-100 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Edit className="w-5 h-5" />
+                  <span>{selectedRequest.correction_number ? 'Edytuj numer korekty' : 'Dodaj numer korekty'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
           </div>
         </div>
       </div>
@@ -2581,6 +2792,7 @@ const AdminReturnRequests = ({ user, initialFilter = {} }) => {
           requests={requests}
           handleRefresh={handleRefresh}
           returnsAPI={returnsAPI}
+          user={user}
         />
 
         <TransportOrderModal
