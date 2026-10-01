@@ -3028,99 +3028,139 @@ export const returnPeriodsAPI = {
 };
 
 // ==================================
-//  API do Statystyk (NAPRAWIONE - BEZ LIMITU 1000)
+//  API do Statystyk (NAPRAWIONE - BEZ LIMITU 1000 + CACHE)
 // ==================================
+const _dashboardStatsCache = new Map();
+const STATS_CACHE_TTL = 60 * 1000; // 60 sekund pamięci podręcznej
+
 export const statsAPI = {
+  /**
+   * Czyści pamięć podręczną statystyk (np. po zatwierdzeniu zgłoszenia lub modyfikacji bębnów).
+   */
+  invalidateStatsCache() {
+    _dashboardStatsCache.clear();
+  },
+
   /**
    * Pobiera statystyki dashboardu dla klienta lub administratora.
    * NAPRAWIONE: Używa head: true i count: 'exact' żeby nie było limitu 1000
+   * ZOPTYMALIZOWANE: Pamięć podręczna (60s) + deduplikacja zapytań w locie (zapobiega nadmiarowemu odpytywaniu API Supabase)
    * @param {string|null} nip - NIP klienta (jeśli dotyczy).
+   * @param {boolean} [forceRefresh=false] - Wymuszenie pominięcia cache i pobrania świeżych danych.
    * @returns {Promise<object>} Obiekt ze statystykami.
    */
-  async getDashboardStats(nip = null) {
-    try {
-      const now = new Date().toISOString();
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  async getDashboardStats(nip = null, forceRefresh = false) {
+    const cacheKey = nip ? `client_${nip}` : 'admin';
+    const cached = _dashboardStatsCache.get(cacheKey);
 
-      console.log(`🔄 Pobieranie statystyk dla NIP: ${nip || 'ADMIN'}`);
+    if (!forceRefresh && cached) {
+      if (Date.now() - cached.timestamp < STATS_CACHE_TTL && cached.data) {
+        return cached.data;
+      }
+      if (cached.inFlightPromise) {
+        return cached.inFlightPromise;
+      }
+    }
 
-      if (nip) {
-        // Statystyki dla klienta - idealnie zsynchronizowane z widokami klienta
-        console.log(`👤 Liczenie bębnów dla klienta ${nip}...`);
+    const fetchPromise = (async () => {
+      try {
+        const now = new Date().toISOString();
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-        const [userDrums, { count: pendingReturns }] = await Promise.all([
-          drumsAPI.getAllDrums(nip),
-          supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('user_nip', nip).eq('status', 'Pending')
+        console.log(`🔄 Pobieranie statystyk dla NIP: ${nip || 'ADMIN'}`);
+
+        if (nip) {
+          // Statystyki dla klienta - idealnie zsynchronizowane z widokami klienta
+          console.log(`👤 Liczenie bębnów dla klienta ${nip}...`);
+
+          const [userDrums, { count: pendingReturns }] = await Promise.all([
+            drumsAPI.getAllDrums(nip),
+            supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('user_nip', nip).eq('status', 'Pending')
+          ]);
+
+          const thirtyDaysAgoStr = thirtyDaysAgo.split('T')[0];
+          
+          const totalDrums = userDrums.length;
+          const activeDrums = userDrums.filter(d => d.status === 'Aktywny').length;
+          const recentReturns = userDrums.filter(d => d.data_wydania && d.data_wydania >= thirtyDaysAgoStr).length;
+
+          console.log(`✅ Statystyki klienta ${nip}: ${totalDrums} bębnów, ${activeDrums} aktywnych`);
+          const result = {
+            totalDrums,
+            activeDrums,
+            pendingReturns: pendingReturns || 0,
+            recentReturns
+          };
+          _dashboardStatsCache.set(cacheKey, { data: result, timestamp: Date.now(), inFlightPromise: null });
+          return result;
+        }
+
+        // Statystyki dla admina - NAPRAWIONE: head: true oznacza że pobieramy TYLKO COUNT
+        console.log(`👨‍💼 Liczenie statystyk dla administratora/handlowca...`);
+
+        const currentUser = _currentUserCache;
+        const allowedNips = await getAllowedNips(currentUser);
+
+        const applyNipFilter = (query, field = 'nip') => {
+          if (allowedNips) {
+            if (allowedNips.length === 0) {
+              return query.eq(field, '0000000000_none');
+            }
+            return query.in(field, allowedNips);
+          }
+          return query;
+        };
+
+        const [
+          { count: totalClients },
+          { count: totalDrums },
+          { count: issuedDrums },
+          { count: pendingReturns },
+          { count: overdueReturns },
+          { count: activeRequests },
+          { count: completedRequests }
+        ] = await Promise.all([
+          applyNipFilter(supabase.from('companies').select('*', { count: 'exact', head: true })),
+          applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null')),
+          applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null').neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%')),
+          applyNipFilter(supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Pending'), 'user_nip'),
+          applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null').lt('data_zwrotu_do_dostawcy', now)),
+          applyNipFilter(supabase.from('return_requests').select('*', { count: 'exact', head: true }).in('status', ['Pending', 'Approved']), 'user_nip'),
+          applyNipFilter(supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Completed').gte('updated_at', thirtyDaysAgo), 'user_nip')
         ]);
 
-        const thirtyDaysAgoStr = thirtyDaysAgo.split('T')[0];
-        
-        const totalDrums = userDrums.length;
-        const activeDrums = userDrums.filter(d => d.status === 'Aktywny').length;
-        const recentReturns = userDrums.filter(d => d.data_wydania && d.data_wydania >= thirtyDaysAgoStr).length;
+        const warehouseDrums = (totalDrums || 0) - (issuedDrums || 0);
 
-        console.log(`✅ Statystyki klienta ${nip}: ${totalDrums} bębnów, ${activeDrums} aktywnych`);
-        return {
-          totalDrums,
-          activeDrums,
+        console.log(`✅ Statystyki admina: ${totalDrums} bębnów ogółem (${issuedDrums} u klientów, ${warehouseDrums} na magazynie), ${totalClients} klientów, ${pendingReturns} zwrotów`);
+
+        const result = {
+          totalClients: totalClients || 0,
+          totalDrums: totalDrums || 0,
+          issuedDrums: issuedDrums || 0,
+          warehouseDrums: warehouseDrums >= 0 ? warehouseDrums : 0,
           pendingReturns: pendingReturns || 0,
-          recentReturns
+          overdueReturns: overdueReturns || 0,
+          activeRequests: activeRequests || 0,
+          completedRequests: completedRequests || 0
         };
+
+        _dashboardStatsCache.set(cacheKey, { data: result, timestamp: Date.now(), inFlightPromise: null });
+        return result;
+
+      } catch (error) {
+        _dashboardStatsCache.delete(cacheKey);
+        console.error('❌ Błąd API statystyk:', error);
+        throw error;
       }
+    })();
 
-      // Statystyki dla admina - NAPRAWIONE: head: true oznacza że pobieramy TYLKO COUNT
-      console.log(`👨‍💼 Liczenie statystyk dla administratora/handlowca...`);
+    _dashboardStatsCache.set(cacheKey, {
+      data: cached?.data || null,
+      timestamp: cached?.timestamp || 0,
+      inFlightPromise: fetchPromise
+    });
 
-      const currentUser = _currentUserCache;
-      const allowedNips = await getAllowedNips(currentUser);
-
-      const applyNipFilter = (query, field = 'nip') => {
-        if (allowedNips) {
-          if (allowedNips.length === 0) {
-            return query.eq(field, '0000000000_none');
-          }
-          return query.in(field, allowedNips);
-        }
-        return query;
-      };
-
-      const [
-        { count: totalClients },
-        { count: totalDrums },
-        { count: issuedDrums },
-        { count: pendingReturns },
-        { count: overdueReturns },
-        { count: activeRequests },
-        { count: completedRequests }
-      ] = await Promise.all([
-        applyNipFilter(supabase.from('companies').select('*', { count: 'exact', head: true })),
-        applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null')),
-        applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null').neq('kontrahent', 'Nie wydany').not('kontrahent', 'ilike', '%magazyn%')),
-        applyNipFilter(supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Pending'), 'user_nip'),
-        applyNipFilter(supabase.from('drums').select('*', { count: 'exact', head: true }).or('typ_opakowania.eq.Bęben,typ_opakowania.is.null').lt('data_zwrotu_do_dostawcy', now)),
-        applyNipFilter(supabase.from('return_requests').select('*', { count: 'exact', head: true }).in('status', ['Pending', 'Approved']), 'user_nip'),
-        applyNipFilter(supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'Completed').gte('updated_at', thirtyDaysAgo), 'user_nip')
-      ]);
-
-      const warehouseDrums = (totalDrums || 0) - (issuedDrums || 0);
-
-      console.log(`✅ Statystyki admina: ${totalDrums} bębnów ogółem (${issuedDrums} u klientów, ${warehouseDrums} na magazynie), ${totalClients} klientów, ${pendingReturns} zwrotów`);
-
-      return {
-        totalClients: totalClients || 0,
-        totalDrums: totalDrums || 0,
-        issuedDrums: issuedDrums || 0,
-        warehouseDrums: warehouseDrums >= 0 ? warehouseDrums : 0,
-        pendingReturns: pendingReturns || 0,
-        overdueReturns: overdueReturns || 0,
-        activeRequests: activeRequests || 0,
-        completedRequests: completedRequests || 0
-      };
-
-    } catch (error) {
-      console.error('❌ Błąd API statystyk:', error);
-      throw error;
-    }
+    return fetchPromise;
   },
 
   /**

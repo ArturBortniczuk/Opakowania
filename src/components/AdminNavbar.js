@@ -6,7 +6,7 @@ import {
   UserCheck, ChevronRight, Shield, Settings, Crown, Pin, PinOff, Map, MapPin, HelpCircle, Calculator,
   MessageSquare
 } from 'lucide-react';
-import { statsAPI, normalizeRole } from '../utils/supabaseApi';
+import { normalizeRole } from '../utils/supabaseApi';
 import { chatAPI } from '../utils/chatApi';
 import AdminChatModal from './AdminChatModal';
 import AppSwitcher from './AppSwitcher';
@@ -22,13 +22,6 @@ const AdminNavbar = ({
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [quickStats, setQuickStats] = useState({
-    totalClients: 0,
-    totalDrums: 0,
-    pendingReturns: 0,
-    overdueReturns: 0
-  });
-  const [statsLoading, setStatsLoading] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
@@ -36,7 +29,7 @@ const AdminNavbar = ({
   const canonicalRole = normalizeRole(user?.role);
   const canAccessChat = ['admin', 'supervisor', 'magazyn'].includes(canonicalRole);
 
-  // Pobieranie sumy nieprzeczytanych wiadomości dla uprawnionych ról
+  // Pobieranie sumy nieprzeczytanych wiadomości dla uprawnionych ról (wyłącznie przez WebSocket / zdarzenia Realtime)
   const fetchUnreadChatCount = async () => {
     if (!canAccessChat) return;
     try {
@@ -53,7 +46,7 @@ const AdminNavbar = ({
 
     fetchUnreadChatCount();
 
-    // Nasłuchiwanie zmian w czasie rzeczywistym dla uprawnionych pracowników
+    // Nasłuchiwanie zmian w czasie rzeczywistym dla uprawnionych pracowników (bez ciągłego odpytywania HTTP)
     const subscription = chatAPI.subscribeToStaffChat(() => {
       fetchUnreadChatCount();
     });
@@ -64,31 +57,6 @@ const AdminNavbar = ({
       }
     };
   }, [canAccessChat]);
-
-  // Pobierz szybkie statystyki
-  useEffect(() => {
-    const fetchQuickStats = async () => {
-      try {
-        setStatsLoading(true);
-        const stats = await statsAPI.getDashboardStats();
-        setQuickStats({
-          totalClients: stats.totalClients || 0,
-          totalDrums: stats.totalDrums || 0,
-          pendingReturns: stats.pendingReturns || 0,
-          overdueReturns: stats.overdueReturns || 0
-        });
-      } catch (error) {
-        console.error('Błąd pobierania statystyk:', error);
-      } finally {
-        setStatsLoading(false);
-      }
-    };
-
-    fetchQuickStats();
-
-    const interval = setInterval(fetchQuickStats, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   const menuItems = [
     { path: '/admin', label: 'Strona główna', icon: Home, description: 'Panel główny' },
