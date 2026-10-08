@@ -40,6 +40,14 @@ const isDrumOwn = (drum) => {
   if (isNaN(returnDate.getTime())) return true;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
+  // NKT SA: data w ERP to 270 dni, ale zwrot do kablowni jest dopuszczalny do 360 dni (+90 dni za 75% kaucji)
+  if (supplierUpper.includes('NKT')) {
+    const nktExtended = new Date(returnDate);
+    nktExtended.setDate(nktExtended.getDate() + 90);
+    return nktExtended < today;
+  }
+
   return returnDate < today;
 };
 
@@ -324,7 +332,17 @@ const AdminWarehouseDrums = () => {
          'Magazyn': drum.magazyn || '',
          'Lokalizacja WMS': drum.lokalizacja_wms || '',
          'Kablownia (Dostawca)': drum.kon_dostawca || '',
-         'Data zwrotu': isDrumOwn(drum) ? 'Własny' : (drum.data_zwrotu_do_dostawcy || 'Własny')
+         'Data zwrotu': (() => {
+           if (isDrumOwn(drum)) return 'Własny';
+           if (!drum.data_zwrotu_do_dostawcy) return 'Własny';
+           const retDate = new Date(drum.data_zwrotu_do_dostawcy);
+           const supp = (drum.kon_dostawca || drum.dostawca || '').toUpperCase();
+           if (supp.includes('NKT') && retDate < new Date()) {
+             const ext = new Date(retDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+             return `Do ${ext.toLocaleDateString('pl-PL')} (NKT 75%)`;
+           }
+           return drum.data_zwrotu_do_dostawcy;
+         })()
       }));
       
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -472,9 +490,28 @@ const AdminWarehouseDrums = () => {
     const isOwn = isDrumOwn(drum);
     const isWrongAddress100 = isWms100 && isOwn;
 
+    const supplierUpper = (drum.kon_dostawca || drum.dostawca || '').toUpperCase();
+    const isNKT = supplierUpper.includes('NKT');
+    const retDate = drum.data_zwrotu_do_dostawcy ? new Date(drum.data_zwrotu_do_dostawcy) : null;
+    const isRetDateValid = retDate && !isNaN(retDate.getTime());
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const isNktInGracePeriod = isNKT && isRetDateValid && retDate < today && !isOwn;
+    const nktFinalDeadline = isNktInGracePeriod ? new Date(retDate.getTime() + 90 * 24 * 60 * 60 * 1000) : null;
+
     const isManuallyReady = readyCechy.has(drumCecha);
     const isReady = (isManuallyReady && !isOwn) || (isWms100 && !isOwn);
-    const urgent = !isOwn && isUrgent(drum.data_zwrotu_do_dostawcy);
+    
+    let urgent = false;
+    if (!isOwn) {
+      if (isNktInGracePeriod && nktFinalDeadline) {
+        const diffDays = Math.ceil((nktFinalDeadline - today) / (1000 * 60 * 60 * 24));
+        urgent = diffDays >= 0 && diffDays <= 30;
+      } else if (drum.data_zwrotu_do_dostawcy) {
+        urgent = isUrgent(drum.data_zwrotu_do_dostawcy);
+      }
+    }
 
     const isWmsSelected = drum.lokalizacja_wms && selectedWms.includes(drum.lokalizacja_wms.trim().toUpperCase());
 
@@ -499,6 +536,16 @@ const AdminWarehouseDrums = () => {
             </span>
             <span className="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded font-black uppercase tracking-wider shrink-0">
               Zmień adres
+            </span>
+          </div>
+        ) : isNktInGracePeriod ? (
+          <div className="mb-3 flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs bg-amber-50 text-amber-900 border border-amber-200">
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+              NKT: termin ERP (270 dni) minął – zwrot do 360 dni za 75%
+            </span>
+            <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded font-black uppercase shrink-0">
+              75% zwrot
             </span>
           </div>
         ) : isReady ? (
@@ -595,18 +642,30 @@ const AdminWarehouseDrums = () => {
 
           <div className="flex justify-between items-center pt-2 border-t border-gray-100">
             <span className="text-sm text-gray-500">Termin zwrotu</span>
-            <span className={`text-sm font-bold flex items-center gap-1 ${
-              isWrongAddress100
-                ? 'text-red-800 bg-red-100 px-2.5 py-1 rounded-lg border border-red-200 font-black'
-                : urgent
-                ? 'text-orange-600'
-                : (isOwn ? 'text-indigo-600' : 'text-gray-900')
-            }`}>
-              {isWrongAddress100 && <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />}
-              {isOwn ? 'Własny' : (drum.data_zwrotu_do_dostawcy ?
-                new Date(drum.data_zwrotu_do_dostawcy).toLocaleDateString('pl-PL') :
-                'Własny')}
-            </span>
+            {isNktInGracePeriod ? (
+              <div className="flex flex-col items-end">
+                <span className="text-sm font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 flex items-center gap-1" title="Termin ERP (270 dni) minął, ale zwrot do NKT SA jest możliwy do 360 dni za 75% kaucji">
+                  <Clock className="w-3.5 h-3.5 text-amber-600" />
+                  Do {nktFinalDeadline.toLocaleDateString('pl-PL')} (75%)
+                </span>
+                <span className="text-[10px] text-gray-400 mt-0.5 font-medium">
+                  ERP: {retDate.toLocaleDateString('pl-PL')}
+                </span>
+              </div>
+            ) : (
+              <span className={`text-sm font-bold flex items-center gap-1 ${
+                isWrongAddress100
+                  ? 'text-red-800 bg-red-100 px-2.5 py-1 rounded-lg border border-red-200 font-black'
+                  : urgent
+                  ? 'text-orange-600'
+                  : (isOwn ? 'text-indigo-600' : 'text-gray-900')
+              }`}>
+                {isWrongAddress100 && <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />}
+                {isOwn ? 'Własny' : (drum.data_zwrotu_do_dostawcy ?
+                  new Date(drum.data_zwrotu_do_dostawcy).toLocaleDateString('pl-PL') :
+                  'Własny')}
+              </span>
+            )}
           </div>
         </div>
 

@@ -716,8 +716,18 @@ export const drumsAPI = {
         today.setHours(0, 0, 0, 0);
         const nextMonth = new Date(today);
         nextMonth.setDate(today.getDate() + 30);
-        query = query.gte('data_zwrotu_do_dostawcy', today.toISOString().split('T')[0])
-                     .lte('data_zwrotu_do_dostawcy', nextMonth.toISOString().split('T')[0]);
+
+        const nktMin = new Date(today);
+        nktMin.setDate(nktMin.getDate() - 90);
+        const nktMax = new Date(nextMonth);
+        nktMax.setDate(nktMax.getDate() - 90);
+
+        const todayStr = today.toISOString().split('T')[0];
+        const nextMonthStr = nextMonth.toISOString().split('T')[0];
+        const nktMinStr = nktMin.toISOString().split('T')[0];
+        const nktMaxStr = nktMax.toISOString().split('T')[0];
+
+        query = query.or(`and(data_zwrotu_do_dostawcy.gte.${todayStr},data_zwrotu_do_dostawcy.lte.${nextMonthStr}),and(kon_dostawca.ilike.%NKT%,data_zwrotu_do_dostawcy.gte.${nktMinStr},data_zwrotu_do_dostawcy.lte.${nktMaxStr})`);
       }
 
       const trimmedWms = (selectedWms || []).map(w => w.trim()).filter(Boolean);
@@ -759,7 +769,22 @@ export const drumsAPI = {
         const supplierUpper = (d.kon_dostawca || '').toUpperCase();
         const nameUpper = (d.nazwa || '').toUpperCase();
         const retDate = d.data_zwrotu_do_dostawcy ? new Date(d.data_zwrotu_do_dostawcy) : null;
-        const isPastDeadline = retDate && !isNaN(retDate.getTime()) ? retDate < today : false;
+        
+        let isPastDeadline = false;
+        let effectiveDeadline = retDate;
+
+        if (retDate && !isNaN(retDate.getTime())) {
+          // NKT SA: data w ERP to 270 dni, ale zwrot dopuszczalny do 360 dni (+90 dni za 75% kaucji)
+          if (supplierUpper.includes('NKT')) {
+            const nktExtended = new Date(retDate);
+            nktExtended.setDate(nktExtended.getDate() + 90);
+            effectiveDeadline = nktExtended;
+            isPastDeadline = nktExtended < today;
+          } else {
+            isPastDeadline = retDate < today;
+          }
+        }
+
         const isOwn = !d.data_zwrotu_do_dostawcy || supplierUpper.includes('ELTRON') || nameUpper.startsWith('BĘBEN ELTRON') || isPastDeadline;
 
         if (d.status === 'pusty na magazynie') {
@@ -774,8 +799,8 @@ export const drumsAPI = {
           statusCounts.full++;
         }
 
-        if (d.data_zwrotu_do_dostawcy && !isOwn) {
-          const diffDays = Math.ceil((retDate - today) / (1000 * 60 * 60 * 24));
+        if (effectiveDeadline && !isOwn) {
+          const diffDays = Math.ceil((effectiveDeadline - today) / (1000 * 60 * 60 * 24));
           if (diffDays >= 0 && diffDays <= 30) urgentCount++;
         }
 
@@ -864,10 +889,17 @@ export const drumsAPI = {
         const nextMonth = new Date(today);
         nextMonth.setDate(today.getDate() + 30);
         
+        const nktMin = new Date(today);
+        nktMin.setDate(nktMin.getDate() - 90);
+        const nktMax = new Date(nextMonth);
+        nktMax.setDate(nktMax.getDate() - 90);
+
         const todayStr = today.toISOString().split('T')[0];
         const nextMonthStr = nextMonth.toISOString().split('T')[0];
-        
-        query = query.gte('data_zwrotu_do_dostawcy', todayStr).lte('data_zwrotu_do_dostawcy', nextMonthStr);
+        const nktMinStr = nktMin.toISOString().split('T')[0];
+        const nktMaxStr = nktMax.toISOString().split('T')[0];
+
+        query = query.or(`and(data_zwrotu_do_dostawcy.gte.${todayStr},data_zwrotu_do_dostawcy.lte.${nextMonthStr}),and(kon_dostawca.ilike.%NKT%,data_zwrotu_do_dostawcy.gte.${nktMinStr},data_zwrotu_do_dostawcy.lte.${nktMaxStr})`);
       }
 
       if (withLocationOnly) {

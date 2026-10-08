@@ -35,6 +35,22 @@ const getAgeInDays = (dateStr) => {
   return Math.floor(diffTime / (1000 * 60 * 60 * 24));
 };
 
+const isDrumOverdue = (drum) => {
+  if (!drum || !drum.data_zwrotu_do_dostawcy) return false;
+  const returnDate = new Date(drum.data_zwrotu_do_dostawcy);
+  if (isNaN(returnDate.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const supp = (drum.kon_dostawca || drum.dostawca || '').toUpperCase();
+  // NKT SA: zwrot do kablowni możliwy do 360 dni (+90 dni past ERP)
+  if (supp.includes('NKT')) {
+    const nktExtended = new Date(returnDate);
+    nktExtended.setDate(nktExtended.getDate() + 90);
+    return nktExtended < today;
+  }
+  return returnDate < today;
+};
+
 const LogisticsMap = ({ user }) => {
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
@@ -306,7 +322,7 @@ const LogisticsMap = ({ user }) => {
       const groupedDrums = Object.values(drumsByLoc).map(loc => ({
         ...loc,
         drumsCount: loc.drums.length,
-        overdueCount: loc.drums.filter(d => new Date(d.data_zwrotu_do_dostawcy) < new Date()).length
+        overdueCount: loc.drums.filter(d => isDrumOverdue(d)).length
       }));
 
       // 2. Pobieramy aktywne zwroty
@@ -465,7 +481,18 @@ const LogisticsMap = ({ user }) => {
           if (supp.includes('ELTRON')) return true;
           const nameUpper = (d.nazwa || d.kod_bebna || '').toUpperCase();
           if (nameUpper.startsWith('BĘBEN ELTRON')) return true;
-          return new Date(d.data_zwrotu_do_dostawcy) < today;
+          
+          const returnDate = new Date(d.data_zwrotu_do_dostawcy);
+          if (isNaN(returnDate.getTime())) return true;
+
+          // NKT SA: data w ERP to 270 dni, ale zwrot do kablowni jest dopuszczalny do 360 dni (+90 dni za 75% kaucji)
+          if (supp.includes('NKT')) {
+            const nktExtended = new Date(returnDate);
+            nktExtended.setDate(nktExtended.getDate() + 90);
+            return nktExtended < today;
+          }
+
+          return returnDate < today;
         };
         const readyWarehouseDrums = Array.from(drumsMap.values()).filter(d => !isOwnDrum(d));
 
@@ -842,7 +869,7 @@ const LogisticsMap = ({ user }) => {
           ...loc,
           filteredDrums,
           visibleCount: filteredDrums.length,
-          visibleOverdue: filteredDrums.filter(d => new Date(d.data_zwrotu_do_dostawcy) < new Date()).length,
+          visibleOverdue: filteredDrums.filter(d => isDrumOverdue(d)).length,
           maxAgeDays: calculatedMaxAge
         };
       }
