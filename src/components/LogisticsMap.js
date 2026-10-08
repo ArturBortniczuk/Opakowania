@@ -461,6 +461,10 @@ const LogisticsMap = ({ user }) => {
         today.setHours(0, 0, 0, 0);
         const isOwnDrum = (d) => {
           if (!d.data_zwrotu_do_dostawcy) return true;
+          const supp = (d.kon_dostawca || d.dostawca || '').toUpperCase();
+          if (supp.includes('ELTRON')) return true;
+          const nameUpper = (d.nazwa || d.kod_bebna || '').toUpperCase();
+          if (nameUpper.startsWith('BĘBEN ELTRON')) return true;
           return new Date(d.data_zwrotu_do_dostawcy) < today;
         };
         const readyWarehouseDrums = Array.from(drumsMap.values()).filter(d => !isOwnDrum(d));

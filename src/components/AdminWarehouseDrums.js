@@ -24,11 +24,24 @@ import {
   ChevronDown,
   ChevronUp,
   Zap,
-  Building,
-  RotateCcw,
-  Truck
+  RotateCcw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+
+const isDrumOwn = (drum) => {
+  if (!drum) return false;
+  if (!drum.data_zwrotu_do_dostawcy) return true;
+  const supplierUpper = (drum.kon_dostawca || drum.dostawca || '').toUpperCase();
+  if (supplierUpper.includes('ELTRON')) return true;
+  const nameUpper = (drum.nazwa || drum.kod_bebna || drum.rozmiar_bebna || '').toUpperCase();
+  if (nameUpper.startsWith('BĘBEN ELTRON')) return true;
+
+  const returnDate = new Date(drum.data_zwrotu_do_dostawcy);
+  if (isNaN(returnDate.getTime())) return true;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return returnDate < today;
+};
 
 const AdminWarehouseDrums = () => {
   const navigate = useNavigate();
@@ -163,12 +176,9 @@ const AdminWarehouseDrums = () => {
       const result = await drumsAPI.getWarehouseDrums(requestOptions);
 
       if (readyOnly) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
         const filteredData = (result.data || []).filter(drum => {
           const cecha = drum.cecha || drum.kod_bebna;
-          const isOverdue = drum.data_zwrotu_do_dostawcy ? new Date(drum.data_zwrotu_do_dostawcy) < today : false;
-          const isOwn = isOverdue || !drum.data_zwrotu_do_dostawcy;
+          const isOwn = isDrumOwn(drum);
           // Bębny własne nie podlegają zwrotowi do kablowni!
           if (isOwn) return false;
 
@@ -314,7 +324,7 @@ const AdminWarehouseDrums = () => {
          'Magazyn': drum.magazyn || '',
          'Lokalizacja WMS': drum.lokalizacja_wms || '',
          'Kablownia (Dostawca)': drum.kon_dostawca || '',
-         'Data zwrotu': drum.data_zwrotu_do_dostawcy || 'Własny'
+         'Data zwrotu': isDrumOwn(drum) ? 'Własny' : (drum.data_zwrotu_do_dostawcy || 'Własny')
       }));
       
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -452,14 +462,6 @@ const AdminWarehouseDrums = () => {
     return diffDays >= 0 && diffDays <= 30;
   };
 
-  const isOverdue = (dateString) => {
-    if (!dateString) return false;
-    const date = new Date(dateString);
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    return date < today;
-  };
-
   const filteredWmsDropdownList = availableWmsLocations.filter(item =>
     !wmsSearchFilter || item.location.toLowerCase().includes(wmsSearchFilter.toLowerCase())
   );
@@ -467,44 +469,36 @@ const AdminWarehouseDrums = () => {
   const DrumCard = ({ drum, index }) => {
     const drumCecha = drum.cecha || drum.kod_bebna;
     const isWms100 = drum.lokalizacja_wms && drum.lokalizacja_wms.trim().endsWith('100');
-    const overdue = isOverdue(drum.data_zwrotu_do_dostawcy);
-    const isOwnDrum = overdue || !drum.data_zwrotu_do_dostawcy;
-    const isWrongAddress100 = isWms100 && isOwnDrum;
+    const isOwn = isDrumOwn(drum);
+    const isWrongAddress100 = isWms100 && isOwn;
 
     const isManuallyReady = readyCechy.has(drumCecha);
-    const isReady = (isManuallyReady && !isOwnDrum) || (isWms100 && !isOwnDrum);
-    const urgent = !isOwnDrum && isUrgent(drum.data_zwrotu_do_dostawcy);
-
-    let borderColor = 'border-blue-100';
-    if (isWrongAddress100) {
-      borderColor = 'border-red-400 bg-red-50/20 shadow-red-100 ring-1 ring-red-300';
-    } else if (isReady) {
-      borderColor = 'border-emerald-500 bg-emerald-50/20 shadow-emerald-100';
-    } else if (urgent) {
-      borderColor = 'border-orange-400 bg-orange-50/30';
-    }
+    const isReady = (isManuallyReady && !isOwn) || (isWms100 && !isOwn);
+    const urgent = !isOwn && isUrgent(drum.data_zwrotu_do_dostawcy);
 
     const isWmsSelected = drum.lokalizacja_wms && selectedWms.includes(drum.lokalizacja_wms.trim().toUpperCase());
 
     return (
       <div
-        className={`bg-white/90 backdrop-blur-lg rounded-2xl p-6 shadow-lg border-2 transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] h-full flex flex-col ${
+        className={`rounded-2xl p-6 shadow-lg border-2 transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] h-full flex flex-col ${
           isWrongAddress100
-            ? 'border-red-400 bg-red-50/20 shadow-red-100 ring-1 ring-red-300'
+            ? 'bg-red-50/90 border-red-500 shadow-red-200 ring-2 ring-red-400'
             : isReady
-            ? 'border-emerald-500 bg-emerald-50/20 shadow-emerald-100'
-            : borderColor
+            ? 'bg-white/90 backdrop-blur-lg border-emerald-500 bg-emerald-50/20 shadow-emerald-100'
+            : urgent
+            ? 'bg-white/90 backdrop-blur-lg border-orange-400 bg-orange-50/30'
+            : 'bg-white/90 backdrop-blur-lg border-blue-100'
         }`}
         style={{ animationDelay: `${index * 50}ms` }}
       >
         {isWrongAddress100 ? (
-          <div className="mb-3 flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold shadow-sm bg-red-50 text-red-900 border border-red-200">
+          <div className="mb-3 flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold shadow-xs bg-red-100 text-red-900 border border-red-300">
             <span className="flex items-center gap-1.5">
               <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-              Bęben własny – zmień adres z 100 na inny!
+              DO POPRAWY: Bęben własny na adresie 100!
             </span>
-            <span className="text-[10px] bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-bold uppercase shrink-0">
-              Nie do zwrotu
+            <span className="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded font-black uppercase tracking-wider shrink-0">
+              Zmień adres
             </span>
           </div>
         ) : isReady ? (
@@ -520,12 +514,12 @@ const AdminWarehouseDrums = () => {
           <div className="flex items-center space-x-3 min-w-0 flex-1">
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg ${
               isWrongAddress100
-                ? 'bg-gradient-to-br from-red-500 to-rose-600'
+                ? 'bg-gradient-to-br from-red-500 to-rose-600 text-white'
                 : drum.status === 'pusty na magazynie'
-                ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
-                : 'bg-gradient-to-br from-blue-600 to-indigo-700'
+                ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white'
+                : 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white'
             }`}>
-              <Package className="w-6 h-6 text-white" />
+              <Package className="w-6 h-6" />
             </div>
             <div className="min-w-0 flex-1">
               <h3 className="font-bold text-gray-900 truncate text-lg">{drum.cecha || drum.kod_bebna}</h3>
@@ -536,11 +530,11 @@ const AdminWarehouseDrums = () => {
           </div>
           
           {isWrongAddress100 ? (
-            <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" title="Bęben własny na adresie 100 – nie podlega zwrotowi do kablowni (zmień adres)" />
+            <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 animate-pulse" title="DO POPRAWY: Bęben własny na adresie 100 (nie podlega zwrotowi do kablowni)" />
           ) : urgent ? (
             <Clock className="w-6 h-6 text-orange-500 flex-shrink-0" title="Pilny zwrot (≤ 30 dni)" />
           ) : (
-            <CheckCircle className="w-6 h-6 text-emerald-500 flex-shrink-0" title="Własny lub termin w normie" />
+            <CheckCircle className="w-6 h-6 text-emerald-500 flex-shrink-0" title={isOwn ? "Bęben własny" : "Termin w normie"} />
           )}
         </div>
 
@@ -572,17 +566,17 @@ const AdminWarehouseDrums = () => {
                 }}
                 className={`text-xs font-bold truncate ml-2 flex items-center px-2 py-1 rounded-lg border transition-all ${
                   isWrongAddress100
-                    ? 'bg-red-50 text-red-800 border-red-300 hover:bg-red-100'
+                    ? 'bg-red-100 text-red-900 border-red-300 hover:bg-red-200'
                     : isWmsSelected
                     ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs ring-2 ring-emerald-200'
                     : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300'
                 }`}
-                title={isWrongAddress100 ? "Adres 100 dotyczy tylko bębnów do zwrotu do kablowni! Zmień adres tego bębna w WMS." : "Kliknij, aby przefiltrować lub dodać ten adres WMS do analizy"}
+                title={isWrongAddress100 ? "Adres 100 dotyczy tylko bębnów do zwrotu do kablowni! Zmień adres tego bębna w WMS na regał magazynowy." : "Kliknij, aby przefiltrować lub dodać ten adres WMS do analizy"}
               >
                 <MapPin className={`w-3.5 h-3.5 mr-1 shrink-0 ${isWrongAddress100 ? 'text-red-600' : ''}`} />
                 <span>{drum.lokalizacja_wms}</span>
                 {isWrongAddress100 && (
-                  <span className="ml-1.5 text-[10px] font-bold bg-red-200 text-red-900 px-1 rounded">
+                  <span className="ml-1.5 text-[10px] font-black bg-red-600 text-white px-1.5 py-0.5 rounded uppercase">
                     Do zmiany!
                   </span>
                 )}
@@ -603,13 +597,13 @@ const AdminWarehouseDrums = () => {
             <span className="text-sm text-gray-500">Termin zwrotu</span>
             <span className={`text-sm font-bold flex items-center gap-1 ${
               isWrongAddress100
-                ? 'text-red-700 bg-red-100/90 px-2 py-0.5 rounded-lg'
+                ? 'text-red-800 bg-red-100 px-2.5 py-1 rounded-lg border border-red-200 font-black'
                 : urgent
                 ? 'text-orange-600'
-                : (isOwnDrum ? 'text-indigo-600' : 'text-gray-900')
+                : (isOwn ? 'text-indigo-600' : 'text-gray-900')
             }`}>
-              {isWrongAddress100 && <AlertCircle className="w-3.5 h-3.5 text-red-600" />}
-              {isOwnDrum ? 'Własny (nasz)' : (drum.data_zwrotu_do_dostawcy ?
+              {isWrongAddress100 && <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />}
+              {isOwn ? 'Własny' : (drum.data_zwrotu_do_dostawcy ?
                 new Date(drum.data_zwrotu_do_dostawcy).toLocaleDateString('pl-PL') :
                 'Własny')}
             </span>
@@ -618,7 +612,7 @@ const AdminWarehouseDrums = () => {
 
         <div className="mt-4 pt-3 border-t border-gray-100">
           {isWrongAddress100 ? (
-            <div className="w-full py-2.5 px-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-bold flex items-center justify-center gap-1.5 text-center shadow-2xs">
+            <div className="w-full py-2.5 px-3 rounded-xl bg-red-100 border border-red-300 text-red-900 text-xs font-bold flex items-center justify-center gap-2 text-center shadow-xs">
               <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
               <span>Bęben własny – przenieś z adresu 100 na regał</span>
             </div>
@@ -773,7 +767,7 @@ const AdminWarehouseDrums = () => {
               </div>
 
               {/* KPI Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 my-6 relative z-10">
+              <div className={`grid grid-cols-2 ${analyticsData.wrongAddress100Count > 0 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4 my-6 relative z-10`}>
                 <div className="bg-gradient-to-br from-gray-50 to-white p-4 rounded-2xl border border-gray-200/70 shadow-xs">
                   <div className="flex items-center justify-between text-gray-500 mb-1">
                     <span className="text-xs font-semibold uppercase tracking-wider">Bębnów na adresie</span>
@@ -790,19 +784,41 @@ const AdminWarehouseDrums = () => {
 
                 <div className="bg-gradient-to-br from-emerald-50/50 to-white p-4 rounded-2xl border border-emerald-100 shadow-xs">
                   <div className="flex items-center justify-between text-emerald-700 mb-1">
-                    <span className="text-xs font-semibold uppercase tracking-wider">Puste (gotowe)</span>
+                    <span className="text-xs font-semibold uppercase tracking-wider">
+                      {analyticsData.wrongAddress100Count > 0 ? 'Do zwrotu (kablownia)' : 'Puste (gotowe)'}
+                    </span>
                     <CheckCircle className="w-4 h-4 text-emerald-600" />
                   </div>
                   <div className="text-2xl font-black text-emerald-700">
-                    {analyticsData.statusCounts?.empty || 0}
+                    {analyticsData.wrongAddress100Count > 0 ? (analyticsData.returnableEmptyCount || 0) : (analyticsData.statusCounts?.empty || 0)}
                     <span className="text-xs font-normal text-emerald-600/80 ml-1.5">
-                      ({analyticsData.total > 0 ? Math.round((analyticsData.statusCounts.empty / analyticsData.total) * 100) : 0}%)
+                      ({analyticsData.total > 0 ? Math.round(((analyticsData.wrongAddress100Count > 0 ? (analyticsData.returnableEmptyCount || 0) : (analyticsData.statusCounts?.empty || 0)) / analyticsData.total) * 100) : 0}%)
                     </span>
                   </div>
                   <div className="text-[11px] text-emerald-600/70 mt-1">
-                    Puste bębny gotowe do zwrotu
+                    Puste bębny do zwrotu do kablowni
                   </div>
                 </div>
+
+                {analyticsData.wrongAddress100Count > 0 && (
+                  <div className="bg-gradient-to-br from-red-50 to-rose-50/70 p-4 rounded-2xl border-2 border-red-300 shadow-xs ring-1 ring-red-200">
+                    <div className="flex items-center justify-between text-red-800 mb-1">
+                      <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                        Do poprawy (Własne)
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-red-700">
+                      {analyticsData.wrongAddress100Count}
+                      <span className="text-xs font-normal text-red-600 ml-1.5">
+                        ({analyticsData.total > 0 ? Math.round((analyticsData.wrongAddress100Count / analyticsData.total) * 100) : 0}%)
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-red-700 font-medium mt-1">
+                      Bębny własne – przenieś z adresu 100!
+                    </div>
+                  </div>
+                )}
 
                 <div className="bg-gradient-to-br from-blue-50/50 to-white p-4 rounded-2xl border border-blue-100 shadow-xs">
                   <div className="flex items-center justify-between text-blue-700 mb-1">

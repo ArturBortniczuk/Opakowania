@@ -628,24 +628,46 @@ export const drumsAPI = {
    */
   async getWarehouseDrumWmsLocations() {
     try {
-      const { data, error } = await supabase
-        .from('drums')
-        .select('lokalizacja_wms')
-        .in('status', ['pusty na magazynie', 'na magazynie z towarem'])
-        .eq('typ_opakowania', 'Bęben')
-        .not('lokalizacja_wms', 'is', null)
-        .neq('lokalizacja_wms', '');
-      
-      if (error) throw error;
-      
-      const countMap = {};
-      data.forEach(d => {
-        const loc = (d.lokalizacja_wms || '').trim();
-        if (loc) {
-          countMap[loc] = (countMap[loc] || 0) + 1;
+      const chunkSize = 1000;
+      const buildQuery = (isCount = false) => {
+        let q = supabase.from('drums');
+        if (isCount) {
+          q = q.select('*', { count: 'exact', head: true });
+        } else {
+          q = q.select('lokalizacja_wms');
         }
-      });
-      
+        return q
+          .in('status', ['pusty na magazynie', 'na magazynie z towarem'])
+          .eq('typ_opakowania', 'Bęben')
+          .not('lokalizacja_wms', 'is', null)
+          .neq('lokalizacja_wms', '');
+      };
+
+      const { count, error: countError } = await buildQuery(true);
+      if (countError) throw countError;
+
+      const countMap = {};
+      if (count && count > 0) {
+        const totalPages = Math.ceil(count / chunkSize);
+        const promises = [];
+        for (let i = 0; i < totalPages; i++) {
+          promises.push(buildQuery(false).range(i * chunkSize, (i + 1) * chunkSize - 1));
+        }
+
+        const results = await Promise.all(promises);
+        for (const res of results) {
+          if (res.error) throw res.error;
+          if (res.data) {
+            res.data.forEach(d => {
+              const loc = (d.lokalizacja_wms || '').trim();
+              if (loc) {
+                countMap[loc] = (countMap[loc] || 0) + 1;
+              }
+            });
+          }
+        }
+      }
+
       return Object.entries(countMap)
         .map(([location, count]) => ({ location, count }))
         .sort((a, b) => a.location.localeCompare(b.location, undefined, { numeric: true }));
@@ -717,6 +739,9 @@ export const drumsAPI = {
       const statusCounts = { empty: 0, full: 0 };
       const addressCounts = {};
       let urgentCount = 0;
+      let ownCount = 0;
+      let returnableEmptyCount = 0;
+      let wrongAddress100Count = 0;
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -730,11 +755,26 @@ export const drumsAPI = {
         const supplier = rawSupplier.length > 25 ? rawSupplier.slice(0, 25) + '...' : rawSupplier;
         supplierCounts[supplier] = (supplierCounts[supplier] || 0) + 1;
 
-        if (d.status === 'pusty na magazynie') statusCounts.empty++;
-        else if (d.status === 'na magazynie z towarem') statusCounts.full++;
+        const isAddr100 = (d.lokalizacja_wms || '').trim().endsWith('100');
+        const supplierUpper = (d.kon_dostawca || '').toUpperCase();
+        const nameUpper = (d.nazwa || '').toUpperCase();
+        const retDate = d.data_zwrotu_do_dostawcy ? new Date(d.data_zwrotu_do_dostawcy) : null;
+        const isPastDeadline = retDate && !isNaN(retDate.getTime()) ? retDate < today : false;
+        const isOwn = !d.data_zwrotu_do_dostawcy || supplierUpper.includes('ELTRON') || nameUpper.startsWith('BĘBEN ELTRON') || isPastDeadline;
 
-        if (d.data_zwrotu_do_dostawcy) {
-          const retDate = new Date(d.data_zwrotu_do_dostawcy);
+        if (d.status === 'pusty na magazynie') {
+          statusCounts.empty++;
+          if (isOwn) {
+            ownCount++;
+            if (isAddr100) wrongAddress100Count++;
+          } else {
+            returnableEmptyCount++;
+          }
+        } else if (d.status === 'na magazynie z towarem') {
+          statusCounts.full++;
+        }
+
+        if (d.data_zwrotu_do_dostawcy && !isOwn) {
           const diffDays = Math.ceil((retDate - today) / (1000 * 60 * 60 * 24));
           if (diffDays >= 0 && diffDays <= 30) urgentCount++;
         }
@@ -769,6 +809,9 @@ export const drumsAPI = {
       return {
         total,
         urgentCount,
+        ownCount,
+        returnableEmptyCount,
+        wrongAddress100Count,
         statusCounts,
         sizes: sizesArray,
         suppliers: suppliersArray,
