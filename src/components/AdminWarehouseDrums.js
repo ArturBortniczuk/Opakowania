@@ -478,14 +478,10 @@ const AdminWarehouseDrums = () => {
         style={{ animationDelay: `${index * 50}ms` }}
       >
         {isReady && (
-          <div className={`mb-3 flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm ${
-            isWms100
-              ? 'bg-amber-100/90 text-amber-900 border border-amber-300'
-              : 'bg-emerald-100/90 text-emerald-800 border border-emerald-300'
-          }`}>
+          <div className="mb-3 flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm bg-emerald-50 text-emerald-800 border border-emerald-200">
             <span className="flex items-center gap-1.5">
-              <CheckCircle className={`w-4 h-4 shrink-0 ${isWms100 ? 'text-amber-600' : 'text-emerald-600'}`} />
-              {isWms100 ? 'GOTOWY DO ZWROTU (WMS: 100)' : 'GOTOWY DO ZWROTU DO KABLOWNI'}
+              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+              {isWms100 ? 'Gotowy do zwrotu (WMS: 100)' : 'Gotowy do zwrotu do kablowni'}
             </span>
           </div>
         )}
@@ -1004,29 +1000,29 @@ const AdminWarehouseDrums = () => {
             {/* Szybkie stałe filtry magazynów (Białystok, Zielonka, Lublin, Wrocław) */}
             <div className="mb-6 pb-5 border-b border-gray-100">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wider">
-                    <Zap className="w-4 h-4 text-amber-500" />
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <Zap className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Szybkie filtry stałe:</span>
                   </div>
 
-                  {/* Szybki przycisk dla wszystkich bębnów do zwrotu (WMS: 100) */}
+                  {/* Dyskretny, estetyczny przycisk zbiorczy adresu 100 */}
                   <button
                     type="button"
                     onClick={handleApplyAllReturnsPreset}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border cursor-pointer ${
                       activePresetId === 'all-returns'
-                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-500 shadow-md ring-2 ring-amber-300 font-extrabold'
-                        : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                        : 'bg-gray-50 hover:bg-emerald-50 text-gray-700 border-gray-200 hover:border-emerald-300 hover:text-emerald-800'
                     }`}
-                    title="Filtruj bębny gotowe do zwrotu ze wszystkich magazynów (adresy WMS kończące się na 100)"
+                    title="Filtruj bębny na adresach 100 ze wszystkich magazynów"
                   >
-                    <Truck className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Wszystkie do zwrotu (WMS: 100)</span>
-                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                      activePresetId === 'all-returns' ? 'bg-white/20 text-white' : 'bg-amber-200 text-amber-950'
+                    <RotateCcw className={`w-3 h-3 ${activePresetId === 'all-returns' ? 'text-white' : 'text-gray-400'}`} />
+                    <span>Wszystkie do zwrotu (100)</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      activePresetId === 'all-returns' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'
                     }`}>
-                      {totalWms100Count} szt.
+                      {totalWms100Count}
                     </span>
                   </button>
                 </div>
@@ -1035,10 +1031,10 @@ const AdminWarehouseDrums = () => {
                   <button
                     type="button"
                     onClick={handleClearPreset}
-                    className="text-xs text-red-600 hover:text-red-700 font-bold flex items-center gap-1 self-start sm:self-auto cursor-pointer hover:underline"
+                    className="text-xs text-gray-400 hover:text-red-600 font-medium flex items-center gap-1 self-start sm:self-auto cursor-pointer transition-colors"
                   >
                     <X className="w-3.5 h-3.5" />
-                    <span>Wyłącz filtr stały</span>
+                    <span>Wyczyść filtr</span>
                   </button>
                 )}
               </div>
@@ -1056,74 +1052,58 @@ const AdminWarehouseDrums = () => {
                     <div
                       key={preset.id}
                       onClick={() => handleApplyPreset(preset)}
-                      className={`relative p-3.5 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer select-none group ${
+                      className={`relative p-3.5 rounded-xl border text-left transition-all duration-150 flex flex-col justify-between cursor-pointer select-none group ${
                         isPresetActive
-                          ? 'bg-gradient-to-br from-emerald-600 to-teal-700 text-white border-emerald-600 shadow-md ring-2 ring-emerald-300 transform scale-[1.01]'
+                          ? 'bg-emerald-50/70 border-emerald-500 ring-1 ring-emerald-400 shadow-2xs'
                           : isReturnActive
-                          ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white border-amber-500 shadow-md ring-2 ring-amber-300 transform scale-[1.01]'
-                          : 'bg-white hover:bg-emerald-50/60 text-gray-800 border-gray-200 hover:border-emerald-300 shadow-2xs hover:shadow-xs'
+                          ? 'bg-emerald-50/40 border-emerald-400 ring-1 ring-emerald-300 shadow-2xs'
+                          : 'bg-white hover:bg-gray-50/70 text-gray-800 border-gray-200 hover:border-gray-300 shadow-2xs'
                       }`}
                     >
-                      <div>
-                        <div className="flex items-center justify-between gap-1 mb-2">
-                          <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded font-mono ${
-                            isPresetActive || isReturnActive ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
-                          }`}>
-                            {preset.shortCode}
-                          </span>
-                          {isPresetActive ? (
-                            <span className="flex items-center gap-1 text-[10px] font-bold bg-white text-emerald-800 px-1.5 py-0.5 rounded shadow-2xs">
-                              <CheckCircle className="w-3 h-3 text-emerald-600" />
-                              Puste (97-99)
-                            </span>
-                          ) : isReturnActive ? (
-                            <span className="flex items-center gap-1 text-[10px] font-bold bg-white text-amber-800 px-1.5 py-0.5 rounded shadow-2xs">
-                              <RotateCcw className="w-3 h-3 text-amber-600" />
-                              Do zwrotu (100)
-                            </span>
-                          ) : (
-                            <Building className="w-3.5 h-3.5 text-gray-400 group-hover:text-emerald-600 transition-colors" />
-                          )}
-                        </div>
-
-                        <div className={`font-bold text-xs sm:text-sm leading-snug ${isPresetActive || isReturnActive ? 'text-white' : 'text-gray-900'}`}>
-                          {preset.title}
-                        </div>
-
-                        <div className={`text-[11px] mt-1 font-mono flex items-center justify-between ${
-                          isPresetActive || isReturnActive ? 'text-emerald-100' : 'text-gray-500'
+                      <div className="flex items-center justify-between gap-1 mb-2">
+                        <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded font-mono ${
+                          isPresetActive || isReturnActive ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
                         }`}>
-                          <span>WMS: 97, 98, 99</span>
-                        </div>
-                      </div>
+                          {preset.shortCode}
+                        </span>
 
-                      {/* Dedykowany mały przycisk "Do zwrotu (100)" na dole kafelka */}
-                      <div className="mt-3 pt-2.5 border-t border-gray-100/40 flex items-center justify-between gap-2">
+                        {/* Mały, estetyczny przycisk "Do zwrotu" w prawym górnym rogu */}
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleApplyReturnPreset(preset);
                           }}
-                          className={`w-full py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs ${
+                          className={`text-[11px] font-medium px-2 py-0.5 rounded-md transition-all flex items-center gap-1 border cursor-pointer ${
                             isReturnActive
-                              ? 'bg-white text-amber-900 font-extrabold shadow-sm'
-                              : isPresetActive
-                              ? 'bg-black/20 hover:bg-black/30 text-white border border-white/30'
-                              : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 hover:border-amber-300'
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                              : 'bg-gray-50 hover:bg-emerald-50 text-gray-600 hover:text-emerald-700 border-gray-200 hover:border-emerald-200'
                           }`}
-                          title={`Filtruj bębny gotowe do zwrotu z ${preset.city} (WMS: ${preset.returnWms.join(', ')})`}
+                          title={`Filtruj adres 100 (${preset.city} - do zwrotu)`}
                         >
-                          <RotateCcw className={`w-3 h-3 ${isReturnActive ? 'text-amber-700' : 'text-amber-600'}`} />
-                          <span>Do zwrotu (100)</span>
-                          {returnCount > 0 && (
-                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
-                              isReturnActive ? 'bg-amber-200 text-amber-950' : 'bg-amber-200/80 text-amber-900'
-                            }`}>
-                              {returnCount}
-                            </span>
-                          )}
+                          <span>Do zwrotu</span>
+                          <span className={`text-[10px] font-bold ${isReturnActive ? 'text-emerald-100' : 'text-gray-400'}`}>
+                            {returnCount}
+                          </span>
                         </button>
+                      </div>
+
+                      <div className="font-semibold text-xs sm:text-sm text-gray-900 leading-snug">
+                        {preset.title}
+                      </div>
+
+                      <div className="text-[11px] mt-1.5 font-mono text-gray-400 flex items-center justify-between">
+                        <span>WMS: 97, 98, 99</span>
+                        {isPresetActive && (
+                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-sans">
+                            Aktywny (97-99)
+                          </span>
+                        )}
+                        {isReturnActive && (
+                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-sans">
+                            Aktywny (100)
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
