@@ -457,7 +457,13 @@ const LogisticsMap = ({ user }) => {
             }
           });
         }
-        const readyWarehouseDrums = Array.from(drumsMap.values());
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const isOwnDrum = (d) => {
+          if (!d.data_zwrotu_do_dostawcy) return true;
+          return new Date(d.data_zwrotu_do_dostawcy) < today;
+        };
+        const readyWarehouseDrums = Array.from(drumsMap.values()).filter(d => !isOwnDrum(d));
 
         if (readyWarehouseDrums.length > 0) {
           // Grupowanie według nazwy magazynu / miejscowości

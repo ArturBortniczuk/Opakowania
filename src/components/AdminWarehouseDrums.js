@@ -163,8 +163,15 @@ const AdminWarehouseDrums = () => {
       const result = await drumsAPI.getWarehouseDrums(requestOptions);
 
       if (readyOnly) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         const filteredData = (result.data || []).filter(drum => {
           const cecha = drum.cecha || drum.kod_bebna;
+          const isOverdue = drum.data_zwrotu_do_dostawcy ? new Date(drum.data_zwrotu_do_dostawcy) < today : false;
+          const isOwn = isOverdue || !drum.data_zwrotu_do_dostawcy;
+          // Bębny własne nie podlegają zwrotowi do kablowni!
+          if (isOwn) return false;
+
           const isWms100 = drum.lokalizacja_wms && drum.lokalizacja_wms.trim().endsWith('100');
           return (cecha && latestReadySet.has(cecha)) || isWms100;
         });
@@ -460,36 +467,63 @@ const AdminWarehouseDrums = () => {
   const DrumCard = ({ drum, index }) => {
     const drumCecha = drum.cecha || drum.kod_bebna;
     const isWms100 = drum.lokalizacja_wms && drum.lokalizacja_wms.trim().endsWith('100');
-    const isManuallyReady = readyCechy.has(drumCecha);
-    const isReady = isManuallyReady || isWms100;
     const overdue = isOverdue(drum.data_zwrotu_do_dostawcy);
-    const urgent = !overdue && isUrgent(drum.data_zwrotu_do_dostawcy);
+    const isOwnDrum = overdue || !drum.data_zwrotu_do_dostawcy;
+    const isWrongAddress100 = isWms100 && isOwnDrum;
+
+    const isManuallyReady = readyCechy.has(drumCecha);
+    const isReady = (isManuallyReady && !isOwnDrum) || (isWms100 && !isOwnDrum);
+    const urgent = !isOwnDrum && isUrgent(drum.data_zwrotu_do_dostawcy);
 
     let borderColor = 'border-blue-100';
-    if (urgent) borderColor = 'border-orange-400 bg-orange-50/30';
+    if (isWrongAddress100) {
+      borderColor = 'border-red-400 bg-red-50/20 shadow-red-100 ring-1 ring-red-300';
+    } else if (isReady) {
+      borderColor = 'border-emerald-500 bg-emerald-50/20 shadow-emerald-100';
+    } else if (urgent) {
+      borderColor = 'border-orange-400 bg-orange-50/30';
+    }
 
     const isWmsSelected = drum.lokalizacja_wms && selectedWms.includes(drum.lokalizacja_wms.trim().toUpperCase());
 
     return (
       <div
         className={`bg-white/90 backdrop-blur-lg rounded-2xl p-6 shadow-lg border-2 transition-all duration-300 hover:shadow-xl transform hover:scale-[1.02] h-full flex flex-col ${
-          isReady ? 'border-emerald-500 bg-emerald-50/20 shadow-emerald-100' : borderColor
+          isWrongAddress100
+            ? 'border-red-400 bg-red-50/20 shadow-red-100 ring-1 ring-red-300'
+            : isReady
+            ? 'border-emerald-500 bg-emerald-50/20 shadow-emerald-100'
+            : borderColor
         }`}
         style={{ animationDelay: `${index * 50}ms` }}
       >
-        {isReady && (
+        {isWrongAddress100 ? (
+          <div className="mb-3 flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold shadow-sm bg-red-50 text-red-900 border border-red-200">
+            <span className="flex items-center gap-1.5">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+              Bęben własny – zmień adres z 100 na inny!
+            </span>
+            <span className="text-[10px] bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-bold uppercase shrink-0">
+              Nie do zwrotu
+            </span>
+          </div>
+        ) : isReady ? (
           <div className="mb-3 flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm bg-emerald-50 text-emerald-800 border border-emerald-200">
             <span className="flex items-center gap-1.5">
               <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
               {isWms100 ? 'Gotowy do zwrotu (WMS: 100)' : 'Gotowy do zwrotu do kablowni'}
             </span>
           </div>
-        )}
+        ) : null}
 
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-3 min-w-0 flex-1">
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg ${
-              drum.status === 'pusty na magazynie' ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : 'bg-gradient-to-br from-blue-600 to-indigo-700'
+              isWrongAddress100
+                ? 'bg-gradient-to-br from-red-500 to-rose-600'
+                : drum.status === 'pusty na magazynie'
+                ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
+                : 'bg-gradient-to-br from-blue-600 to-indigo-700'
             }`}>
               <Package className="w-6 h-6 text-white" />
             </div>
@@ -501,7 +535,9 @@ const AdminWarehouseDrums = () => {
             </div>
           </div>
           
-          {urgent ? (
+          {isWrongAddress100 ? (
+            <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" title="Bęben własny na adresie 100 – nie podlega zwrotowi do kablowni (zmień adres)" />
+          ) : urgent ? (
             <Clock className="w-6 h-6 text-orange-500 flex-shrink-0" title="Pilny zwrot (≤ 30 dni)" />
           ) : (
             <CheckCircle className="w-6 h-6 text-emerald-500 flex-shrink-0" title="Własny lub termin w normie" />
@@ -535,14 +571,21 @@ const AdminWarehouseDrums = () => {
                   toggleWmsLocation(drum.lokalizacja_wms);
                 }}
                 className={`text-xs font-bold truncate ml-2 flex items-center px-2 py-1 rounded-lg border transition-all ${
-                  isWmsSelected
+                  isWrongAddress100
+                    ? 'bg-red-50 text-red-800 border-red-300 hover:bg-red-100'
+                    : isWmsSelected
                     ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs ring-2 ring-emerald-200'
                     : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300'
                 }`}
-                title="Kliknij, aby przefiltrować lub dodać ten adres WMS do analizy"
+                title={isWrongAddress100 ? "Adres 100 dotyczy tylko bębnów do zwrotu do kablowni! Zmień adres tego bębna w WMS." : "Kliknij, aby przefiltrować lub dodać ten adres WMS do analizy"}
               >
-                <MapPin className="w-3.5 h-3.5 mr-1 shrink-0" />
-                {drum.lokalizacja_wms}
+                <MapPin className={`w-3.5 h-3.5 mr-1 shrink-0 ${isWrongAddress100 ? 'text-red-600' : ''}`} />
+                <span>{drum.lokalizacja_wms}</span>
+                {isWrongAddress100 && (
+                  <span className="ml-1.5 text-[10px] font-bold bg-red-200 text-red-900 px-1 rounded">
+                    Do zmiany!
+                  </span>
+                )}
               </button>
             ) : (
               <span className="text-sm font-medium text-gray-400 truncate ml-2">Brak</span>
@@ -558,10 +601,15 @@ const AdminWarehouseDrums = () => {
 
           <div className="flex justify-between items-center pt-2 border-t border-gray-100">
             <span className="text-sm text-gray-500">Termin zwrotu</span>
-            <span className={`text-sm font-bold ${
-              urgent ? 'text-orange-600' : (overdue ? 'text-indigo-600' : 'text-gray-900')
+            <span className={`text-sm font-bold flex items-center gap-1 ${
+              isWrongAddress100
+                ? 'text-red-700 bg-red-100/90 px-2 py-0.5 rounded-lg'
+                : urgent
+                ? 'text-orange-600'
+                : (isOwnDrum ? 'text-indigo-600' : 'text-gray-900')
             }`}>
-              {overdue ? 'Własny (nasz)' : (drum.data_zwrotu_do_dostawcy ?
+              {isWrongAddress100 && <AlertCircle className="w-3.5 h-3.5 text-red-600" />}
+              {isOwnDrum ? 'Własny (nasz)' : (drum.data_zwrotu_do_dostawcy ?
                 new Date(drum.data_zwrotu_do_dostawcy).toLocaleDateString('pl-PL') :
                 'Własny')}
             </span>
@@ -569,21 +617,28 @@ const AdminWarehouseDrums = () => {
         </div>
 
         <div className="mt-4 pt-3 border-t border-gray-100">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleToggleReady(drumCecha);
-            }}
-            className={`w-full py-2.5 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 border ${
-              isReady
-                ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 shadow-sm'
-                : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300'
-            }`}
-          >
-            <CheckCircle className={`w-4 h-4 ${isReady ? 'text-white' : 'text-gray-400'}`} />
-            <span>{isReady ? 'Odznacz "Gotowy do zwrotu"' : 'Oznacz jako gotowy do zwrotu'}</span>
-          </button>
+          {isWrongAddress100 ? (
+            <div className="w-full py-2.5 px-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-bold flex items-center justify-center gap-1.5 text-center shadow-2xs">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+              <span>Bęben własny – przenieś z adresu 100 na regał</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggleReady(drumCecha);
+              }}
+              className={`w-full py-2.5 px-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 border ${
+                isReady
+                  ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 shadow-sm'
+                  : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300'
+              }`}
+            >
+              <CheckCircle className={`w-4 h-4 ${isReady ? 'text-white' : 'text-gray-400'}`} />
+              <span>{isReady ? 'Odznacz "Gotowy do zwrotu"' : 'Oznacz jako gotowy do zwrotu'}</span>
+            </button>
+          )}
         </div>
       </div>
     );
