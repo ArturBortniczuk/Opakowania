@@ -438,25 +438,45 @@ const LogisticsMap = ({ user }) => {
       const groupedPickups = Object.values(pickupsByLoc);
 
       // 3. Pobieramy bębny gotowe do zwrotu z magazynu (Czarna pineska z podziałem na miejscowości z pola 'magazyn')
+      // Uwzględniamy bębny z adresem WMS kończącym się na 100 (gotowe do zwrotu) oraz oznaczone ręcznie
       const warehouseReadyLocations = [];
       try {
         const readyCechy = await drumsAPI.getReadyForReturnCechy();
-        if (readyCechy && readyCechy.length > 0) {
-          const warehouseDrumsRes = await drumsAPI.getWarehouseDrums({ limit: 5000 });
-          const readyWarehouseDrums = (warehouseDrumsRes.data || []).filter(d => 
-            readyCechy.includes(d.cecha) || readyCechy.includes(d.kod_bebna)
-          );
+        const returnWmsList = ['PKB-000-000-100', 'PKZ-000-000-100', 'PKL-000-000-100', 'PKW-000-000-100'];
+        const [warehouseDrumsRes, wms100DrumsRes] = await Promise.all([
+          readyCechy && readyCechy.length > 0 ? drumsAPI.getWarehouseDrums({ limit: 5000 }) : Promise.resolve({ data: [] }),
+          drumsAPI.getWarehouseDrums({ selectedWms: returnWmsList, limit: 5000 })
+        ]);
 
-          if (readyWarehouseDrums.length > 0) {
-            // Grupowanie według nazwy magazynu / miejscowości
-            const drumsByWarehouse = {};
-            readyWarehouseDrums.forEach(d => {
-              const magName = d.magazyn || 'Magazyn Białystok';
-              if (!drumsByWarehouse[magName]) {
-                drumsByWarehouse[magName] = [];
-              }
-              drumsByWarehouse[magName].push(d);
-            });
+        const drumsMap = new Map();
+        (wms100DrumsRes.data || []).forEach(d => drumsMap.set(d.id || d.cecha || d.kod_bebna, d));
+        if (readyCechy && readyCechy.length > 0) {
+          (warehouseDrumsRes.data || []).forEach(d => {
+            if (readyCechy.includes(d.cecha) || readyCechy.includes(d.kod_bebna)) {
+              drumsMap.set(d.id || d.cecha || d.kod_bebna, d);
+            }
+          });
+        }
+        const readyWarehouseDrums = Array.from(drumsMap.values());
+
+        if (readyWarehouseDrums.length > 0) {
+          // Grupowanie według nazwy magazynu / miejscowości
+          const drumsByWarehouse = {};
+          readyWarehouseDrums.forEach(d => {
+            let magName = d.magazyn;
+            if (!magName) {
+              const wms = (d.lokalizacja_wms || '').toUpperCase();
+              if (wms.startsWith('PKB')) magName = 'Magazyn Białystok';
+              else if (wms.startsWith('PKZ')) magName = 'Magazyn Zielonka';
+              else if (wms.startsWith('PKL')) magName = 'Magazyn Lublin';
+              else if (wms.startsWith('PKW')) magName = 'Magazyn Wrocław';
+              else magName = 'Magazyn Białystok';
+            }
+            if (!drumsByWarehouse[magName]) {
+              drumsByWarehouse[magName] = [];
+            }
+            drumsByWarehouse[magName].push(d);
+          });
 
             const warehouseDetailsMap = {
               'lublin': {
@@ -640,7 +660,6 @@ const LogisticsMap = ({ user }) => {
               });
             });
           }
-        }
       } catch (err) {
         console.error('Błąd pobierania bębnów gotowych z magazynu do mapy:', err);
       }

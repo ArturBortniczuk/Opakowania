@@ -24,7 +24,9 @@ import {
   ChevronDown,
   ChevronUp,
   Zap,
-  Building
+  Building,
+  RotateCcw,
+  Truck
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -77,7 +79,8 @@ const AdminWarehouseDrums = () => {
       title: 'Puste w Białymstoku',
       shortCode: 'PKB',
       city: 'Białystok',
-      wms: ['PKB-000-000-097', 'PKB-000-000-098', 'PKB-000-000-099', 'PKB-000-000-100'],
+      wms: ['PKB-000-000-097', 'PKB-000-000-098', 'PKB-000-000-099'],
+      returnWms: ['PKB-000-000-100'],
       magazynMatcher: (m) => m.toLowerCase().includes('białystok')
     },
     {
@@ -85,7 +88,8 @@ const AdminWarehouseDrums = () => {
       title: 'Puste w Zielonce',
       shortCode: 'PKZ',
       city: 'Zielonka',
-      wms: ['PKZ-000-000-097', 'PKZ-000-000-098', 'PKZ-000-000-099', 'PKZ-000-000-100'],
+      wms: ['PKZ-000-000-097', 'PKZ-000-000-098', 'PKZ-000-000-099'],
+      returnWms: ['PKZ-000-000-100'],
       magazynMatcher: (m) => m.toLowerCase().includes('zielonka')
     },
     {
@@ -93,7 +97,8 @@ const AdminWarehouseDrums = () => {
       title: 'Puste w Lublinie',
       shortCode: 'PKL',
       city: 'Lublin',
-      wms: ['PKL-000-000-097', 'PKL-000-000-098', 'PKL-000-000-099', 'PKL-000-000-100'],
+      wms: ['PKL-000-000-097', 'PKL-000-000-098', 'PKL-000-000-099'],
+      returnWms: ['PKL-000-000-100'],
       magazynMatcher: (m) => m.toLowerCase().includes('lublin')
     },
     {
@@ -101,10 +106,13 @@ const AdminWarehouseDrums = () => {
       title: 'Puste we Wrocławiu',
       shortCode: 'PKW',
       city: 'Wrocław',
-      wms: ['PKW-000-000-097', 'PKW-000-000-098', 'PKW-000-000-099', 'PKW-000-000-100'],
+      wms: ['PKW-000-000-097', 'PKW-000-000-098', 'PKW-000-000-099'],
+      returnWms: ['PKW-000-000-100'],
       magazynMatcher: (m) => m.toLowerCase().includes('wrocław') || m.toLowerCase().includes('wroclaw')
     }
   ];
+
+  const ALL_RETURN_WMS = ['PKB-000-000-100', 'PKZ-000-000-100', 'PKL-000-000-100', 'PKW-000-000-100'];
 
   const [activePresetId, setActivePresetId] = useState(null);
   
@@ -155,7 +163,11 @@ const AdminWarehouseDrums = () => {
       const result = await drumsAPI.getWarehouseDrums(requestOptions);
 
       if (readyOnly) {
-        const filteredData = (result.data || []).filter(drum => latestReadySet.has(drum.cecha || drum.kod_bebna));
+        const filteredData = (result.data || []).filter(drum => {
+          const cecha = drum.cecha || drum.kod_bebna;
+          const isWms100 = drum.lokalizacja_wms && drum.lokalizacja_wms.trim().endsWith('100');
+          return (cecha && latestReadySet.has(cecha)) || isWms100;
+        });
         setDrumsData({
           ...result,
           data: filteredData,
@@ -361,6 +373,41 @@ const AdminWarehouseDrums = () => {
     setShowAnalytics(true);
   };
 
+  const handleApplyReturnPreset = (preset) => {
+    const returnPresetId = `${preset.id}-return`;
+    if (activePresetId === returnPresetId) {
+      setActivePresetId(null);
+      setStatusFilter('all');
+      setSelectedWms([]);
+      setSelectedMagazyny([]);
+      return;
+    }
+
+    setActivePresetId(returnPresetId);
+    setStatusFilter('all');
+    setSelectedWms(preset.returnWms);
+
+    const matchingMags = availableMagazyny.filter(preset.magazynMatcher);
+    setSelectedMagazyny(matchingMags);
+    setShowAnalytics(true);
+  };
+
+  const handleApplyAllReturnsPreset = () => {
+    if (activePresetId === 'all-returns') {
+      setActivePresetId(null);
+      setStatusFilter('all');
+      setSelectedWms([]);
+      setSelectedMagazyny([]);
+      return;
+    }
+
+    setActivePresetId('all-returns');
+    setStatusFilter('all');
+    setSelectedWms(ALL_RETURN_WMS);
+    setSelectedMagazyny([]);
+    setShowAnalytics(true);
+  };
+
   const handleClearPreset = () => {
     setActivePresetId(null);
     setStatusFilter('all');
@@ -412,7 +459,9 @@ const AdminWarehouseDrums = () => {
 
   const DrumCard = ({ drum, index }) => {
     const drumCecha = drum.cecha || drum.kod_bebna;
-    const isReady = readyCechy.has(drumCecha);
+    const isWms100 = drum.lokalizacja_wms && drum.lokalizacja_wms.trim().endsWith('100');
+    const isManuallyReady = readyCechy.has(drumCecha);
+    const isReady = isManuallyReady || isWms100;
     const overdue = isOverdue(drum.data_zwrotu_do_dostawcy);
     const urgent = !overdue && isUrgent(drum.data_zwrotu_do_dostawcy);
 
@@ -429,10 +478,14 @@ const AdminWarehouseDrums = () => {
         style={{ animationDelay: `${index * 50}ms` }}
       >
         {isReady && (
-          <div className="mb-3 flex items-center justify-between bg-emerald-100/90 text-emerald-800 border border-emerald-300 px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm">
+          <div className={`mb-3 flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm ${
+            isWms100
+              ? 'bg-amber-100/90 text-amber-900 border border-amber-300'
+              : 'bg-emerald-100/90 text-emerald-800 border border-emerald-300'
+          }`}>
             <span className="flex items-center gap-1.5">
-              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-              GOTOWY DO ZWROTU DO KABLOWNI
+              <CheckCircle className={`w-4 h-4 shrink-0 ${isWms100 ? 'text-amber-600' : 'text-emerald-600'}`} />
+              {isWms100 ? 'GOTOWY DO ZWROTU (WMS: 100)' : 'GOTOWY DO ZWROTU DO KABLOWNI'}
             </span>
           </div>
         )}
@@ -540,6 +593,11 @@ const AdminWarehouseDrums = () => {
     );
   };
 
+  const totalWms100Count = availableWmsLocations
+    .filter(loc => loc.location && loc.location.trim().endsWith('100'))
+    .reduce((sum, loc) => sum + (loc.count || 0), 0);
+  const totalReadyCount = readyCechy.size + totalWms100Count;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-blue-50">
       <div className="max-w-7xl mx-auto p-6">
@@ -585,11 +643,11 @@ const AdminWarehouseDrums = () => {
 
               <button
                 onClick={() => navigate('/admin/map?filter=pickups')}
-                className="flex items-center space-x-2 px-4 py-2 bg-gray-900 hover:bg-black text-white rounded-xl font-bold transition-all shadow-md border border-gray-800 text-sm"
-                title="Pokaż czarną pineskę na mapie z bębnami gotowymi do zwrotu do kablowni"
+                className="flex items-center space-x-2 px-4 py-2 bg-gray-900 hover:bg-black text-white rounded-xl font-bold transition-all shadow-md border border-gray-800 text-sm cursor-pointer"
+                title="Pokaż czarną pineskę na mapie z bębnami gotowymi do zwrotu do kablowni (w tym adresy WMS 100)"
               >
                 <MapPin className="w-4 h-4 text-emerald-400" />
-                <span>Czarna pineska ({readyCechy.size})</span>
+                <span>Czarna pineska ({totalReadyCount})</span>
               </button>
 
               <button
@@ -945,11 +1003,34 @@ const AdminWarehouseDrums = () => {
           <div className="bg-white/90 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-emerald-100 mb-6 relative z-50">
             {/* Szybkie stałe filtry magazynów (Białystok, Zielonka, Lublin, Wrocław) */}
             <div className="mb-6 pb-5 border-b border-gray-100">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  <Zap className="w-4 h-4 text-amber-500" />
-                  <span>Szybkie filtry stałe:</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    <Zap className="w-4 h-4 text-amber-500" />
+                    <span>Szybkie filtry stałe:</span>
+                  </div>
+
+                  {/* Szybki przycisk dla wszystkich bębnów do zwrotu (WMS: 100) */}
+                  <button
+                    type="button"
+                    onClick={handleApplyAllReturnsPreset}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                      activePresetId === 'all-returns'
+                        ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-500 shadow-md ring-2 ring-amber-300 font-extrabold'
+                        : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200'
+                    }`}
+                    title="Filtruj bębny gotowe do zwrotu ze wszystkich magazynów (adresy WMS kończące się na 100)"
+                  >
+                    <Truck className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Wszystkie do zwrotu (WMS: 100)</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                      activePresetId === 'all-returns' ? 'bg-white/20 text-white' : 'bg-amber-200 text-amber-950'
+                    }`}>
+                      {totalWms100Count} szt.
+                    </span>
+                  </button>
                 </div>
+
                 {activePresetId && (
                   <button
                     type="button"
@@ -962,42 +1043,89 @@ const AdminWarehouseDrums = () => {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {WMS_PRESETS.map((preset) => {
-                  const isActive = activePresetId === preset.id;
+                  const isPresetActive = activePresetId === preset.id;
+                  const isReturnActive = activePresetId === `${preset.id}-return`;
+                  const returnLocMatch = availableWmsLocations.find(l => 
+                    preset.returnWms.includes(l.location)
+                  );
+                  const returnCount = returnLocMatch?.count || 0;
+
                   return (
-                    <button
+                    <div
                       key={preset.id}
-                      type="button"
                       onClick={() => handleApplyPreset(preset)}
-                      className={`relative p-3.5 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer ${
-                        isActive
-                          ? 'bg-gradient-to-br from-emerald-600 to-teal-700 text-white border-emerald-600 shadow-md ring-2 ring-emerald-300 transform scale-[1.02]'
+                      className={`relative p-3.5 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer select-none group ${
+                        isPresetActive
+                          ? 'bg-gradient-to-br from-emerald-600 to-teal-700 text-white border-emerald-600 shadow-md ring-2 ring-emerald-300 transform scale-[1.01]'
+                          : isReturnActive
+                          ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white border-amber-500 shadow-md ring-2 ring-amber-300 transform scale-[1.01]'
                           : 'bg-white hover:bg-emerald-50/60 text-gray-800 border-gray-200 hover:border-emerald-300 shadow-2xs hover:shadow-xs'
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-1 mb-2">
-                        <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded font-mono ${
-                          isActive ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+                      <div>
+                        <div className="flex items-center justify-between gap-1 mb-2">
+                          <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded font-mono ${
+                            isPresetActive || isReturnActive ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {preset.shortCode}
+                          </span>
+                          {isPresetActive ? (
+                            <span className="flex items-center gap-1 text-[10px] font-bold bg-white text-emerald-800 px-1.5 py-0.5 rounded shadow-2xs">
+                              <CheckCircle className="w-3 h-3 text-emerald-600" />
+                              Puste (97-99)
+                            </span>
+                          ) : isReturnActive ? (
+                            <span className="flex items-center gap-1 text-[10px] font-bold bg-white text-amber-800 px-1.5 py-0.5 rounded shadow-2xs">
+                              <RotateCcw className="w-3 h-3 text-amber-600" />
+                              Do zwrotu (100)
+                            </span>
+                          ) : (
+                            <Building className="w-3.5 h-3.5 text-gray-400 group-hover:text-emerald-600 transition-colors" />
+                          )}
+                        </div>
+
+                        <div className={`font-bold text-xs sm:text-sm leading-snug ${isPresetActive || isReturnActive ? 'text-white' : 'text-gray-900'}`}>
+                          {preset.title}
+                        </div>
+
+                        <div className={`text-[11px] mt-1 font-mono flex items-center justify-between ${
+                          isPresetActive || isReturnActive ? 'text-emerald-100' : 'text-gray-500'
                         }`}>
-                          {preset.shortCode}
-                        </span>
-                        {isActive ? (
-                          <CheckCircle className="w-4 h-4 text-emerald-200" />
-                        ) : (
-                          <Building className="w-3.5 h-3.5 text-gray-400" />
-                        )}
+                          <span>WMS: 97, 98, 99</span>
+                        </div>
                       </div>
 
-                      <div className={`font-bold text-xs sm:text-sm leading-snug ${isActive ? 'text-white' : 'text-gray-900'}`}>
-                        {preset.title}
+                      {/* Dedykowany mały przycisk "Do zwrotu (100)" na dole kafelka */}
+                      <div className="mt-3 pt-2.5 border-t border-gray-100/40 flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleApplyReturnPreset(preset);
+                          }}
+                          className={`w-full py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs ${
+                            isReturnActive
+                              ? 'bg-white text-amber-900 font-extrabold shadow-sm'
+                              : isPresetActive
+                              ? 'bg-black/20 hover:bg-black/30 text-white border border-white/30'
+                              : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 hover:border-amber-300'
+                          }`}
+                          title={`Filtruj bębny gotowe do zwrotu z ${preset.city} (WMS: ${preset.returnWms.join(', ')})`}
+                        >
+                          <RotateCcw className={`w-3 h-3 ${isReturnActive ? 'text-amber-700' : 'text-amber-600'}`} />
+                          <span>Do zwrotu (100)</span>
+                          {returnCount > 0 && (
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                              isReturnActive ? 'bg-amber-200 text-amber-950' : 'bg-amber-200/80 text-amber-900'
+                            }`}>
+                              {returnCount}
+                            </span>
+                          )}
+                        </button>
                       </div>
-
-                      <div className={`text-[11px] mt-1.5 font-mono flex items-center justify-between ${isActive ? 'text-emerald-100' : 'text-gray-500'}`}>
-                        <span>WMS: 97, 98, 99, 100</span>
-                        {isActive && <span className="text-[10px] font-bold bg-white text-emerald-800 px-1.5 py-0.2 rounded">Aktywny</span>}
-                      </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -1295,7 +1423,7 @@ const AdminWarehouseDrums = () => {
                   />
                   <span className="font-bold text-emerald-800 text-sm flex items-center">
                     <CheckCircle className="w-4 h-4 mr-1 text-emerald-600" />
-                    Tylko gotowe do zwrotu ({readyCechy.size})
+                    Tylko gotowe do zwrotu ({totalReadyCount})
                   </span>
                 </label>
 
