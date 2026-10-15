@@ -4,7 +4,7 @@ import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-m
 import { supabase } from '../lib/supabase';
 import { returnsAPI, drumsAPI, transportAPI } from '../utils/supabaseApi';
 import GeocodeMigration from './GeocodeMigration';
-import { MapPin, Map as MapIcon, X, Check, Search, AlertTriangle, Filter, Building, User, Eye, Truck, Mail, Save, CheckCircle } from 'lucide-react';
+import { MapPin, Map as MapIcon, X, Check, Search, AlertTriangle, Filter, Building, User, Eye, Truck, Mail, Save, CheckCircle, RefreshCw } from 'lucide-react';
 import TransportOrderModal from './TransportOrderModal';
 
 const containerStyle = {
@@ -50,6 +50,72 @@ const isDrumOverdue = (drum) => {
   }
   return returnDate < today;
 };
+
+// Pamięć podręczna współrzędnych i mapowania MPK dla mapy logistycznej (20 min)
+let _coordsCacheMemory = null;
+let _coordsCacheTimestamp = 0;
+let _mpkCacheMemory = null;
+let _mpkCacheTimestamp = 0;
+
+const MAP_CACHE_TTL = 20 * 60 * 1000; // 20 minut
+
+function getCachedCoordinates() {
+  const now = Date.now();
+  if (_coordsCacheMemory && (now - _coordsCacheTimestamp < MAP_CACHE_TTL)) {
+    return _coordsCacheMemory;
+  }
+  try {
+    const raw = sessionStorage.getItem('opakowania_coords_cache');
+    const ts = sessionStorage.getItem('opakowania_coords_cache_time');
+    if (raw && ts && (now - parseInt(ts, 10) < MAP_CACHE_TTL)) {
+      _coordsCacheMemory = JSON.parse(raw);
+      _coordsCacheTimestamp = parseInt(ts, 10);
+      return _coordsCacheMemory;
+    }
+  } catch (e) {
+    console.warn('Błąd odczytu coords cache:', e);
+  }
+  return null;
+}
+
+function setCachedCoordinates(data) {
+  _coordsCacheMemory = data;
+  _coordsCacheTimestamp = Date.now();
+  try {
+    sessionStorage.setItem('opakowania_coords_cache', JSON.stringify(data));
+    sessionStorage.setItem('opakowania_coords_cache_time', String(_coordsCacheTimestamp));
+  } catch (e) {
+    console.warn('sessionStorage quota exceeded dla coords cache, zachowano w pamięci RAM:', e);
+  }
+}
+
+function updateSingleCoordinateInCache(address, latitude, longitude) {
+  if (!address) return;
+  const key = address.trim().toLowerCase();
+  if (_coordsCacheMemory) {
+    const found = _coordsCacheMemory.find(c => c.address && c.address.trim().toLowerCase() === key);
+    if (found) {
+      found.latitude = latitude;
+      found.longitude = longitude;
+    } else {
+      _coordsCacheMemory.push({ address, latitude, longitude });
+    }
+    setCachedCoordinates(_coordsCacheMemory);
+  }
+}
+
+function getCachedMpkMapping() {
+  const now = Date.now();
+  if (_mpkCacheMemory && (now - _mpkCacheTimestamp < MAP_CACHE_TTL)) {
+    return _mpkCacheMemory;
+  }
+  return null;
+}
+
+function setCachedMpkMapping(mapping) {
+  _mpkCacheMemory = mapping;
+  _mpkCacheTimestamp = Date.now();
+}
 
 const LogisticsMap = ({ user }) => {
   const { isLoaded, loadError } = useJsApiLoader({
@@ -212,7 +278,7 @@ const LogisticsMap = ({ user }) => {
     setMap(null);
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (forceRefresh = false) => {
     try {
       // 1. Pobieramy bębny (z respektowaniem uprawnień handlowców)
       let allDrums = [];
@@ -224,19 +290,23 @@ const LogisticsMap = ({ user }) => {
       
       const drumsData = allDrums;
 
-      // Pobieramy cały cache (z paginacją, by uniknąć limitu 1000)
-      let allCacheData = [];
-      let cPage = 0;
-      while (true) {
-        const { data: cacheChunk, error: cacheError } = await supabase
-          .from('address_coordinates_cache')
-          .select('address, latitude, longitude')
-          .range(cPage * 1000, cPage * 1000 + 999);
-        
-        if (cacheError) break;
-        if (cacheChunk && cacheChunk.length > 0) allCacheData = [...allCacheData, ...cacheChunk];
-        if (!cacheChunk || cacheChunk.length < 1000) break;
-        cPage++;
+      // Pobieramy cały cache (z paginacją, by uniknąć limitu 1000) - używamy pamięci podręcznej (20 min)
+      let allCacheData = !forceRefresh ? getCachedCoordinates() : null;
+      if (!allCacheData) {
+        allCacheData = [];
+        let cPage = 0;
+        while (true) {
+          const { data: cacheChunk, error: cacheError } = await supabase
+            .from('address_coordinates_cache')
+            .select('address, latitude, longitude')
+            .range(cPage * 1000, cPage * 1000 + 999);
+          
+          if (cacheError) break;
+          if (cacheChunk && cacheChunk.length > 0) allCacheData = [...allCacheData, ...cacheChunk];
+          if (!cacheChunk || cacheChunk.length < 1000) break;
+          cPage++;
+        }
+        setCachedCoordinates(allCacheData);
       }
       
       // Słownik cache dla szybkiego dostępu (ignorujemy wielkość liter i spacje)
@@ -329,23 +399,27 @@ const LogisticsMap = ({ user }) => {
       const retRes = await returnsAPI.getReturns();
       setRequests(retRes || []);
       
-      // 2b. Pobieramy mapowanie MPK
-      let mpkByNip = {};
-      try {
-        const { data: companies } = await supabase.from('companies').select('nip, salesperson_name');
-        const { data: salespeople } = await supabase.from('salespeople').select('name, mpk');
-        if (companies && salespeople) {
-          companies.forEach(c => {
-            if (c.salesperson_name) {
-              const sp = salespeople.find(s => s.name === c.salesperson_name);
-              if (sp && sp.mpk) {
-                mpkByNip[c.nip] = sp.mpk;
+      // 2b. Pobieramy mapowanie MPK (z buforowaniem 20 min)
+      let mpkByNip = !forceRefresh ? getCachedMpkMapping() : null;
+      if (!mpkByNip) {
+        mpkByNip = {};
+        try {
+          const { data: companies } = await supabase.from('companies').select('nip, salesperson_name');
+          const { data: salespeople } = await supabase.from('salespeople').select('name, mpk');
+          if (companies && salespeople) {
+            companies.forEach(c => {
+              if (c.salesperson_name) {
+                const sp = salespeople.find(s => s.name === c.salesperson_name);
+                if (sp && sp.mpk) {
+                  mpkByNip[c.nip] = sp.mpk;
+                }
               }
-            }
-          });
+            });
+            setCachedMpkMapping(mpkByNip);
+          }
+        } catch (err) {
+          console.error('Błąd pobierania danych MPK', err);
         }
-      } catch (err) {
-        console.error('Błąd pobierania danych MPK', err);
       }
 
       const pickupsByLoc = {};
@@ -916,6 +990,8 @@ const LogisticsMap = ({ user }) => {
               is_manual: true,
               is_not_found: false
             }, { onConflict: 'address' });
+
+          updateSingleCoordinateInCache(cacheKey, lat, lng);
         }
 
         // Aktualizuj Bębny po ID - to najbezpieczniejsze i zapewnia, że nie zmienimy innych!
@@ -1111,6 +1187,16 @@ const LogisticsMap = ({ user }) => {
               title="Zresetuj widok do całej Polski"
             >
               Cała Polska
+            </button>
+
+            <button
+              type="button"
+              onClick={() => fetchData(true)}
+              className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 px-3 py-2 rounded-lg text-sm font-semibold transition-colors shrink-0 flex items-center space-x-1"
+              title="Wymuś odświeżenie danych i współrzędnych z bazy"
+            >
+              <RefreshCw className="w-4 h-4 mr-1 text-gray-500" />
+              <span>Odśwież</span>
             </button>
           </div>
         </form>
